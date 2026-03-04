@@ -1,0 +1,10 @@
+{
+  "id": "trade-slash-wrapper",
+  "name": "Trade Slash Wrapper",
+  "description": "Guarantees an immediate /trade acknowledgment, then hands off to a background trade run.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
