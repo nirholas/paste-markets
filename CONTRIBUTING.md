@@ -24,6 +24,7 @@ Keep this repository limited to public install-critical assets for `/trade`.
 - [ ] install/update commands remain accurate for all supported clients
 - [ ] no legacy pre-migration naming in user-facing docs
 - [ ] no secrets/private URLs in committed files
+- [ ] `CHANGELOG.md` updated for every user-visible or runtime-behavior change (under `Unreleased` until release)
 
 ## Validation
 

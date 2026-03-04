@@ -2,6 +2,16 @@
 
 All notable changes to `paste-trade-skill` will be documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Guarded extraction validation in `skill/adapters/board/post.ts` so fresh installs do not fail when `data/extractions` is missing.
+
+### Changed
+
+- Added contribution policy requiring a changelog entry for every user-visible or runtime-behavior change before merge.
+
 ## [1.0.0] - 2026-03-03
 
 ### Added
