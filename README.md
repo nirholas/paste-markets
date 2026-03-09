@@ -123,6 +123,7 @@ docs/install/       Client-specific install guides
 
 ## Docs
 
+- [How it works](ARCHITECTURE.md) — pipeline diagram, field glossary, streaming lifecycle
 - [OpenClaw install/update](docs/install/openclaw.md)
 - [Claude Code install/update](docs/install/claude-code.md)
 - [Codex install/update](docs/install/codex.md)
