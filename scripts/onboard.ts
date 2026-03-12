@@ -23,6 +23,7 @@ interface KeyStatus {
   status: "found" | "provisioned" | "missing" | "failed";
   required: boolean;
   hint?: string;
+  install_command?: string;
 }
 
 /**
@@ -121,10 +122,22 @@ async function run() {
   if (ytDlpInstalled) {
     keys.yt_dlp = { status: "found", required: false };
   } else {
+    // Pick the best install command for this platform
+    let installCmd = "pip3 install yt-dlp";
+    if (process.platform === "darwin") {
+      try {
+        execSync("command -v brew", { stdio: "ignore" });
+        installCmd = "brew install yt-dlp";
+      } catch {
+        // No brew — fall back to pip3
+      }
+    }
+
     keys.yt_dlp = {
       status: "missing",
       required: false,
-      hint: "Required for YouTube video/podcast extraction. Install via: brew install yt-dlp",
+      hint: "Required for YouTube video/podcast extraction.",
+      install_command: installCmd,
     };
   }
 

@@ -50,9 +50,8 @@ npx skills add rohunvora/paste-trade-skill -a codex
 ## Prerequisites
 
 - [Bun](https://bun.sh) runtime
-- `yt-dlp` for YouTube extraction (install via `brew install yt-dlp` or `pip install yt-dlp`)
-- Optional: `GEMINI_API_KEY` for multi-speaker diarization
-- Optional: `X_BEARER_TOKEN` for X/Twitter API (falls back to free extraction without it)
+- `yt-dlp` for YouTube extraction — the skill will offer to install it on first run
+- See [env.example](env.example) for all environment variables (required and optional)
 
 ## Use cases
 

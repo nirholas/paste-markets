@@ -49,6 +49,7 @@ If `status` is `"ready"`, continue to §3.
 If `status` is `"onboarding"`:
 - Greet the user with their handle and paste.trade profile link.
 - For each key with `status: "missing"`, share the `hint` text.
+- For missing items with an `install_command`, offer to run it (e.g., "Want me to install yt-dlp?").
 - Do not gate on optional keys. Tell the user they can add them later and continue.
 - Offer to save keys now: "Want to add any of these? You can paste each key and I'll save it to your .env."
 - If the user pastes a key in reply, append `KEY=value` to the `env_path` from onboard output. Confirm what was saved and where. Never echo the full key value back in chat.
