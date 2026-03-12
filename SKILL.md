@@ -35,6 +35,28 @@ Supporting docs: `references/` (skill index, ASCII map, CLI cheatsheet, routing 
 - For transcript sources, next status line should set duration expectation: `On it. Pulling transcript now. Longer videos can take a few minutes.`
 - After source creation, send: `Watch live: {source_url} (I will post final trades here when done).`
 
+## Preflight
+
+Run before every `/trade`:
+
+```bash
+bun run scripts/onboard.ts
+# Returns: { status, env_path, keys, handle?, profile_url? }
+```
+
+If `status` is `"ready"`, continue to §3.
+
+If `status` is `"onboarding"`:
+- Greet the user with their handle and paste.trade profile link.
+- For each key with `status: "missing"`, share the `hint` text.
+- Do not gate on optional keys. Tell the user they can add them later and continue.
+- Offer to save keys now: "Want to add any of these? You can paste each key and I'll save it to your .env."
+- If the user pastes a key in reply, append `KEY=value` to the `env_path` from onboard output. Confirm what was saved and where. Never echo the full key value back in chat.
+- Re-run `onboard.ts` after saving to verify the key is detected.
+- Then continue to §3 with the original `/trade` input.
+
+If `status` is `"failed"`, stop and show the error. Do not proceed without a working `PASTE_TRADE_KEY`.
+
 ## Core Loop
 
 ### 3 - Classify

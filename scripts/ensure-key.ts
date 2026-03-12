@@ -42,8 +42,7 @@ export async function ensureKey(): Promise<string | null> {
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[paste.trade] Failed to create key (${res.status}): ${errText}`);
+      console.error(`[paste.trade] Failed to create API key. Run \`bun run scripts/onboard.ts\` to set up your account.`);
       return null;
     }
 
@@ -61,12 +60,12 @@ export async function ensureKey(): Promise<string | null> {
     if (saved) {
       console.error(`[paste.trade] Key saved to .env`);
     } else {
-      console.error(`[paste.trade] Could not save to .env — add manually: PASTE_TRADE_KEY=${api_key}`);
+      console.error(`[paste.trade] Could not save to .env. Run \`bun run scripts/onboard.ts\` to set up your account.`);
     }
 
     return api_key;
   } catch (err) {
-    console.error(`[paste.trade] Network error creating key:`, (err as Error).message);
+    console.error(`[paste.trade] Failed to create API key. Run \`bun run scripts/onboard.ts\` to set up your account.`);
     return null;
   }
 }
@@ -79,7 +78,7 @@ function findEnvPaths(): string[] {
 }
 
 /** Append PASTE_TRADE_KEY to the best .env file. Returns true if saved. */
-function saveKeyToEnv(apiKey: string): boolean {
+export function saveKeyToEnv(apiKey: string): boolean {
   const line = `\nPASTE_TRADE_KEY=${apiKey}\n`;
 
   // Try each candidate path — append to first one that exists
