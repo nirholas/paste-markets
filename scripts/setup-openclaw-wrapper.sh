@@ -60,9 +60,7 @@ echo "Installing OpenClaw wrapper plugin from ${PLUGIN_PATH}"
 openclaw plugins install --link "${PLUGIN_PATH}"
 merge_allowlist
 
-echo "Restarting OpenClaw gateway"
-openclaw gateway restart
-
-echo "Wrapper setup complete. Verify with:"
+echo "Wrapper setup complete. The gateway will detect the config change and reload automatically."
+echo "Verify with:"
 echo "  openclaw plugins info ${PLUGIN_ID}"
 echo "  openclaw skills info trade"
