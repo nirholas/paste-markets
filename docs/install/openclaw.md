@@ -2,8 +2,10 @@
 
 ## Install
 
-```bash
-npx skills add rohunvora/paste-trade-skill -a openclaw
+Paste the repo URL into your agent:
+
+```
+https://github.com/rohunvora/paste-trade-skill
 ```
 
 ## Required OpenClaw-only bridge setup
@@ -46,8 +48,10 @@ X login is optional and should not block first run.
 
 ## Update
 
-```bash
-npx skills add rohunvora/paste-trade-skill -a openclaw
+Paste the repo URL into your agent again:
+
+```
+https://github.com/rohunvora/paste-trade-skill
 ```
 
 Then rerun wrapper setup:

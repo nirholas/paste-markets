@@ -69,7 +69,10 @@ Use `.scratch/` for all temporary artifacts. It's gitignored. Never commit files
 
 ## Install contract
 
-```bash
-npx skills add rohunvora/paste-trade-skill -a <client>
+Paste the repo URL into your agent:
+
 ```
-Supported clients: `openclaw`, `claude-code`, `codex`. If install/update commands change, update `README.md` and all three `docs/install/*.md` files.
+https://github.com/rohunvora/paste-trade-skill
+```
+
+Supported clients: OpenClaw, Claude Code, Codex. OpenClaw additionally requires running the wrapper setup script after install. If install/update commands change, update `README.md` and all three `docs/install/*.md` files.

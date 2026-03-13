@@ -18,33 +18,26 @@ OpenClaw needs one extra OpenClaw-only component: an async command bridge that
 acknowledges `/trade` immediately and then hands the real run off in background.
 If you are not using OpenClaw, ignore that step completely.
 
+### Claude Code / Codex
+
+Paste the repo URL into your agent:
+
+```
+https://github.com/rohunvora/paste-trade-skill
+```
+
 ### OpenClaw
 
-OpenClaw-only extra:
-- installs the `trade` skill
-- installs the `trade-slash-wrapper` bridge plugin
-- makes `/trade` feel instant in chat while the real run continues in background
+Paste the repo URL into your agent:
 
-```bash
-npx skills add rohunvora/paste-trade-skill -a openclaw
+```
+https://github.com/rohunvora/paste-trade-skill
 ```
 
 Then install/enable the bundled wrapper plugin:
 
 ```bash
 bash ~/.openclaw/skills/trade/scripts/setup-openclaw-wrapper.sh
-```
-
-### Claude Code
-
-```bash
-npx skills add rohunvora/paste-trade-skill -a claude-code
-```
-
-### Codex
-
-```bash
-npx skills add rohunvora/paste-trade-skill -a codex
 ```
 
 ## Prerequisites
@@ -82,23 +75,26 @@ Direct thesis (raw market observation):
 
 ## Update
 
+### Claude Code / Codex
+
+Paste the repo URL into your agent again:
+
+```
+https://github.com/rohunvora/paste-trade-skill
+```
+
 ### OpenClaw
 
+Paste the repo URL into your agent again:
+
+```
+https://github.com/rohunvora/paste-trade-skill
+```
+
+Then rerun wrapper setup:
+
 ```bash
-npx skills add rohunvora/paste-trade-skill -a openclaw
 bash ~/.openclaw/skills/trade/scripts/setup-openclaw-wrapper.sh
-```
-
-### Claude Code
-
-```bash
-npx skills add rohunvora/paste-trade-skill -a claude-code
-```
-
-### Codex
-
-```bash
-npx skills add rohunvora/paste-trade-skill -a codex
 ```
 
 ## Account portability
