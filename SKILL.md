@@ -105,7 +105,7 @@ bun run skill/scripts/extract.ts "URL"
 Create the source page as soon as you know the source metadata:
 
 ```bash
-bun run skill/scripts/create-source.ts '{ "url": "...", "title": "...", "platform": "...", "author_handle": "...", "source_date": "...", "source_images": [...], "body_text": "...", "word_count": N, "duration_seconds": N, "speakers_count": N }'
+bun run skill/scripts/create-source.ts '{ "url": "...", "title": "...", "platform": "...", "author_handle": "...", "author_avatar_url": "...", "source_date": "...", "source_images": [...], "body_text": "...", "word_count": N, "duration_seconds": N, "speakers_count": N }'
 # Returns: { source_id, source_url, status: "processing", run_id }
 ```
 
@@ -122,6 +122,7 @@ bun run skill/scripts/create-source.ts '{ "url": "...", "title": "...", "platfor
 
 - `author_handle` here means the source publisher/channel handle.
 - YouTube uses `channel_handle`, not a guest speaker.
+- `author_avatar_url` is the author's profile picture URL from extract output. Always include it — the source page and feed cards display it immediately.
 - `body_text` is the **full original source text** (e.g., the complete tweet, article body). Always include it — the source page displays it verbatim.
 - `word_count`, `duration_seconds`, `speakers_count` are optional extraction metadata for the live stats bar.
 - Save `run_id` and thread it through every later adapter call for this source run.
