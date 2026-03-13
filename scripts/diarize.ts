@@ -435,9 +435,9 @@ async function processAudio(
       )
     );
 
-    // Parallel diarize all chunks
+    // Parallel diarize all chunks — allSettled so one failure doesn't kill the rest
     slog(`Diarizing ${chunks.length} chunks in parallel...`);
-    const diarizeResults = await Promise.all(
+    const settled = await Promise.allSettled(
       uploadResults.map((uploaded, i) =>
         diarizeOneFile(
           uploaded.uri,
@@ -448,9 +448,45 @@ async function processAudio(
       )
     );
 
-    // Merge results
-    slog(`Merging ${chunks.length} chunks...`);
-    finalResult = mergeChunkResults(diarizeResults);
+    // Collect successes, retry failures once
+    const succeeded: { chunk: Chunk; result: DiarizeResult }[] = [];
+    const failedIndices: number[] = [];
+    for (let i = 0; i < settled.length; i++) {
+      if (settled[i].status === "fulfilled") {
+        succeeded.push((settled[i] as PromiseFulfilledResult<{ chunk: Chunk; result: DiarizeResult }>).value);
+      } else {
+        failedIndices.push(i);
+      }
+    }
+
+    if (failedIndices.length > 0 && failedIndices.length < chunks.length) {
+      slog(`${failedIndices.length} chunk(s) failed, retrying...`);
+      const retries = await Promise.allSettled(
+        failedIndices.map((i) =>
+          diarizeOneFile(
+            uploadResults[i].uri,
+            uploadResults[i].mimeType,
+            apiKey,
+            `chunk ${i + 1}/${chunks.length} (retry)`
+          ).then((result) => ({ chunk: chunks[i], result }))
+        )
+      );
+      for (const r of retries) {
+        if (r.status === "fulfilled") succeeded.push(r.value);
+      }
+    }
+
+    if (succeeded.length === 0) {
+      throw new Error("All diarization chunks failed");
+    }
+
+    if (succeeded.length < chunks.length) {
+      slog(`${succeeded.length}/${chunks.length} chunks diarized, filling gaps from captions`);
+    }
+
+    // Merge successful chunks
+    slog(`Merging ${succeeded.length} chunks...`);
+    finalResult = mergeChunkResults(succeeded);
 
     // Cleanup chunk files
     for (const chunk of chunks) {
