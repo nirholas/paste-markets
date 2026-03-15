@@ -5,6 +5,14 @@ Versioning note:
 - the March 5 rewrite was previously tracked internally as `2.0.0`
 - install commands use the bare repo path (no version tag)
 
+## [1.2.5] - 2026-03-15
+
+Breaking news chain trading.
+
+### Changed
+
+- `references/fast.md` — "Think in chains": route 2nd and 3rd order effects when the causal chain is clear, not just the direct trade. Removes prescriptive steps, higher abstraction.
+
 ## [1.2.4] - 2026-03-13
 
 Shared chat contract rollback after wrapper overreach.

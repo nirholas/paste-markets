@@ -3,8 +3,6 @@
 Loaded by sparse.md when the source is breaking news with an obvious asset impact.
 Handles extraction through routing. Return to SKILL.md §10 Post when done.
 
-If the thesis needs decomposition or the asset isn't obvious, go back to sparse.md's full tree.
-
 ## Principles
 
 **Parallel, not serial.** Fire every independent tool call in the same response.
@@ -17,11 +15,13 @@ Never stream "Researching..." or "Routing..." — those say nothing.
 
 **Fewer decisions.** The thesis is the headline. Save it, research it, route it, post it.
 
+**Think in chains.** One event causes many things to move. The direct trade is obvious — the market prices it fast. The higher r/r is often in what moves next: second and third-order effects the market hasn't connected yet. Route as many orders of the chain as you can see clearly.
+
 ## Flow
 
 1. Identify the trade from the headline. Save the thesis immediately.
 2. In the same response: discover instruments (HL + PM), web search to verify and size the impact, and stream your initial read via stream-thought.
-3. Read results. Route the primary ticker. If research changed your read, stream what changed and why. If a relevant PM contract exists, save it as an additive thesis.
+3. Read results. Route the primary ticker. If research reveals downstream effects worth trading, save those as additional theses and route them too.
 4. Update with derivation, post, finalize.
 
 Use the same schema, derivation rules, and validation from sparse.md.
