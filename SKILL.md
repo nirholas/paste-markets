@@ -470,12 +470,14 @@ Useful optional `trade_data` fields:
 
 For Polymarket trades, also include:
 
-- `pm_side`: `"yes"` or `"no"` — which contract was bought
-- `pm_yes_no_price`: 0-1 contract price
+- `outcome`: `"yes"` or `"no"` — canonical field for which token was bought
+- `pm_side`: `"yes"` or `"no"` — legacy compatibility alias for `outcome`
+- `pm_yes_no_price`: raw YES price in the 0-1 range
 
 ### Notes
 
-- Card price is the underlying asset price at `author_date`
+- Card price is the canonical entry price at `author_date`
+- For Polymarket, that means the held-side token price: YES price for YES trades, NO price for NO trades
 - API warnings are real feedback; notice them and fix obvious quality problems before moving on
 - Keep `run_id` explicit throughout the run. Do not rely on implicit context lookup.
 

@@ -216,7 +216,7 @@ interface BackendAssessMinimal {
 
 /** Enrich author_price from the assess endpoint if missing.
  *  The assess endpoint returns the historical price at author_date for the given ticker.
- *  Only needed for stocks/perps — PM trades set author_price from the contract price. */
+ *  Only needed for stocks/perps — PM trades set author_price from their held-side token price. */
 async function enrichBaselineViaAssess(
   tradeBody: Record<string, unknown>,
   baseUrl: string,
@@ -428,8 +428,9 @@ if (!apiKey) {
 // Skip /api/skill/assess enrichment (Yahoo Finance) which would corrupt them.
 const platform = typeof body.platform === "string" ? body.platform : "";
 if (platform === "polymarket") {
-  // Capture pm_side before normalizing direction (YES/NO → long/short)
+  // Capture outcome before normalizing direction (YES/NO → long/short)
   if (body.direction === "yes" || body.direction === "no") {
+    body.outcome = body.direction;
     body.pm_side = body.direction;
   }
   // Normalize PM direction: skill LLM may output "yes"/"no" instead of "long"/"short"
@@ -438,12 +439,17 @@ if (platform === "polymarket") {
   // Normalize PM instrument: must be "polymarket" for frontend display (YES/NO, cent pricing, PmBlock)
   if (typeof body.instrument === "string" && body.instrument !== "polymarket") body.instrument = "polymarket";
 
-  // Contract price: pm_yes_no_price is the YES token price (0-1).
-  // author_price also gets set to this value for P&L computation.
-  const buyPrice = toFiniteNumber(body.buy_price_usd ?? body.pm_yes_no_price);
-  if (buyPrice != null && buyPrice > 0 && buyPrice <= 1) {
-    body.pm_yes_no_price = buyPrice;
-    body.author_price = buyPrice;
+  // Determine which outcome this trade is buying.
+  const pmOutcome: string = body.outcome ?? (body.direction === "short" ? "no" : "yes");
+  body.outcome = pmOutcome;
+  body.pm_side = pmOutcome; // backward compat
+
+  // Public distribution stays API-only.
+  // Route output provides the raw YES price; convert it into the held-side entry price.
+  const yesPrice = toFiniteNumber(body.buy_price_usd ?? body.pm_yes_no_price);
+  if (yesPrice != null && yesPrice > 0 && yesPrice <= 1) {
+    body.author_price = pmOutcome === "no" ? 1 - yesPrice : yesPrice;
+    body.pm_yes_no_price = yesPrice; // legacy compat — raw YES price
   }
   // Warn if PM price looks like a stock price (should be 0-1 probability)
   const pubPrice = toFiniteNumber(body.author_price);

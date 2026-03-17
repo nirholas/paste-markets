@@ -102,13 +102,15 @@ When routing to Polymarket, the trade needs specific fields:
 - `ticker`: the market slug from discover.ts output (e.g., "us-recession-by-end-of-2026"). Never invent a slug — use exactly what discover.ts returned.
 - `platform`: "polymarket"
 - `instrument`: "polymarket" (this is `trades.instrument`, not `tickers.instrument_type`)
-- `author_price`: set to the contract price (0-1)
+- `author_price`: the held-side entry price (0-1). YES trades use YES price; NO trades use NO price.
 - `direction`: "long" means buying YES, "short" means buying NO
-- `pm_side`: "yes" or "no" — captured automatically by post.ts from direction before normalization
+- `outcome`: "yes" or "no" — canonical field, captured automatically by post.ts from direction before normalization
+- `pm_side`: "yes" or "no" — legacy alias still written for backward compatibility
 
 **Stored in `trade_data` JSON:**
-- `pm_yes_no_price`: the contract price (0-1 range)
-- `pm_side`: "yes" or "no" — which contract was bought
+- `pm_yes_no_price`: the raw YES price (0-1 range)
+- `outcome`: "yes" or "no" — canonical field for which contract was bought
+- `pm_side`: "yes" or "no" — legacy alias for `outcome`
 - `market_slug`: for deeplinks back to Polymarket
 - `condition_id`: **required** — the contract identifier from discover.ts results. Without this, the trade cannot price. Copy verbatim from discover.ts output.
 - `market_question`: the full market question text
@@ -116,4 +118,5 @@ When routing to Polymarket, the trade needs specific fields:
 
 Do NOT call `enrichBaselineViaAssess` for PM trades — it calls `/api/skill/assess`
 which internally uses Yahoo Finance and will corrupt the PM contract price.
-The contract price from the PM market IS the canonical `author_price`.
+The raw PM quote is the YES price. `post.ts` converts it into canonical held-side
+`author_price` and keeps the raw YES quote in `pm_yes_no_price` for compatibility.

@@ -5,6 +5,19 @@ Versioning note:
 - the March 5 rewrite was previously tracked internally as `2.0.0`
 - install commands use the bare repo path (no version tag)
 
+## [1.2.7] - 2026-03-17
+
+Polymarket held-side pricing sync.
+
+### Fixed
+
+- `scripts/post.ts` — Polymarket posts now preserve canonical `outcome`, keep `pm_side` only for backward compatibility, and convert the raw YES quote into held-side `author_price` so NO trades store NO cost instead of YES price
+- `shared/pnl.ts` — Polymarket P&L now follows the held-side convention used by the app: YES and NO both use long-style math against the price of the token actually bought
+
+### Changed
+
+- `SKILL.md`, `references/prediction-markets.md`, and `references/index/trade-index.md` now document `outcome` as the canonical PM side field and clarify that `pm_yes_no_price` remains the raw YES quote only for compatibility
+
 ## [1.2.6] - 2026-03-17
 
 OpenClaw same-chat queueing and queued-run delivery hardening.

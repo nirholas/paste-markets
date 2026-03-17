@@ -95,12 +95,13 @@ These three fields nest inside a `derivation` object: `{ explanation, segments, 
 | # | Field | What it is | Set when | Changes when | Used in |
 |---|-------|-----------|----------|-------------|---------|
 | 36 | `market_question` | The question the contract is asking | route.ts returns it (§9) | Never | Trade card |
-| 37 | `buy_price_usd` | Cost per YES contract, 0 to 1 (e.g. $0.35 = 35% implied probability) | route.ts returns it (§9) | Never | Trade card. This IS the `publish_price` for PM trades |
+| 37 | `buy_price_usd` | Raw YES price from route.ts, 0 to 1 (e.g. $0.35 = 35% implied probability) | route.ts returns it (§9) | Never | Input to `post.ts`. For NO trades, `post.ts` converts this to held-side `author_price` as `1 - buy_price_usd` |
+| 37a | `outcome` | Which PM token the trade is actually buying: `yes` or `no` | post.ts derives it from direction before normalization | Never | Canonical PM side for price and P&L semantics |
 | 38 | `market_slug` | URL-safe identifier for the Polymarket market page | route.ts returns it (§9) | Never | Trade card deeplink |
 | 39 | `volume_usd` | How much money is trading on this contract | route.ts returns it (§9) | Never | Liquidity flag. Flag < $1K as low-liquidity |
 | 40 | `end_date` | When the contract resolves | route.ts returns it (§9) | Never | Trade card. This is NOT `source_date` |
 | 41 | `condition_id` | Polymarket's internal contract identifier | route.ts returns it (§9) | Never | Live price lookup by backend |
-| 41b | `market_implied_prob` | Implied probability derived from `buy_price_usd` (e.g. $0.35 = 35%) | Backend computes from buy price at POST time | Never | Frontend price reference for PM trades. Stored in `trade_data` blob |
+| 41b | `market_implied_prob` | Implied probability derived from the raw YES quote `buy_price_usd` (e.g. $0.35 = 35%) | Backend computes from buy price at POST time | Never | Raw probability reference. Stored in `trade_data` blob |
 
 ## Output-only (assembled at post time)
 

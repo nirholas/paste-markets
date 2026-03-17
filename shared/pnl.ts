@@ -9,20 +9,26 @@
  */
 
 /**
- * Derive pm_side from trade_data blob fields.
- * Centralizes the fallback logic: explicit pm_side → infer from buy_price_usd + direction → null.
+ * Derive PM outcome (yes/no) from trade_data blob fields.
+ * Centralizes the fallback logic: outcome → pm_side → infer from direction → null.
  * Used by db-helpers (unpackRow), feed-ranking (fetchRankableTrades), leaderboard-refresh.
  */
-export function derivePmSide(
+export function derivePmOutcome(
   tradeData: Record<string, any>,
   direction: string,
+  platform?: string | null,
 ): "yes" | "no" | null {
+  if (tradeData.outcome) return tradeData.outcome;
   if (tradeData.pm_side) return tradeData.pm_side;
-  if (tradeData.buy_price_usd != null) {
+  // Infer from direction for legacy PM trades when the caller already knows it's PM.
+  if (platform === "polymarket" || tradeData.platform === "polymarket" || tradeData.condition_id || tradeData.market_slug) {
     return direction === "short" ? "no" : "yes";
   }
   return null;
 }
+
+/** @deprecated Use derivePmOutcome instead. Kept for backward compat. */
+export const derivePmSide = derivePmOutcome;
 
 /** Minimal trade shape required for P&L calculation. */
 export interface PnlTrade {
@@ -34,34 +40,36 @@ export interface PnlTrade {
   pm_side?: "yes" | "no" | string | null;
 }
 
+export type PnlLens = "author" | "platform";
+
 /** Whether a trade is a Hyperliquid perpetual (eligible for leverage multiplication). */
 export function isHlPerp(trade: { instrument?: string | null; platform?: string | null }): boolean {
   return trade.instrument === 'perps' || (trade.platform === 'hyperliquid' && trade.instrument !== 'polymarket');
 }
 
+function isPmTrade(trade: { instrument?: string | null; platform?: string | null }): boolean {
+  return trade.instrument === "polymarket" || trade.platform === "polymarket";
+}
+
 /**
  * Core P&L math. Shared by both lenses.
  *
- * For Polymarket: pm_side determines the formula.
- *   YES = long-style (profit when price rises)
- *   NO  = inverted (profit when YES price drops, denominator is NO cost = 1 - base)
+ * "Track what you hold" convention:
+ *   - basePrice and currentPrice are always the HELD-SIDE price.
+ *   - For stocks/crypto: held side = the asset itself.
+ *   - For Polymarket: held side = the token you bought (YES or NO).
+ *     Both YES and NO tokens profit when their price rises,
+ *     so PM always uses long-style math regardless of direction.
  *
- * For everything else: direction determines the formula.
+ * For stocks/crypto/perps: direction determines the formula.
  *   long  = profit when price rises
  *   short = profit when price falls
  */
-function computePnl(currentPrice: number, basePrice: number, trade: PnlTrade): number | null {
+export function computePnlFromBase(currentPrice: number, basePrice: number, trade: PnlTrade): number | null {
   if (!basePrice || !currentPrice || basePrice <= 0 || currentPrice <= 0) return null;
 
-  // Polymarket: use pm_side (explicit), fall back to direction if pm_side not set
-  if (trade.instrument === "polymarket") {
-    const side = trade.pm_side ?? (trade.direction === "short" ? "no" : "yes");
-    if (side === "no") {
-      const noCost = 1 - basePrice;
-      if (noCost <= 0) return null;
-      return ((basePrice - currentPrice) / noCost) * 100;
-    }
-    // YES = long-style
+  // Polymarket: prices are the held token cost. Profit = price increase.
+  if (isPmTrade(trade)) {
     return ((currentPrice - basePrice) / basePrice) * 100;
   }
 
@@ -77,7 +85,7 @@ function computePnl(currentPrice: number, basePrice: number, trade: PnlTrade): n
  * Base = author_price (price when the author originally said it).
  */
 export function computeAuthorPnl(currentPrice: number, trade: PnlTrade): number | null {
-  return computePnl(currentPrice, trade.author_price, trade);
+  return computePnlFromBase(currentPrice, trade.author_price, trade);
 }
 
 /**
@@ -87,7 +95,20 @@ export function computeAuthorPnl(currentPrice: number, trade: PnlTrade): number 
  */
 export function computePostedPnl(currentPrice: number, trade: PnlTrade): number | null {
   if (!trade.posted_price) return null;
-  return computePnl(currentPrice, trade.posted_price, trade);
+  return computePnlFromBase(currentPrice, trade.posted_price, trade);
+}
+
+/** Resolve P&L for the active lens.
+ *  Platform lens falls back to author lens when posted_price is unavailable. */
+export function computePnlForLens(
+  currentPrice: number,
+  trade: PnlTrade,
+  lens: PnlLens,
+): number | null {
+  if (lens === "platform") {
+    return computePostedPnl(currentPrice, trade) ?? computeAuthorPnl(currentPrice, trade);
+  }
+  return computeAuthorPnl(currentPrice, trade);
 }
 
 /**
