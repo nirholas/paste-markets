@@ -443,6 +443,22 @@ if (platform === "polymarket") {
   const pmOutcome: string = body.outcome ?? (body.direction === "short" ? "no" : "yes");
   body.outcome = pmOutcome;
   body.pm_side = pmOutcome; // backward compat
+  // Normalize direction to match outcome — "long" = YES, "short" = NO
+  body.direction = pmOutcome === "no" ? "short" : "long";
+
+  // Sync canonical PM fields into trade_data so the backend finds them
+  // where it reads (tradeDataFields = body.trade_data). The LLM may put
+  // these at top-level only; this ensures they're in both places.
+  if (body.trade_data && typeof body.trade_data === "object") {
+    body.trade_data.outcome = pmOutcome;
+    body.trade_data.pm_side = pmOutcome;
+    if (body.condition_id && !body.trade_data.condition_id) {
+      body.trade_data.condition_id = body.condition_id;
+    }
+    if (body.market_slug && !body.trade_data.market_slug) {
+      body.trade_data.market_slug = body.market_slug;
+    }
+  }
 
   // Public distribution stays API-only.
   // Route output provides the raw YES price; convert it into the held-side entry price.
