@@ -4,7 +4,7 @@ Rules for sparse sources: tweets, user-typed theses, screenshots, single claims.
 Read when SKILL.md routes here at §6. Handles extraction through routing (§6-§9).
 Return to SKILL.md at §10 Post.
 
-## 
+## Reasoning Tree
 
 You will use the sparse source as the starting point to fill out the thesis.json by using Reasoning Tree.
 

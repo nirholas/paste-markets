@@ -58,11 +58,12 @@ Every tool call emits events to the source page via WebSocket. The LLM never dec
 Each thesis card on the source page follows this state machine. Cards appear as unrouted candidates (step 4), resolve independently as routing completes (step 5), and finalize when posted (step 6).
 
 **Event types:**
-- `started`, `extracted`, `enriching` — phase progress
+- `status`, `extraction_complete`, `enriching` — phase progress
 - `source_updated` — metadata push (author, date, thumbnail)
-- `thesis_saved`, `thesis_routing`, `thesis_routed`, `thesis_dropped` — per-thesis lifecycle
+- `thought` — narration/insight messages
+- `thesis_found`, `thesis_routing`, `thesis_routed`, `thesis_dropped` — per-thesis lifecycle
 - `trade_posted` — trade is live
-- `done`, `error` — terminal states
+- `done`, `failed`, `error` — terminal states
 
 ---
 
@@ -96,8 +97,7 @@ The skill uses two main data shapes. Here's what each field means in plain Engli
 | `instrument` | `shares` (stocks on Robinhood), `perps` (perpetual futures on Hyperliquid), or `prediction_market` (Polymarket) |
 | `platform` | Where to execute: `robinhood`, `hyperliquid`, or `polymarket` |
 | `trade_type` | `direct` (the author basically named it) or `derived` (the AI connected the dots) |
-| `publish_price` | Price when the source was published — this is the "entry" price on the card |
-| `source_date_price` | Same as publish_price (historical name) |
+| `author_price` | Price at the author's publish date — this is the "entry" price on the card |
 | `since_published_move_pct` | How much the price has moved since the source was published |
 | `fallback_reason_tag` | If the AI picked a proxy ticker instead of the obvious one, why |
 

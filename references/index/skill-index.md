@@ -27,22 +27,23 @@ Core data objects:
 ## Sections
 
 
-| #   | Title      | Lines   | Flow focus                                                                |
-| --- | ---------- | ------- | ------------------------------------------------------------------------- |
-| 0   | Intro      | 16-20   | Run-wide narration and supporting refs                                    |
-| 1   | Defaults   | 22-28   | Global trade and reply defaults                                           |
-| 2   | Chat UX    | 30-35   | Live status messaging                                                     |
-| 3   | Classify   | 39-43   | Input type -> workflow branch                                             |
-| 4   | Extract    | 45-84   | Raw source -> extract output -> source run                                |
-| 5   | Enrich     | 86-109  | Source run + transcript -> enriched metadata                              |
-| 6   | Theses     | 111-190 | Transcript -> thesis records                                              |
-| 7   | Research   | 192-298 | Thesis records -> route evidence (dense only; sparse in sparse.md)        |
-| 8   | Narrate    | 300-337 | Source + research -> derivation (dense only; sparse in sparse.md)         |
-| 9   | Price      | 339-369 | Route output -> persisted route package (dense only; sparse in sparse.md) |
-| 10  | Post       | 371-403 | Route package -> post/finalize payloads                                   |
-| 11  | Contract   | 405-451 | Field-level post/finalize contract                                        |
-| 12  | Reply      | 453-477 | Saved trade data -> final chat reply                                      |
-| 13  | Hard Rules | 479-485 | Run-wide guardrails                                                       |
+| #   | Title      | Lines     | Flow focus                                                                |
+| --- | ---------- | --------- | ------------------------------------------------------------------------- |
+| 0   | Intro      | 16-20     | Run-wide narration and supporting refs                                    |
+| 1   | Defaults   | 22-29     | Global trade and reply defaults                                           |
+| 2   | Chat UX    | 31-39     | Live status messaging                                                     |
+| —   | Preflight  | 41-64     | Bun check + onboard.ts                                                    |
+| 3   | Classify   | 68-73     | Input type -> workflow branch                                             |
+| 4   | Extract    | 75-117    | Raw source -> extract output -> source run                                |
+| 5   | Enrich     | 119-142   | Source run + transcript -> enriched metadata                              |
+| 6   | Theses     | 144-219   | Transcript -> thesis records                                              |
+| 7   | Research   | 221-325   | Thesis records -> route evidence (dense only; sparse in sparse.md)        |
+| 8   | Narrate    | 327-364   | Source + research -> derivation (dense only; sparse in sparse.md)         |
+| 9   | Price      | 366-397   | Route output -> persisted route package (dense only; sparse in sparse.md) |
+| 10  | Post       | 399-431   | Route package -> post/finalize payloads                                   |
+| 11  | Contract   | 433-482   | Field-level post/finalize contract                                        |
+| 12  | Reply      | 484-508   | Saved trade data -> final chat reply                                      |
+| 13  | Hard Rules | 510-516   | Run-wide guardrails                                                       |
 
 
 ---

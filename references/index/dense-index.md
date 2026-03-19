@@ -6,19 +6,17 @@ Companion to [skill-index.md](skill-index.md) — dense.md handles §5-§9 for d
 
 ## Sections
 
-| #    | Title              | Lines   | What happens                                      |
-| ---- | ------------------ | ------- | ------------------------------------------------- |
-| d-0  | Intro              | 1-7     | Scope, routing from SKILL.md, guiding principle   |
-| d-1  | Enrich             | 9-32    | Diarization, speaker identity, transcript upload  |
-| d-2  | Extract            | 34-61   | First pass, decompose, batch save, thesis map     |
-| d-3  | Fill this out      | 62-95   | Target JSON shape for each routed thesis          |
-| d-4  | Route tree         | 96-129  | Per-thesis flow: research → evaluate → save       |
-| d-5  | Research tools     | 131-140 | discover.ts, source-excerpt.ts, web search detail |
-| d-6  | Instrument pref    | 141-152 | Venue ranking + caveats                           |
-| d-7  | Directness         | 153-157 | direct vs derived definitions                     |
-| d-8  | Route command      | 158-168 | route.ts CLI + price handling                     |
-| d-9  | Narration rules    | 169-190 | derivation JSON shape + provenance rules          |
-| d-10 | Update checklist   | 191-208 | Pre-save validation + save.ts --update            |
+| #    | Title              | Lines     | What happens                                      |
+| ---- | ------------------ | --------- | ------------------------------------------------- |
+| d-0  | Intro              | 1-7       | Scope, routing from SKILL.md, guiding principle   |
+| d-1  | Enrich             | 9-46      | Diarization, speaker identity, transcript upload  |
+| d-2  | Extract            | 48-85     | First pass, decompose, batch save, thesis map     |
+| d-3  | Route each thesis  | 87-141    | Target JSON + per-thesis flow diagram             |
+| d-4  | Research           | 143-183   | discover.ts, source-excerpt.ts, web search        |
+| d-5  | Evaluate + select  | 185-219   | Instrument preference, directness, requirements   |
+| d-6  | Route + price      | 221-239   | route.ts CLI + mapping rules                      |
+| d-7  | Narrate            | 241-272   | Derivation JSON shape + provenance rules          |
+| d-8  | Validate and save  | 274-293   | Pre-save checklist + save.ts --update             |
 
 ---
 
