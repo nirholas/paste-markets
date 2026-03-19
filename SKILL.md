@@ -149,7 +149,7 @@ Read the canonical source artifact and find every tradeable thesis.
 A thesis is a directional belief about what changes and what that means for price.
 
 #### Extraction
-- **Dense source** (podcast, article, PDF): → read `references/dense.md` for three-pass extraction, thesis map, parallelization, and chunking.
+- **Dense source** (podcast, article, PDF): handled by `references/dense.md` (entered at §5). Covers extraction through routing. Resume at §10 Post.
 - **Sparse source** (tweet, user thesis, screenshot): → read `references/sparse.md`. Handles extraction through routing (§6-§9). Resume at §10 Post.
 
 Both paths use the thesis schema and save commands below.
@@ -220,6 +220,7 @@ Do not use routing difficulty as a filter at extraction time. Capture first, the
 
 ### 7 - Research
 
+Dense sources: §7-§9 are handled in `references/dense.md` (d-3 through d-8). Skip to §10.
 Sparse sources: §7-§9 are handled in `references/sparse.md`. Skip to §10.
 
 For each thesis, determine the best executable expression on supported venues.

@@ -265,7 +265,7 @@ Steps should earn the conclusion, not summarize it. If the speaker named the tic
 - Provenance: has `segment` = sourced from quote, has `url` = backed by research, has neither = agent inference
 - When a step depends on external research or a factual check, embed the source inline as numbered Markdown citations: `[1](url)`, `[2](url)`; treat this as part of the format, not decoration
 - `url` on a step is a fallback when numbered inline linking does not fit
-- 2-4 steps. Each step must advance the chain. If you can remove a step and the conclusion still follows, it was filler.
+- 2-3 steps. Each step must advance the chain. If you can remove a step and the conclusion still follows, it was filler.
 - At least one step must cite external research (web search, not the source itself). A derivation backed only by speaker quotes is a restatement, not a verified thesis.
 - Be honest when a step is your own inference
 - Video/podcast: every segment MUST include `timestamp` (MM:SS or H:MM:SS from diarized transcript) and `source_url` (the video URL). These power click-to-seek on the source page. Resolve speaker X handles when it materially helps attribution.

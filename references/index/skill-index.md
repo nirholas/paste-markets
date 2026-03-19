@@ -307,7 +307,7 @@ Rules:
 | 8d  | 331  | Provenance: segment = sourced, url = researched, neither = inference | in: step fields (`segment`/`url`)         |      |
 | 8e  | 332  | Inline numbered citations: [1](url), [2](url)                        | in: research URLs                         |      |
 | 8f  | 333  | url on step is fallback when inline doesn't fit                      | in: research URL                          |      |
-| 8g  | 334  | 2-5 steps                                                            | in: `derivation.steps[]`                  |      |
+| 8g  | 334  | 2-3 steps                                                            | in: `derivation.steps[]`                  |      |
 | 8h  | 335  | Be honest when step is your own inference                            | in: inference steps                       |      |
 | 8i  | 336  | User thesis: their words are the segment, speaker: "user"            | in: user-thesis path (3b)                 |      |
 | 8j  | 337  | Video/podcast: timestamps + resolve speaker X handles                | in: video/podcast transcript + 5j handles |      |
@@ -346,7 +346,7 @@ Post rules:
 | --- | ---- | ------------------------------------------------------------------------- | ------------------------------------------------------- | ---- |
 | 10a | 381  | headline_quote must exactly match one saved quotes[]                      | in: saved `quotes[]` + post payload `headline_quote`    |      |
 | 10b | 382  | ticker/direction/instrument/platform/trade_type must match route_evidence | in: `route_evidence.selected_expression` + post payload |      |
-| 10c | 383  | Carry source_date_price and since_published_move_pct from route           | in: route `price_context`                               |      |
+| 10c | 383  | Carry author_price from route price_context                               | in: route `price_context`                               |      |
 | 10d | 384  | post.ts baseline backfill is fallback, not primary                        | in: incomplete post payload                             |      |
 
 
@@ -375,9 +375,7 @@ Required fields:
 | --- | ---- | ----------------------------------------------------- | ----------------------------------------------------- | ---- |
 | 11a | 411  | ticker (use routed_ticker if returned)                | in: 7p `routed_ticker` / `selected_expression.ticker` |      |
 | 11b | 412  | direction (long/short)                                | in: `selected_expression.direction`                   |      |
-| 11c | 413  | publish_price (source_date_price from route)          | in: route `price_context.source_date_price`           |      |
-| 11d | 414  | source_date_price (required for baseline P&L)         | in: route `price_context.source_date_price`           |      |
-| 11e | 415  | since_published_move_pct (required when available)    | in: route `price_context.since_published_move_pct`    |      |
+| 11c | 413  | author_price (price at author's publish date)         | in: route `price_context.author_price`                |      |
 | 11f | 416  | thesis                                                | in: thesis record `thesis`                            |      |
 | 11g | 417  | headline_quote (exact match to quotes[], <=120 chars) | in: thesis record `headline_quote`/`quotes[]`         |      |
 | 11h | 418  | ticker_context (1-3 sentences, no jargon)             | in: selected expression + research/proxy reasoning    |      |
@@ -409,7 +407,7 @@ Notes:
 
 | ID  | Line | Rule                                                 | Flow                                  | File |
 | --- | ---- | ---------------------------------------------------- | ------------------------------------- | ---- |
-| 11w | 449  | Card price = underlying at source_date               | in: 11d `source_date_price`           |      |
+| 11w | 449  | Card price = underlying at author_date               | in: 11c `author_price`                |      |
 | 11x | 450  | API warnings are real feedback, fix before moving on | in: save/post/finalize warning output |      |
 | 11y | 451  | Keep run_id explicit, no implicit context lookup     | in: 4h/4i `run_id`                    |      |
 

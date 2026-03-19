@@ -141,7 +141,7 @@ SPARSE SOURCE
 ├─ NARRATE
 │  explanation: 1-2 sentences, plain English, no em dashes
 │  segments: [{ quote: "user's words", speaker: "user" }]
-│  steps: 2-4, earn the conclusion
+│  steps: 2-3, earn the conclusion
 │    every step must advance the chain. if you can
 │    remove it and the conclusion still follows, cut it
 │    has segment → sourced from quote

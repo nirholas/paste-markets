@@ -129,7 +129,7 @@ Companion to [skill-index.md](skill-index.md) — dense.md handles §5-§9 for d
 | ---- | ------- | ---------------------------------------------------------------- | ---------------------------------------- |
 | d-9a | 172-183 | Derivation JSON: explanation + segments + steps                  | out: derivation object                   |
 | d-9b | 175     | Segments: speaker attribution with name + handle                 | in: speaker identity from d-1e           |
-| d-9c | 185     | 2-5 steps, earn the conclusion                                   | in: reasoning chain                      |
+| d-9c | 185     | 2-3 steps, earn the conclusion                                   | in: reasoning chain                      |
 | d-9d | 186     | Provenance: segment = sourced, url = researched, neither = inference | in: step fields                      |
 | d-9e | 187     | Include timestamps from transcript                               | in: transcript timestamps                |
 | d-9f | 188     | Can cite context from source-excerpt                             | in: d-5d/d-5e recovered context          |
