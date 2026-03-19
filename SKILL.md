@@ -220,8 +220,8 @@ Do not use routing difficulty as a filter at extraction time. Capture first, the
 
 ### 7 - Research
 
-Dense sources: §7-§9 are handled in `references/dense.md` (d-3 through d-8). Skip to §10.
-Sparse sources: §7-§9 are handled in `references/sparse.md`. Skip to §10.
+Dense sources: §7-§9 are covered by `references/dense.md` (d-3 through d-8).
+Sparse sources: §7-§9 are covered by `references/sparse.md`.
 
 For each thesis, determine the best executable expression on supported venues.
 On adapter error, retry the failed step once. If it fails again, try an alternative ticker or skip the thesis.
