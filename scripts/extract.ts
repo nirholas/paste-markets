@@ -639,6 +639,8 @@ async function extractTweetViaFxTwitter(tweetId: string, handle: string): Promis
           text: string;
           author: { screen_name: string; name: string };
         };
+        replying_to?: string | null;
+        replying_to_status?: string | null;
       };
     };
 
@@ -656,6 +658,24 @@ async function extractTweetViaFxTwitter(tweetId: string, handle: string): Promis
 
     if (media.length) {
       console.error(`[transcript] Tweet has ${media.length} image(s)`);
+    }
+
+    // Fetch parent tweet if this is a reply
+    let repliedToTweet: { author: string; text: string } | null = null;
+    if (t.replying_to && t.replying_to_status) {
+      console.error(`[transcript] Reply detected — fetching parent tweet ${t.replying_to_status} by @${t.replying_to}...`);
+      try {
+        const parentRes = await fetch(`https://api.fxtwitter.com/${t.replying_to}/status/${t.replying_to_status}`);
+        if (parentRes.ok) {
+          const parentData = await parentRes.json() as { tweet?: { text: string; author: { screen_name: string } } };
+          if (parentData.tweet) {
+            repliedToTweet = { author: parentData.tweet.author.screen_name, text: parentData.tweet.text };
+            console.error(`[transcript] Parent tweet by @${repliedToTweet.author}: ${repliedToTweet.text.slice(0, 80)}...`);
+          }
+        }
+      } catch (err: any) {
+        console.error(`[transcript] Failed to fetch parent tweet: ${err.message}`);
+      }
     }
 
     // fxtwitter created_at format varies; normalize to ISO 8601
@@ -700,6 +720,7 @@ async function extractTweetViaFxTwitter(tweetId: string, handle: string): Promis
             ...(extractedArticle.article_title ? { article_title: extractedArticle.article_title } : {}),
           }
         : {}),
+      ...(repliedToTweet ? { is_reply: true, replied_to_tweet: repliedToTweet } : {}),
       ...(t.quote ? { quoted_tweet: { author: t.quote.author.screen_name, text: t.quote.text } } : {}),
       likes: t.likes ?? 0,
       retweets: t.retweets ?? 0,
@@ -731,11 +752,31 @@ async function extractTweetViaVxTwitter(tweetId: string, handle: string): Promis
       retweets?: number;
       replies?: number;
       views?: number;
+      replyingTo?: string | null;
+      replyingToID?: string | null;
     };
 
     if (!data.text) return null;
 
     console.error(`[transcript] vxtwitter: ${data.text.length} chars`);
+
+    // Fetch parent tweet if this is a reply
+    let repliedToTweet: { author: string; text: string } | null = null;
+    if (data.replyingTo && data.replyingToID) {
+      console.error(`[transcript] Reply detected — fetching parent tweet ${data.replyingToID} by @${data.replyingTo}...`);
+      try {
+        const parentRes = await fetch(`https://api.fxtwitter.com/${data.replyingTo}/status/${data.replyingToID}`);
+        if (parentRes.ok) {
+          const parentData = await parentRes.json() as { tweet?: { text: string; author: { screen_name: string } } };
+          if (parentData.tweet) {
+            repliedToTweet = { author: parentData.tweet.author.screen_name, text: parentData.tweet.text };
+            console.error(`[transcript] Parent tweet by @${repliedToTweet.author}: ${repliedToTweet.text.slice(0, 80)}...`);
+          }
+        }
+      } catch (err: any) {
+        console.error(`[transcript] Failed to fetch parent tweet: ${err.message}`);
+      }
+    }
 
     const vxPublishedAt = data.date ? new Date(data.date).toISOString() : undefined;
 
@@ -748,6 +789,7 @@ async function extractTweetViaVxTwitter(tweetId: string, handle: string): Promis
       ...(vxPublishedAt ? { published_at: vxPublishedAt } : {}),
       text: data.text,
       word_count: data.text.split(/\s+/).length,
+      ...(repliedToTweet ? { is_reply: true, replied_to_tweet: repliedToTweet } : {}),
       likes: data.likes ?? 0,
       retweets: data.retweets ?? 0,
       replies: data.replies ?? 0,
