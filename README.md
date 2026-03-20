@@ -6,19 +6,10 @@ Open source. [paste.trade](https://paste.trade) is where the trades live.
 
 ## Why this exists
 
-You can already ask Claude "what's the trade here?" and get a smart answer. Then you close the tab and it's gone.
+You can already ask AI "what's the trade here?" and get a decent answer. Then you close the tab and it's gone.
 
-The pipeline in this repo is what makes it persist. It doesn't just think about the trade. It commits it to a system. Creates a source page. Saves each thesis. Posts each trade with a locked price. Pushes events to a WebSocket so you can watch it happen. Now that reasoning has a URL, a price ticking against it, and a spot on a feed next to every other trade the system has ever produced.
+Paste.trade is designed to improve the answers and track them against the market.
 
-The LLM is the brain. The chain is what gives it a body.
-
-## Why now
-
-Agent skills are new. Six months ago there was no way to give an LLM a structured pipeline with real tool calls, file I/O, and API posts. It was a chatbot. Now it's a runtime.
-
-This pipeline is six sequential tool calls where each one depends on the last: extract the source, find what's tradeable, research instruments, compare candidates, pick the best fit, post the trade. A year ago that chain would break by step three. Now it works.
-
-Context windows matter too. A one-hour podcast is 50k tokens. That used to not fit. Now the agent reads the whole thing and finds the three tradeable moments across five speakers.
 
 ## What it does
 
@@ -27,7 +18,7 @@ Context windows matter too. A one-hour podcast is 50k tokens. That used to not f
 ┌─────────────────────┐       ┌──────────────────────────────────┐
 │ @kansasangus         │       │ @kansasangus · Mar 18, 2026      │
 │                      │       │                                  │
-│ "Cow/calf is just    │       │ "Cow/calf is just beginning      │
+│ "Cow/calf markets    │       │ "Cow/calf is just beginning      │
 │  beginning to get    │  ──>  │  to get wild"                    │
 │  wild"               │       │                                  │
 │                      │       │  1  Severe drought across        │
@@ -43,8 +34,8 @@ Context windows matter too. A one-hour podcast is 50k tokens. That used to not f
 ```
 
 Two prices on every trade:
-- **author price**: the moment the source was published
-- **posted price**: the moment the AI posted the trade
+- **author price**: the moment the source was actually published (skill extracts this from source)
+- **paste price**: the moment it's uploaded to paste.trade
 
 ## How it works
 
@@ -74,18 +65,18 @@ post to paste.trade ── P&L tracks from here
 
 ## Why it's built this way
 
-Agent skill because that's where you already are. Scripts are CLI tools because that's what LLMs can call. Streams live because you don't trust a black box. Two prices because you want to know who was early.
+Claude Code and OpenClaw are the tools we use everyday. So, making it as simple as "/trade [anything]" makes it the easiest path to use this.
 
 ```
 ┌─────────────────────────┐      ┌─────────────────────────────┐
-│  this repo               │      │  paste.trade                 │
+│  the skill               │      │  paste.trade                 │
 │                          │      │                              │
 │  reads sources           │ ───> │  tracks P&L                  │
 │  extracts theses         │ ───> │  streams progress live       │
-│  researches instruments  │ ───> │  publishes share cards       │
-│  explains reasoning      │ ───> │  ranks by results            │
+│  researches instruments  │ ───> │  publishes trade cards       │
+│  explains reasoning      │ ───> │  saves to your profile       │
 │                          │      │                              │
-│  runs in your agent      │      │  anyone can see              │
+│  runs in your agent      │      │  sharable link               │
 └─────────────────────────┘      └─────────────────────────────┘
 ```
 
