@@ -6,6 +6,8 @@ allowed-tools:
   - Bash(command -v bun)
   - Bash(command -v yt-dlp)
   - Bash(curl -fsSL https://bun.sh/install | bash)
+  - Bash(git -C * pull origin main)
+  - Bash(git -C * log --oneline *)
 metadata:
   openclaw:
     homepage: https://paste.trade/docs/openclaw
@@ -23,6 +25,15 @@ command-tool: trade_slash_dispatch
 Think through trades live. The user is watching the work, not just the final card. Narrate what changed your mind, what has no clean expression, and why one instrument beats another.
 
 Supporting docs: `references/` (skill index, ASCII map, CLI cheatsheet, routing decision rules, event types, trade data index, Hyperliquid thematic universe, prediction markets).
+
+### update
+
+If the input is exactly "update": pull the latest version of the skill repo, show what changed, and stop.
+
+1. Find the skill repo root (the directory containing this SKILL.md).
+2. Run `git -C <repo_root> pull origin main`.
+3. Run `git -C <repo_root> log --oneline -5` to show recent changes.
+4. Tell the user what updated (SKILL.md, scripts, references, etc.) and stop. Do not continue to the trade pipeline.
 
 ## 1 - Defaults
 
