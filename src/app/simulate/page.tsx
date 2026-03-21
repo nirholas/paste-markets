@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Nav from "@/components/ui/nav";
 import CallerSelector from "@/components/caller-selector";
@@ -66,6 +66,14 @@ function formatBigDollar(n: number): string {
 }
 
 export default function SimulatePage() {
+  return (
+    <Suspense>
+      <SimulatePageInner />
+    </Suspense>
+  );
+}
+
+function SimulatePageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 

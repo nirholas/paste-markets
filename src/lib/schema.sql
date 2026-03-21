@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS authors (
   handle TEXT PRIMARY KEY,
   display_name TEXT,
-  added_at TEXT DEFAULT (datetime('now')),
+  added_at TEXT DEFAULT NOW()::text,
   last_fetched TEXT,
   total_trades INTEGER DEFAULT 0,
   win_count INTEGER DEFAULT 0,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS authors (
 
 -- Individual trades (cached from paste.trade)
 CREATE TABLE IF NOT EXISTS trades (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   author_handle TEXT NOT NULL,
   ticker TEXT NOT NULL,
   direction TEXT NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS trades (
   entry_date TEXT,
   posted_at TEXT,
   source_url TEXT,
-  fetched_at TEXT DEFAULT (datetime('now')),
+  fetched_at TEXT DEFAULT NOW()::text,
   -- Timestamp integrity fields
   tweet_id TEXT,
   tweet_created_at TEXT,        -- when the tweet was posted (author_date from paste.trade)
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS trades (
 
 -- Precomputed rankings snapshot
 CREATE TABLE IF NOT EXISTS rankings (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   author_handle TEXT NOT NULL,
   rank INTEGER NOT NULL,
   prev_rank INTEGER,
@@ -54,16 +54,16 @@ CREATE TABLE IF NOT EXISTS rankings (
   total_trades INTEGER,
   total_pnl REAL,
   streak INTEGER DEFAULT 0,
-  computed_at TEXT DEFAULT (datetime('now')),
+  computed_at TEXT DEFAULT NOW()::text,
   timeframe TEXT DEFAULT '30d',
   FOREIGN KEY (author_handle) REFERENCES authors(handle)
 );
 
 -- Search/view tracking (for trending)
 CREATE TABLE IF NOT EXISTS views (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   author_handle TEXT NOT NULL,
-  viewed_at TEXT DEFAULT (datetime('now')),
+  viewed_at TEXT DEFAULT NOW()::text,
   page TEXT -- 'profile', 'leaderboard', 'h2h', 'wrapped'
 );
 
@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS scan_jobs (
   status TEXT NOT NULL DEFAULT 'queued',
   tweets_scanned INTEGER DEFAULT 0,
   calls_found INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
+  created_at TEXT DEFAULT NOW()::text,
+  updated_at TEXT DEFAULT NOW()::text,
   completed_at TEXT,
   error TEXT,
   result_json TEXT
@@ -91,9 +91,9 @@ CREATE INDEX IF NOT EXISTS idx_scan_jobs_status ON scan_jobs(status);
 
 -- Scan rate limiting (one row per request attempt)
 CREATE TABLE IF NOT EXISTS scan_rate_limits (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   ip TEXT NOT NULL,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_scan_rate_ip ON scan_rate_limits(ip, created_at);
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS trade_wager_config (
   status            TEXT NOT NULL DEFAULT 'active',
   settled_at        TEXT,
   caller_tip_earned REAL,
-  created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at        TEXT NOT NULL DEFAULT NOW()::text
 );
 
 -- Individual wagers on a call
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS wagers (
   amount          REAL NOT NULL,
   currency        TEXT NOT NULL DEFAULT 'USDC',
   status          TEXT NOT NULL DEFAULT 'active',
-  wagered_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  wagered_at      TEXT NOT NULL DEFAULT NOW()::text,
   settled_at      TEXT,
   pnl_amount      REAL,
   tx_signature    TEXT NOT NULL,
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
   key         TEXT PRIMARY KEY,
   handle      TEXT NOT NULL,
   tier        TEXT NOT NULL DEFAULT 'free', -- free | developer
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at  TEXT NOT NULL DEFAULT NOW()::text,
   last_used   TEXT,
   request_count INTEGER NOT NULL DEFAULT 0
 );
@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS wall_posts (
   retweets INTEGER DEFAULT 0,
   category TEXT DEFAULT 'reaction', -- reaction, testimonial, feature_request
   featured INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_wall_posts_category ON wall_posts(category);
@@ -177,14 +177,14 @@ CREATE INDEX IF NOT EXISTS idx_wall_posts_posted_at ON wall_posts(posted_at DESC
 -- ─── Waitlist ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS waitlist (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   twitter_handle TEXT NOT NULL UNIQUE,
   email TEXT,
   referral_code TEXT UNIQUE,
   referred_by TEXT,
   position INTEGER,
   status TEXT DEFAULT 'waiting', -- waiting, invited, active
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_waitlist_referral ON waitlist(referral_code);
@@ -193,14 +193,14 @@ CREATE INDEX IF NOT EXISTS idx_waitlist_status ON waitlist(status);
 -- ─── Price Alert Notifications ──────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS alerts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   user_handle TEXT NOT NULL,
   alert_type TEXT NOT NULL,   -- 'caller', 'ticker', 'consensus'
   target TEXT NOT NULL,        -- handle or ticker symbol
   threshold_pnl REAL,         -- optional: only alert if P&L > X%
   channel TEXT DEFAULT 'web',  -- web, email, telegram, webhook
   active INTEGER DEFAULT 1,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_handle);
@@ -209,14 +209,14 @@ CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts(alert_type, target);
 -- ─── Caller Nominations ─────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS submissions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   caller_handle TEXT NOT NULL,
   submitted_by TEXT,
   reason TEXT,
   example_tweet_url TEXT,
   upvotes INTEGER DEFAULT 1,
   status TEXT DEFAULT 'pending', -- pending, approved, rejected, tracked
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_submissions_handle ON submissions(caller_handle);
@@ -228,7 +228,7 @@ CREATE INDEX IF NOT EXISTS idx_submissions_upvotes ON submissions(upvotes DESC);
 CREATE TABLE IF NOT EXISTS telegram_subs (
   chat_id TEXT NOT NULL,
   caller_handle TEXT NOT NULL,
-  created_at TEXT DEFAULT (datetime('now')),
+  created_at TEXT DEFAULT NOW()::text,
   PRIMARY KEY (chat_id, caller_handle)
 );
 
@@ -244,14 +244,14 @@ CREATE TABLE IF NOT EXISTS caller_watchlist (
   last_checked_at TEXT,
   last_tweet_id TEXT,
   enabled INTEGER DEFAULT 1,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_watchlist_enabled ON caller_watchlist(enabled);
 
 -- Live signal detections from the poller
 CREATE TABLE IF NOT EXISTS live_signals (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   handle TEXT NOT NULL,
   tweet_id TEXT NOT NULL UNIQUE,
   tweet_text TEXT NOT NULL,
@@ -264,7 +264,7 @@ CREATE TABLE IF NOT EXISTS live_signals (
   entry_price REAL,
   trade_url TEXT,
   paste_trade_id TEXT,
-  detected_at TEXT DEFAULT (datetime('now')),
+  detected_at TEXT DEFAULT NOW()::text,
   detection_latency_ms INTEGER,
   FOREIGN KEY (handle) REFERENCES caller_watchlist(handle)
 );
@@ -283,8 +283,8 @@ CREATE TABLE IF NOT EXISTS backtest_jobs (
   tweets_scanned INTEGER DEFAULT 0,
   total_tweets INTEGER DEFAULT 0,
   calls_found INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
+  created_at TEXT DEFAULT NOW()::text,
+  updated_at TEXT DEFAULT NOW()::text,
   completed_at TEXT,
   error TEXT,
   result_json TEXT
@@ -304,7 +304,7 @@ CREATE TABLE IF NOT EXISTS wager_events (
   amount REAL,
   pnl_percent REAL,
   tip_amount REAL,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_wager_events_trade ON wager_events(trade_id);
@@ -328,7 +328,7 @@ CREATE TABLE IF NOT EXISTS event_markets (
   outcome TEXT,                    -- 'YES' | 'NO' | null
   caller_count INTEGER DEFAULT 0,
   market_url TEXT,
-  last_updated TEXT DEFAULT (datetime('now'))
+  last_updated TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_event_markets_category ON event_markets(category);
@@ -343,7 +343,7 @@ CREATE TABLE IF NOT EXISTS event_market_calls (
   handle TEXT NOT NULL,
   direction TEXT NOT NULL,         -- 'yes' | 'no'
   entry_probability REAL NOT NULL,
-  called_at TEXT DEFAULT (datetime('now')),
+  called_at TEXT DEFAULT NOW()::text,
   FOREIGN KEY (market_id) REFERENCES event_markets(id),
   UNIQUE(market_id, handle)
 );
@@ -364,7 +364,7 @@ CREATE TABLE IF NOT EXISTS source_extractions (
   word_count INTEGER DEFAULT 0,
   thesis_count INTEGER DEFAULT 0,
   processing_time_ms INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_source_extractions_created ON source_extractions(created_at DESC);
@@ -387,7 +387,7 @@ CREATE TABLE IF NOT EXISTS extracted_theses (
   paste_trade_url TEXT,
   current_pnl REAL,
   tracked_at TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
+  created_at TEXT DEFAULT NOW()::text,
   FOREIGN KEY (extraction_id) REFERENCES source_extractions(id)
 );
 
@@ -405,7 +405,7 @@ CREATE TABLE IF NOT EXISTS alert_rules (
   enabled INTEGER DEFAULT 1,
   match_count INTEGER DEFAULT 0,
   last_matched_at TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_alert_rules_user ON alert_rules(user_id);
@@ -422,7 +422,7 @@ CREATE TABLE IF NOT EXISTS alert_notifications (
   channel TEXT NOT NULL,             -- 'browser' | 'telegram' | 'webhook'
   delivered INTEGER DEFAULT 0,
   read_at TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
+  created_at TEXT DEFAULT NOW()::text,
   FOREIGN KEY (rule_id) REFERENCES alert_rules(id)
 );
 
