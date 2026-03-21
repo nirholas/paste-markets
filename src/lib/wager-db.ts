@@ -5,6 +5,7 @@
  */
 
 import { sql } from "./db";
+import { deriveVaultPDA } from "./solana";
 
 export interface TradeWagerConfig {
   trade_card_id: string;
@@ -55,11 +56,13 @@ const MAX_WAGER_PER_USER = 500; // USDC
 // ─── vault address ────────────────────────────────────────────────────────────
 
 /**
- * Returns the on-chain Solana vault address for a trade card.
- * Requires a deployed Solana program — returns null until integration is complete.
+ * Returns the on-chain Solana vault PDA for a trade card.
+ * Requires SOLANA_PROGRAM_ID env var. Returns null until a program is deployed.
  */
-export function deriveVaultAddress(_tradeCardId: string): string | null {
-  return null;
+export function deriveVaultAddress(tradeCardId: string): string | null {
+  const { deriveVaultPDA } = require("./solana");
+  const result = deriveVaultPDA(tradeCardId);
+  return result?.address ?? null;
 }
 
 // ─── public API ───────────────────────────────────────────────────────────────

@@ -74,6 +74,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid Solana wallet address" }, { status: 400 });
     }
 
+    // Validate transaction signature format
+    if (!isValidSolanaSignature(txSignature)) {
+      return NextResponse.json({ error: "Invalid Solana transaction signature format" }, { status: 400 });
+    }
+
+    // Verify transaction on-chain (graceful degradation on RPC failure)
+    const verification = await verifySolanaTransaction(txSignature);
+    if (!verification.verified) {
+      if (verification.error?.includes("RPC unavailable")) {
+        // Graceful degradation: log warning but allow the wager through
+        console.warn("[api/wager] RPC unavailable, skipping tx verification for:", txSignature);
+      } else {
+        return NextResponse.json(
+          { error: `Transaction verification failed: ${verification.error}` },
+          { status: 400 },
+        );
+      }
+    }
+
     const result = await submitWager({
       id: randomUUID(),
       tradeCardId,

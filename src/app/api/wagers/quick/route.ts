@@ -7,6 +7,7 @@ import {
   getWagerStats,
   insertWagerEvent,
 } from "@/lib/wager-db";
+import { isValidSolanaSignature, verifySolanaTransaction } from "@/lib/solana";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,24 @@ export async function POST(req: NextRequest) {
       { error: "txSignature is required. Client must sign and submit the Solana transaction first." },
       { status: 400 },
     );
+  }
+
+  // Validate signature format
+  if (!isValidSolanaSignature(txSignature)) {
+    return NextResponse.json({ error: "Invalid Solana transaction signature format" }, { status: 400 });
+  }
+
+  // Verify transaction on-chain (graceful degradation on RPC failure)
+  const verification = await verifySolanaTransaction(txSignature);
+  if (!verification.verified) {
+    if (verification.error?.includes("RPC unavailable")) {
+      console.warn("[api/wagers/quick] RPC unavailable, skipping tx verification for:", txSignature);
+    } else {
+      return NextResponse.json(
+        { error: `Transaction verification failed: ${verification.error}` },
+        { status: 400 },
+      );
+    }
   }
 
   const result = await submitWager({
