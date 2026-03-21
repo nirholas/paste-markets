@@ -8,14 +8,12 @@
     "start": "next start",
     "lint": "next lint",
     "db:seed": "tsx src/lib/seed.ts",
-    "db:sync": "tsx src/lib/seed-from-api.ts",
-    "postinstall": "playwright install chromium --with-deps"
+    "db:sync": "tsx src/lib/seed-from-api.ts"
   },
   "dependencies": {
     "@vercel/og": "^0.11.1",
     "better-sqlite3": "^12.8.0",
     "next": "^15.5.14",
-    "playwright": "^1.58.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
@@ -24,6 +22,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "playwright": "^1.58.2",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.1",
