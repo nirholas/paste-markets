@@ -119,26 +119,48 @@ export interface PriceData {
 
 // ── Source types ─────────────────────────────────────────────────────────────
 
+export interface SourceThesis {
+  thesis_id: string;
+  thesis: string;
+  route_status: string;
+  who: Array<{ ticker: string; direction: string }>;
+}
+
+export interface SourceDetail {
+  id: string;
+  url: string;
+  title: string;
+  platform: string;
+  author_id: string;
+  published_at: string;
+  user_id: string;
+  created_at: string;
+  summary: string;
+  source_summary: string;
+  status: string;
+  source_theses?: SourceThesis[];
+  source_images: string[] | null;
+  thumbnail_url: string | null;
+  engagement_views: number | null;
+  engagement_likes: number | null;
+  engagement_retweets: number | null;
+}
+
+export interface SourceAuthor {
+  id: string;
+  handle: string;
+  name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  twitter_url: string | null;
+  youtube_url: string | null;
+  platform: string;
+  created_at: string;
+}
+
 export interface SourceResult {
-  source: {
-    id: string;
-    url: string;
-    title?: string;
-    platform?: string;
-    status: string;
-    summary?: string;
-    source_summary?: string;
-    source_theses?: string[];
-    [key: string]: unknown;
-  };
-  author: {
-    id?: string;
-    handle?: string;
-    name?: string;
-    avatar_url?: string;
-    platform?: string;
-    [key: string]: unknown;
-  };
+  source: SourceDetail;
+  author: SourceAuthor;
   trades: Record<string, unknown>[];
 }
 
@@ -196,13 +218,52 @@ export interface SubmitTradeResult {
 // ── Skill types ─────────────────────────────────────────────────────────────
 
 export interface SkillRouteParams {
-  ticker: string;
+  tickers: string[];
   direction: "long" | "short";
-  platform?: string;
+  capital?: number;
+}
+
+export interface SkillRoutePnlScenario {
+  move_pct: number;
+  price: number;
+  pnl_dollars: number;
+  return_pct: number;
+  note?: string;
+}
+
+export interface SkillRouteInstrument {
+  form: string;
+  platform: string;
+  available: boolean;
+  hl_status?: string;
+  dex?: string;
+  author_price: number;
+  selection_reason: string;
+  funding_direction: string;
+  max_leverage: number;
+  volume_24h: number;
+  liquidity: string;
+  asset_class: string;
+  theme_tags: string[];
+  instrument_description: string;
+  funding_income_30d_dollars?: Record<string, number>;
+  liquidation_price?: Record<string, number>;
+  liquidation_move_pct?: Record<string, number>;
+  from_here?: Record<string, SkillRoutePnlScenario[]>;
+}
+
+export interface SkillRouteTickerResult {
+  ticker: string;
+  direction: string;
+  capital: number;
+  current_price: number;
+  sector: string | null;
+  instruments: Record<string, SkillRouteInstrument>;
 }
 
 export interface SkillRouteResult {
-  [key: string]: unknown;
+  contract_version: string;
+  results: SkillRouteTickerResult[];
 }
 
 export interface SkillDiscoverParams {
@@ -210,8 +271,30 @@ export interface SkillDiscoverParams {
   platforms?: string[];
 }
 
+export interface DiscoverInstrument {
+  symbol: string;
+  asset_class: string;
+  description: string;
+  theme_tags: string[];
+  reference_symbols: string[];
+  search_aliases: string[];
+  max_leverage: number;
+  liquidity: string;
+  score: number;
+  match_kind: string;
+}
+
 export interface SkillDiscoverResult {
-  [key: string]: unknown;
+  contract_version: string;
+  hyperliquid?: {
+    search_results: DiscoverInstrument[];
+    query: string;
+    total_instruments: number;
+  };
+  polymarket?: {
+    search_results: Record<string, unknown>[];
+    query: string;
+  };
 }
 
 const KNOWN_FIELDS = new Set([
@@ -710,7 +793,11 @@ export async function skillRoute(params: SkillRouteParams): Promise<SkillRouteRe
         ...authHeaders(apiKey),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        tickers: params.tickers,
+        direction: params.direction,
+        ...(params.capital != null && { capital: params.capital }),
+      }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;

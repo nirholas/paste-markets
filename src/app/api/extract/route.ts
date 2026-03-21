@@ -149,9 +149,8 @@ export async function POST(request: NextRequest) {
             ? thesis.direction
             : "long") as "long" | "short";
           const result = await skillRoute({
-            ticker: thesis.ticker,
+            tickers: [thesis.ticker],
             direction: dir,
-            platform: thesis.platform,
           });
           return result ? { ticker: thesis.ticker, ...result } : null;
         }),

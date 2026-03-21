@@ -18,7 +18,7 @@ export async function GET(
       source_id: result.source.id,
       source_url: result.source.url,
       status: result.source.status,
-      handle: result.author?.handle ?? handle || null,
+      handle: result.author?.handle ?? (handle || null),
       original_url: originalUrl || result.source.url || null,
       trades: result.trades ?? [],
       processing: result.source.status === "processing",

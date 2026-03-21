@@ -5,7 +5,7 @@
  *
  * Connects to wss://paste.trade/ws and provides:
  *   - newTrades: array of recent trades received via WebSocket
- *   - priceUpdates: map of trade_id → latest price data
+ *   - priceUpdates: map of price key → latest price entry
  *   - isConnected: whether the WebSocket is currently open
  *
  * Usage:
@@ -24,7 +24,7 @@ const MAX_TRADES = 50;
 
 export interface UsePasteTradeWSResult {
   newTrades: WSNewTrade[];
-  priceUpdates: Map<string, WSPriceUpdate>;
+  priceUpdates: Map<string, WSPriceEntry>;
   isConnected: boolean;
 }
 
@@ -33,7 +33,7 @@ export function usePasteTradeWS(
 ): UsePasteTradeWSResult {
   const enabled = options?.enabled ?? true;
   const [newTrades, setNewTrades] = useState<WSNewTrade[]>([]);
-  const [priceUpdates, setPriceUpdates] = useState<Map<string, WSPriceUpdate>>(
+  const [priceUpdates, setPriceUpdates] = useState<Map<string, WSPriceEntry>>(
     new Map(),
   );
   const [isConnected, setIsConnected] = useState(false);
@@ -46,7 +46,9 @@ export function usePasteTradeWS(
   const handlePriceUpdate = useCallback((data: WSPriceUpdate) => {
     setPriceUpdates((prev) => {
       const next = new Map(prev);
-      next.set(data.trade_id, data);
+      for (const [key, entry] of Object.entries(data.prices)) {
+        next.set(key, entry);
+      }
       return next;
     });
   }, []);
