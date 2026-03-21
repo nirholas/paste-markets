@@ -2,7 +2,7 @@ import { ImageResponse } from "@vercel/og";
 import { NextRequest } from "next/server";
 import { getLatestAudit, type CompletenessGrade } from "@/lib/completeness";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const BG = "#0a0a1a";
 const SURFACE = "#0f0f22";
