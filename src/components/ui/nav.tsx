@@ -74,7 +74,7 @@ function MoreDropdown({ pathname }: { pathname: string }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-52 bg-[#1a1a24] border border-[#ffffff14] rounded-2xl shadow-2xl z-50 py-2 max-h-80 overflow-y-auto">
+        <div className="absolute left-0 top-full mt-2 w-52 bg-[#1a1a1a] border border-[#ffffff14] rounded-2xl shadow-2xl z-50 py-2 max-h-80 overflow-y-auto">
           {MORE_LINKS.map((link) => (
             <Link
               key={link.href}
@@ -135,7 +135,7 @@ function MobileMenu({ pathname }: { pathname: string }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full bg-[#12121a] border-b border-[#ffffff0d] shadow-2xl z-50 px-4 py-4">
+        <div className="absolute left-0 right-0 top-full bg-[#111111] border-b border-[#ffffff0d] shadow-2xl z-50 px-4 py-4">
           <div className="grid grid-cols-2 gap-1">
             {[...NAV_LINKS, ...MORE_LINKS].map((link) => (
               <Link
@@ -162,7 +162,7 @@ export default function Nav() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky top-0 z-40 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-[#ffffff0d] px-4 lg:px-6">
+    <nav className="sticky top-0 z-40 bg-black/90 backdrop-blur-xl border-b border-[#ffffff0d] px-4 lg:px-6">
       <div className="max-w-6xl mx-auto flex items-center h-14 gap-2">
         {/* Logo */}
         <Link href="/" className="text-[#f5f5f7] font-bold text-lg tracking-tight hover:opacity-80 transition-opacity shrink-0 mr-4">
