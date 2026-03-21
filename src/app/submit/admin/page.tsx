@@ -23,11 +23,11 @@ function StatusBadge({ status }: { status: string }) {
     tracked: { bg: "rgba(46, 204, 113, 0.15)", text: "#2ecc71", border: "#2ecc71" },
     rejected: { bg: "rgba(231, 76, 60, 0.1)", text: "#e74c3c", border: "#e74c3c" },
   };
-  const c = colors[status] ?? colors.pending;
+  const c = colors[status] ?? colors.pending!;
   return (
     <span
       className="text-[10px] px-2 py-0.5 rounded uppercase tracking-widest font-bold"
-      style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}
+      style={{ background: c!.bg, color: c!.text, border: `1px solid ${c!.border}` }}
     >
       {status === "tracked" ? "Now Tracking" : status}
     </span>
