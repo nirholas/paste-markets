@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { ExecuteButton } from "@/components/execution/execute-button";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors TradeExtraction from trade-extractor.ts)
@@ -248,15 +249,24 @@ function ThesisCard({
         )}
       </div>
 
-      {/* Track button */}
+      {/* Track + Execute buttons */}
       <div className="pt-2 border-t border-border">
         {submitState.status === "idle" && (
-          <button
-            onClick={handleTrack}
-            className="w-full border border-border rounded-lg px-4 py-2 text-sm font-bold text-text-primary hover:border-accent transition-colors"
-          >
-            Track This Trade
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleTrack}
+              className="flex-1 border border-border rounded-lg px-4 py-2 text-sm font-bold text-text-primary hover:border-accent transition-colors"
+            >
+              Track This Trade
+            </button>
+            <ExecuteButton
+              ticker={thesis.ticker}
+              direction={thesis.direction}
+              platform={thesis.platform}
+              entryPrice={thesis.priceAtExtraction}
+              className="flex-1 rounded-lg"
+            />
+          </div>
         )}
         {submitState.status === "loading" && (
           <p className="text-text-muted text-sm text-center animate-pulse">

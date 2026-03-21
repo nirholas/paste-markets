@@ -4,6 +4,7 @@ import { IntegrityBadge } from "@/components/integrity-badge";
 import { WagerWidget } from "@/components/wager-widget";
 import { DoubleDownButton } from "@/components/double-down-popover";
 import { BackerStrip } from "@/components/backer-strip";
+import { ExecuteButton } from "@/components/execution/execute-button";
 import type { IntegrityClass } from "@/lib/integrity";
 import {
   probabilityToAmericanOdds,
@@ -376,6 +377,17 @@ export function TradeCard({
               backerCount={0}
             />
           )}
+          <ExecuteButton
+            tradeId={tradeId ?? undefined}
+            ticker={ticker}
+            direction={direction}
+            platform={platform}
+            entryPrice={entryPrice}
+            leverage={leverage}
+            authorHandle={handle ?? undefined}
+            thesis={thesis ?? headlineQuote ?? undefined}
+            variant="compact"
+          />
           <span>
             {handle ? `@${handle}` : ""}
             {handle && postedAt ? " · " : ""}

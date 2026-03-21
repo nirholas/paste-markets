@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // Persist extraction to SQLite
     try {
-      saveExtraction({
+      await saveExtraction({
         id: extraction.id,
         source_type: extraction.source.type,
         source_url: extraction.source.url,
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
           tracked.push(result.value);
           // Update DB with tracking info
           try {
-            trackThesis(
+            await trackThesis(
               result.value.thesisId,
               result.value.pasteTradeId,
               result.value.tradeUrl,

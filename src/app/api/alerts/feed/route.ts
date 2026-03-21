@@ -9,6 +9,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "user parameter required" }, { status: 400 });
   }
 
-  const feed = getTriggeredAlerts(user);
+  const feed = await getTriggeredAlerts(user);
   return NextResponse.json(feed);
 }

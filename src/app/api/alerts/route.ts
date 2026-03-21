@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "user parameter required" }, { status: 400 });
   }
 
-  const alerts = getUserAlerts(user);
+  const alerts = await getUserAlerts(user);
   return NextResponse.json(alerts);
 }
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const alert = createAlert({
+    const alert = await createAlert({
       user_handle,
       alert_type,
       target: target.replace(/^[@$]/, ""),
@@ -54,7 +54,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "id and user parameters required" }, { status: 400 });
   }
 
-  const deleted = deleteAlert(parseInt(id), user);
+  const deleted = await deleteAlert(parseInt(id), user);
   if (!deleted) {
     return NextResponse.json({ error: "Alert not found" }, { status: 404 });
   }
@@ -71,7 +71,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "id and user_handle required" }, { status: 400 });
     }
 
-    const alert = toggleAlert(id, user_handle);
+    const alert = await toggleAlert(id, user_handle);
     if (!alert) {
       return NextResponse.json({ error: "Alert not found" }, { status: 404 });
     }

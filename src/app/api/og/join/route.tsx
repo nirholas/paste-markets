@@ -4,7 +4,7 @@ import { getWaitlistCount } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const total = getWaitlistCount();
+  const total = await getWaitlistCount();
 
   return new ImageResponse(
     (

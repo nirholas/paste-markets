@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = joinWaitlist(handle.toLowerCase(), email, referredBy);
+    const result = await joinWaitlist(handle.toLowerCase(), email, referredBy);
 
     return NextResponse.json({
       handle,
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
-    const total = getWaitlistCount();
+    const total = await getWaitlistCount();
     return NextResponse.json({ total });
   } catch {
     return NextResponse.json({ total: 0 });

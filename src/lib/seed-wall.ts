@@ -113,7 +113,7 @@ function toWallPost(raw: RawPost): Omit<WallPost, "created_at"> {
   };
 }
 
-function main() {
+async function main() {
   const filePath = process.argv[2];
   if (!filePath) {
     console.error("Usage: npx tsx src/lib/seed-wall.ts <file.json|file.csv>");
@@ -131,7 +131,7 @@ function main() {
   }
 
   const wallPosts = posts.map(toWallPost);
-  upsertWallPostsBulk(wallPosts);
+  await upsertWallPostsBulk(wallPosts);
 
   console.log(`Seeded ${wallPosts.length} wall posts.`);
 }

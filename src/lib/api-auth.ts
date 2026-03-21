@@ -7,8 +7,8 @@
  *   - free:           100 req/day per key
  *   - developer:      10,000 req/day per key
  *
- * Keys are stored in the SQLite api_keys table (USE_SQLITE=true)
- * or in PT_API_KEYS env var as a JSON array / comma-separated list (serverless).
+ * Keys are stored in the Postgres api_keys table via Neon,
+ * with PT_API_KEYS env var as a JSON array / comma-separated fallback.
  */
 
 import type { NextRequest } from "next/server";
@@ -42,25 +42,19 @@ export type AuthResult = AuthSuccess | AuthFailure;
 
 // ----- Key lookup -----
 
-/** Look up a key, checking SQLite first then env var fallback. */
+/** Look up a key, checking Postgres first then env var fallback. */
 async function lookupKey(key: string): Promise<ApiKeyRecord | null> {
-  // SQLite path
-  if (process.env["USE_SQLITE"] !== "false") {
-    try {
-      const { getApiKey } = await import("./db");
-      const row = getApiKey(key);
-      if (row) {
-        // Fire-and-forget usage tracking
-        try {
-          const { touchApiKey } = await import("./db");
-          touchApiKey(key);
-        } catch { /* non-critical */ }
-        return { key: row.key, tier: row.tier, handle: row.handle };
-      }
-    } catch { /* fall through to env var */ }
-  }
+  try {
+    const { getApiKey, touchApiKey } = await import("./db");
+    const row = await getApiKey(key);
+    if (row) {
+      // Fire-and-forget usage tracking
+      try { touchApiKey(key); } catch { /* non-critical */ }
+      return { key: row.key, tier: row.tier, handle: row.handle };
+    }
+  } catch { /* fall through to env var */ }
 
-  // Env var fallback (serverless / dev without SQLite)
+  // Env var fallback
   const raw = process.env["PT_API_KEYS"] ?? "";
   if (!raw.trim()) return null;
 

@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (notificationId) {
-      markNotificationRead(userId, notificationId);
+      await markNotificationRead(userId, notificationId);
     } else {
-      markAllNotificationsRead(userId);
+      await markAllNotificationsRead(userId);
     }
 
     return NextResponse.json({ success: true });

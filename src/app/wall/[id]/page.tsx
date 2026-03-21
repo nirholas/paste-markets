@@ -12,7 +12,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const post = getWallPostById(id);
+  const post = await getWallPostById(id);
   if (!post) return {};
 
   const title = `@${post.author_handle} on paste.trade`;
@@ -47,7 +47,7 @@ function formatDate(iso: string): string {
 
 export default async function QuotePage({ params }: Props) {
   const { id } = await params;
-  const post = getWallPostById(id);
+  const post = await getWallPostById(id);
   if (!post) notFound();
 
   const isFeatured = post.featured === 1;

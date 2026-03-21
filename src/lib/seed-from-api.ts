@@ -11,7 +11,6 @@
 import type { PasteTradeTrade } from "./paste-trade";
 
 const BASE_URL = "https://paste.trade";
-const useSqlite = process.env["USE_SQLITE"] !== "false";
 
 interface RawGlobalTrade {
   author_handle?: string;
@@ -142,11 +141,6 @@ async function fetchAllTrades(): Promise<Map<string, PasteTradeTrade[]>> {
 }
 
 export async function seedFromApi(): Promise<SeedResult> {
-  if (!useSqlite) {
-    console.warn("[seed-from-api] SQLite mode not enabled — skipping sync");
-    return { authors: 0, trades: 0, ranked: 0 };
-  }
-
   const db = await import("./db");
 
   console.log("[seed-from-api] Fetching all trades from paste.trade...");
@@ -161,8 +155,8 @@ export async function seedFromApi(): Promise<SeedResult> {
 
   for (const [handle, trades] of byAuthor) {
     try {
-      db.getOrCreateAuthor(handle);
-      db.upsertTrades(handle, trades);
+      await db.getOrCreateAuthor(handle);
+      await db.upsertTrades(handle, trades);
       totalTrades += trades.length;
     } catch (err) {
       console.error(`[seed-from-api] Failed to sync @${handle}:`, err);
@@ -173,10 +167,10 @@ export async function seedFromApi(): Promise<SeedResult> {
     `[seed-from-api] Upserted ${totalTrades} trades for ${byAuthor.size} authors. Computing rankings...`,
   );
 
-  db.updateRankings("30d");
-  db.updateRankings("7d");
+  await db.updateRankings("30d");
+  await db.updateRankings("7d");
 
-  const leaderboard = db.getLeaderboard("30d", 9999, 0);
+  const leaderboard = await db.getLeaderboard("30d", 9999, 0);
   const ranked = leaderboard.length;
 
   console.log(

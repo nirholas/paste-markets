@@ -8,7 +8,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const extraction = getExtraction(id);
+  const extraction = await getExtraction(id);
   if (!extraction) return { title: "Source Not Found — paste.markets" };
 
   const title = `${extraction.title} — ${extraction.thesis_count} trades found`;
@@ -47,10 +47,10 @@ function LossIcon() {
 
 export default async function SourcePage({ params }: Props) {
   const { id } = await params;
-  const extraction = getExtraction(id);
+  const extraction = await getExtraction(id);
   if (!extraction) notFound();
 
-  const perf = getSourcePerformance(id);
+  const perf = await getSourcePerformance(id);
   const tracked = extraction.theses.filter((t) => t.paste_trade_id);
   const sourceTypeLabel =
     extraction.source_type.charAt(0).toUpperCase() + extraction.source_type.slice(1);
