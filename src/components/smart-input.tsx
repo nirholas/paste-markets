@@ -16,7 +16,6 @@ function detectType(val: string): "url" | "handle" | "ticker" | "text" | "empty"
   if (!v) return "empty";
   if (v.startsWith("http://") || v.startsWith("https://")) return "url";
   if (v.startsWith("@")) return "handle";
-  // $TICKER or pure uppercase letters like BTC, ETH (2-8 chars, no spaces)
   if (/^\$[A-Za-z]{1,10}$/.test(v) || /^[A-Z]{2,8}$/.test(v)) return "ticker";
   return "text";
 }
@@ -60,28 +59,31 @@ export function SmartInput() {
     else if (type === "ticker") handleViewAsset();
   }
 
-  const borderClass =
+  const ringColor =
     type === "url"
-      ? "border-accent"
+      ? "ring-[#6366f1]"
       : type === "handle"
-        ? "border-[#2ecc71]"
+        ? "ring-[#22c55e]"
         : type === "ticker"
-          ? "border-[#f39c12]"
-          : "border-border focus-within:border-accent";
+          ? "ring-[#f59e0b]"
+          : "ring-transparent focus-within:ring-[#6366f1]/50";
 
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit}>
         <div
-          className={`input-glow flex items-center bg-[#0f0f22] border rounded-lg px-5 py-4 transition-all ${borderClass}`}
+          className={`flex items-center bg-[#12121a] border border-[#ffffff14] rounded-2xl px-5 py-4 transition-all ring-2 ${ringColor}`}
         >
-          <span className="text-[#555568] mr-3 text-lg select-none">/</span>
+          <svg className="w-5 h-5 text-[#52525b] mr-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
           <input
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={PLACEHOLDERS[placeholderIdx]}
-            className="flex-1 bg-transparent outline-none text-[#f0f0f0] placeholder:text-[#555568] font-mono text-base"
+            className="flex-1 bg-transparent outline-none text-[#f5f5f7] placeholder:text-[#52525b] text-base"
             autoComplete="off"
             spellCheck={false}
           />
@@ -89,54 +91,57 @@ export function SmartInput() {
             <button
               type="button"
               onClick={() => setValue("")}
-              className="text-[#555568] hover:text-[#c8c8d0] transition-colors ml-2 text-sm"
+              className="text-[#52525b] hover:text-[#a1a1aa] transition-colors ml-2 p-1 rounded-full hover:bg-[#ffffff0a]"
             >
-              &times;
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           )}
         </div>
 
-        {/* Label */}
+        {/* Type label */}
         {type === "url" && (
-          <p className="text-xs text-accent mt-1.5 font-mono">
+          <p className="text-xs text-[#6366f1] mt-2 ml-1 font-medium">
             URL detected — we&apos;ll extract the trade
           </p>
         )}
         {type === "handle" && (
-          <p className="text-xs text-[#2ecc71] mt-1.5 font-mono">
+          <p className="text-xs text-[#22c55e] mt-2 ml-1 font-medium">
             Trader detected
           </p>
         )}
         {type === "ticker" && (
-          <p className="text-xs text-[#f39c12] mt-1.5 font-mono">
+          <p className="text-xs text-[#f59e0b] mt-2 ml-1 font-medium">
             Ticker detected — view all calls
           </p>
         )}
 
-        {/* Buttons */}
+        {/* Action buttons */}
         <div className="mt-3 flex gap-2">
           {type === "url" && (
             <button
               type="submit"
-              className="flex-1 border border-accent text-accent hover:bg-accent hover:text-white font-mono text-sm py-2 px-4 rounded transition-colors"
+              className="flex-1 bg-[#6366f1] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#5558e6] transition-colors"
             >
-              Find The Trade &rarr;
+              Find The Trade
             </button>
           )}
           {type === "handle" && (
             <button
               type="submit"
-              className="flex-1 border border-[#2ecc71] text-[#2ecc71] hover:bg-[#2ecc71] hover:text-black font-mono text-sm py-2 px-4 rounded transition-colors"
+              className="flex-1 bg-[#22c55e] text-black font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#16a34a] transition-colors"
             >
-              View Profile &rarr;
+              View Profile
             </button>
           )}
           {type === "ticker" && (
             <button
               type="submit"
-              className="flex-1 border border-[#f39c12] text-[#f39c12] hover:bg-[#f39c12] hover:text-black font-mono text-sm py-2 px-4 rounded transition-colors"
+              className="flex-1 bg-[#f59e0b] text-black font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#d97706] transition-colors"
             >
-              View Asset &rarr;
+              View Asset
             </button>
           )}
           {type === "text" && (
@@ -144,15 +149,15 @@ export function SmartInput() {
               <button
                 type="button"
                 onClick={() => handleViewProfile()}
-                className="flex-1 border border-border text-text-secondary hover:border-[#2ecc71] hover:text-[#2ecc71] font-mono text-sm py-2 px-4 rounded transition-colors"
+                className="flex-1 bg-[#ffffff08] border border-[#ffffff14] text-[#a1a1aa] font-medium text-sm py-2.5 px-4 rounded-xl hover:bg-[#ffffff14] hover:text-[#f5f5f7] transition-colors"
               >
                 Search Traders
               </button>
               <button
                 type="submit"
-                className="flex-1 border border-accent text-accent hover:bg-accent hover:text-white font-mono text-sm py-2 px-4 rounded transition-colors"
+                className="flex-1 bg-[#6366f1] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#5558e6] transition-colors"
               >
-                Find The Trade &rarr;
+                Find The Trade
               </button>
             </>
           )}
@@ -160,7 +165,7 @@ export function SmartInput() {
             <button
               type="submit"
               disabled
-              className="flex-1 border border-border text-text-muted font-mono text-sm py-2 px-4 rounded opacity-50 cursor-not-allowed"
+              className="flex-1 bg-[#ffffff08] text-[#52525b] font-medium text-sm py-2.5 px-4 rounded-xl cursor-not-allowed"
             >
               Search or paste a URL
             </button>

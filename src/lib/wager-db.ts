@@ -60,7 +60,6 @@ const MAX_WAGER_PER_USER = 500; // USDC
  * Requires SOLANA_PROGRAM_ID env var. Returns null until a program is deployed.
  */
 export function deriveVaultAddress(tradeCardId: string): string | null {
-  const { deriveVaultPDA } = require("./solana");
   const result = deriveVaultPDA(tradeCardId);
   return result?.address ?? null;
 }
