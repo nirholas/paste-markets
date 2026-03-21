@@ -173,7 +173,7 @@ export function WagerModal({
         <span className="text-sm font-bold text-text-primary">Back This Call</span>
         <button
           onClick={() => setStep("cta")}
-          className="text-text-muted hover:text-text-secondary text-xs"
+          className="text-text-muted hover:text-text-secondary text-xs rounded-lg"
         >
           Cancel
         </button>
@@ -201,7 +201,7 @@ export function WagerModal({
                 key={preset}
                 onClick={() => setAmount(String(preset))}
                 disabled={step === "submitting"}
-                className="px-2 py-1 text-[11px] border border-border rounded hover:border-accent text-text-muted hover:text-text-secondary transition-colors"
+                className="px-2 py-1 text-[11px] border border-border rounded-lg hover:border-accent text-text-muted hover:text-text-secondary transition-colors"
               >
                 ${preset}
               </button>

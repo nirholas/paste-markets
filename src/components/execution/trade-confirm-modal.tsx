@@ -86,7 +86,7 @@ export function TradeConfirmModal({ params, onClose, onSuccess }: Props) {
             <div className="flex gap-3 justify-center">
               <a
                 href={instruction.deepLink}
-                className="border border-[#2ecc71] text-[#2ecc71] px-4 py-2 text-sm font-bold hover:bg-[#2ecc71]/10 transition-colors"
+                className="border border-[#2ecc71] text-[#2ecc71] px-4 py-2 text-sm font-bold rounded-lg hover:bg-[#2ecc71]/10 transition-colors"
               >
                 Open in App
               </a>
@@ -94,7 +94,7 @@ export function TradeConfirmModal({ params, onClose, onSuccess }: Props) {
                 href={instruction.webUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border border-border text-text-secondary px-4 py-2 text-sm hover:border-accent transition-colors"
+                className="border border-border text-text-secondary px-4 py-2 text-sm rounded-lg hover:border-accent transition-colors"
               >
                 Open Web
               </a>
@@ -217,7 +217,7 @@ export function TradeConfirmModal({ params, onClose, onSuccess }: Props) {
             </div>
             <a
               href="/positions"
-              className="block w-full py-2 text-center border border-accent text-accent text-sm font-bold hover:bg-accent/10 transition-colors"
+              className="block w-full py-2 text-center border border-accent text-accent text-sm font-bold rounded-lg hover:bg-accent/10 transition-colors"
             >
               View Positions
             </a>
@@ -308,7 +308,7 @@ export function TradeConfirmModal({ params, onClose, onSuccess }: Props) {
                   key={preset}
                   onClick={() => setSize(String(preset))}
                   disabled={step === "executing"}
-                  className="px-2 py-1 text-[11px] border border-border rounded hover:border-accent text-text-muted hover:text-text-secondary transition-colors"
+                  className="px-2 py-1 text-[11px] border border-border rounded-lg hover:border-accent text-text-muted hover:text-text-secondary transition-colors"
                 >
                   ${preset}
                 </button>
@@ -341,7 +341,7 @@ export function TradeConfirmModal({ params, onClose, onSuccess }: Props) {
                     key={preset}
                     onClick={() => setLeverage(String(preset))}
                     disabled={step === "executing"}
-                    className="px-2 py-1 text-[11px] border border-border rounded hover:border-accent text-text-muted hover:text-text-secondary transition-colors"
+                    className="px-2 py-1 text-[11px] border border-border rounded-lg hover:border-accent text-text-muted hover:text-text-secondary transition-colors"
                   >
                     {preset}x
                   </button>

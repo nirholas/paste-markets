@@ -97,7 +97,7 @@ function PositionCard({
         <button
           onClick={() => onClose(position.id)}
           disabled={closing}
-          className="border border-loss text-loss px-3 py-1.5 text-xs font-bold hover:bg-loss/10 transition-colors disabled:opacity-40"
+          className="border border-loss text-loss px-3 py-1.5 text-xs font-bold rounded-lg hover:bg-loss/10 transition-colors disabled:opacity-40"
         >
           {closing ? "Closing..." : isPolymarket ? "Sell Shares" : "Close Position"}
         </button>
