@@ -111,7 +111,60 @@ export function formatWelcome(): string {
 }
 
 export function formatHelp(): string {
-  return formatWelcome();
+  return [
+    "*Welcome to paste\\.markets\\!*",
+    "",
+    "Real\\-time trade tracking for CT callers\\.",
+    "",
+    "*Commands:*",
+    "/caller \\{handle\\} — Caller stats",
+    "/ticker \\{symbol\\} — Ticker stats",
+    "/top \\{timeframe\\} — Leaderboard \\(7d, 30d, 90d\\)",
+    "/subscribe \\{handle\\} — Get alerts for a caller",
+    "/unsubscribe \\{handle\\} — Stop alerts for a caller",
+    "/mysubs — List your subscriptions",
+    "/help — Show this message",
+    "",
+    "[Visit paste\\.markets](https://paste.markets)",
+  ].join("\n");
+}
+
+export interface ChannelTradeAlert {
+  author_handle: string;
+  ticker: string;
+  direction: string;
+  platform: string | null;
+  entry_price: number | null;
+  confidence: number;
+  tweet_url: string;
+}
+
+export function formatChannelAlert(alert: ChannelTradeAlert): string {
+  const arrow = alert.direction === "long" || alert.direction === "yes" ? "LONG" : "SHORT";
+  const dirEmoji = arrow === "LONG" ? "\u{1F7E2}" : "\u{1F534}";
+
+  const confPct = Math.round(alert.confidence * 100);
+  const confBar = "\u2588".repeat(Math.round(confPct / 10)) + "\u2591".repeat(10 - Math.round(confPct / 10));
+
+  const lines = [
+    `${dirEmoji} *NEW CALL* — $${esc(alert.ticker)}`,
+    "",
+    `Caller: @${esc(alert.author_handle)}`,
+    `Direction: *${esc(arrow)}*`,
+  ];
+
+  if (alert.entry_price != null) {
+    lines.push(`Entry: $${esc(alert.entry_price.toFixed(2))}`);
+  }
+  if (alert.platform) {
+    lines.push(`Platform: ${esc(alert.platform)}`);
+  }
+  lines.push(`Confidence: ${esc(confPct + "%")} ${esc(confBar)}`);
+
+  lines.push("");
+  lines.push(`[View on paste\\.markets](https://paste.markets/${esc(alert.author_handle)})`);
+
+  return lines.join("\n");
 }
 
 function buildWinBar(rate: number, len = 10): string {

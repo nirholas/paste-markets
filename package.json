@@ -17,6 +17,7 @@
     "agent-twitter-client": "^0.0.18",
     "https-proxy-agent": "^8.0.0",
     "next": "^15.5.14",
+    "playwright": "^1.58.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "xactions": "^3.0.44"

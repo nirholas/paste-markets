@@ -439,3 +439,15 @@ CREATE TABLE IF NOT EXISTS executed_trades (
 CREATE INDEX IF NOT EXISTS idx_executed_trades_wallet ON executed_trades(wallet_address);
 CREATE INDEX IF NOT EXISTS idx_executed_trades_status ON executed_trades(status);
 CREATE INDEX IF NOT EXISTS idx_executed_trades_trade ON executed_trades(trade_id);
+
+-- Telegram Alert Log (tracks which signals have been broadcast)
+CREATE TABLE IF NOT EXISTS telegram_alerts_sent (
+  id SERIAL PRIMARY KEY,
+  signal_id INTEGER NOT NULL REFERENCES live_signals(id),
+  chat_id TEXT NOT NULL,
+  sent_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(signal_id, chat_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_telegram_alerts_signal ON telegram_alerts_sent(signal_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_alerts_sent_at ON telegram_alerts_sent(sent_at DESC);

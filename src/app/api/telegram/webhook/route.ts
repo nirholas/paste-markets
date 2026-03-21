@@ -88,10 +88,37 @@ async function fetchTickerStats(ticker: string): Promise<string | null> {
 async function handleSubscribe(chatId: number | string, handle: string) {
   try {
     const { addTelegramSub } = await import("@/lib/telegram-db");
-    await addTelegramSub(String(chatId), handle.toLowerCase().replace(/^@/, ""));
-    await sendMessage(chatId, `Subscribed to alerts for *@${handle.replace(/^@/, "")}*\\. You'll get notified on new calls\\.`);
+    const clean = handle.toLowerCase().replace(/^@/, "");
+    await addTelegramSub(String(chatId), clean);
+    await sendMessage(chatId, `Subscribed to alerts for *@${clean}*\\. You'll get notified on new calls\\.`);
   } catch {
     await sendMessage(chatId, "Failed to subscribe\\. Try again later\\.");
+  }
+}
+
+async function handleUnsubscribe(chatId: number | string, handle: string) {
+  try {
+    const { removeTelegramSub } = await import("@/lib/telegram-db");
+    const clean = handle.toLowerCase().replace(/^@/, "");
+    await removeTelegramSub(String(chatId), clean);
+    await sendMessage(chatId, `Unsubscribed from *@${clean}*\\.`);
+  } catch {
+    await sendMessage(chatId, "Failed to unsubscribe\\. Try again later\\.");
+  }
+}
+
+async function handleMySubs(chatId: number | string) {
+  try {
+    const { getSubscriptions } = await import("@/lib/telegram-db");
+    const subs = await getSubscriptions(String(chatId));
+    if (subs.length === 0) {
+      await sendMessage(chatId, "You have no active subscriptions\\. Use /subscribe \\{handle\\} to add one\\.");
+      return;
+    }
+    const list = subs.map((h) => `• @${h.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1")}`).join("\n");
+    await sendMessage(chatId, `*Your subscriptions:*\n\n${list}`);
+  } catch {
+    await sendMessage(chatId, "Failed to fetch subscriptions\\. Try again later\\.");
   }
 }
 
