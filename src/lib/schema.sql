@@ -28,7 +28,10 @@ CREATE TABLE IF NOT EXISTS authors (
   following INTEGER,
   tweet_count INTEGER,
   x_joined_at TIMESTAMPTZ,
-  x_profile_fetched_at TIMESTAMPTZ
+  x_profile_fetched_at TIMESTAMPTZ,
+  -- Geocoded coordinates (from X profile location string)
+  lat REAL,
+  lng REAL
 );
 
 -- Individual trades (cached from paste.trade)

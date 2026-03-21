@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:seed": "tsx src/lib/seed.ts",
     "db:sync": "tsx src/lib/seed-from-api.ts",
-    "db:migrate-x-profile": "tsx src/lib/migrate-x-profile.ts"
+    "db:migrate-x-profile": "tsx src/lib/migrate-x-profile.ts",
+    "backfill:x-profiles": "tsx src/lib/backfill-x-profiles.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

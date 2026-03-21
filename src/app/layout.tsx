@@ -73,7 +73,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jetbrains.variable}`} style={{ backgroundColor: "#000000" }}>
       <body className="font-sans antialiased min-h-screen">
         <TradeTicker />
         <Nav />

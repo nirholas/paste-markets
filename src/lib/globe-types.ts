@@ -33,4 +33,6 @@ export interface GlobeStats {
   activeTickers: number;
   activeCallers: number;
   avgPnl: number;
+  realLocations?: number;
+  totalLocationsInDb?: number;
 }

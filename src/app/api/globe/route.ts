@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildGlobeData, type TradeInput } from "@/lib/globe-data";
+import { buildGlobeData, type TradeInput, type CallerLocation } from "@/lib/globe-data";
 import { fetchFeed } from "@/lib/upstream";
+import { neon } from "@neondatabase/serverless";
 
 export const dynamic = "force-dynamic";
+
+const sql = neon(process.env.DATABASE_URL!);
+
+/** Load all geocoded caller locations from DB */
+async function getCallerLocations(): Promise<Map<string, CallerLocation>> {
+  try {
+    const rows = await sql`
+      SELECT handle, lat, lng, location FROM authors
+      WHERE lat IS NOT NULL AND lng IS NOT NULL
+    ` as Array<{ handle: string; lat: number; lng: number; location: string | null }>;
+
+    const map = new Map<string, CallerLocation>();
+    for (const row of rows) {
+      map.set(row.handle, {
+        handle: row.handle,
+        lat: row.lat,
+        lng: row.lng,
+        label: row.location ?? undefined,
+      });
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -10,12 +36,15 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10), 200);
 
   try {
-    // Fetch recent trades from paste.trade feed
-    const feedResult = await fetchFeed(
-      "new",
-      limit,
-      window === "24h" ? "24h" : window === "30d" ? "30d" : "7d",
-    );
+    // Fetch trades + real locations in parallel
+    const [feedResult, callerLocations] = await Promise.all([
+      fetchFeed(
+        "new",
+        limit,
+        window === "24h" ? "24h" : window === "30d" ? "30d" : "7d",
+      ),
+      getCallerLocations(),
+    ]);
 
     const trades: TradeInput[] = [];
 
@@ -49,11 +78,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const globeData = buildGlobeData(trades);
+    // Build globe data with real locations
+    const globeData = buildGlobeData(trades, callerLocations);
 
     const uniqueCallers = new Set(trades.map((t) => t.author));
     const uniqueTickers = new Set(trades.map((t) => t.ticker));
     const avgPnl = trades.length > 0 ? trades.reduce((s, t) => s + t.pnl, 0) / trades.length : 0;
+
+    // Count how many callers have real locations
+    const realLocationCount = [...uniqueCallers].filter((h) => callerLocations.has(h)).length;
 
     return NextResponse.json({
       ...globeData,
@@ -62,6 +95,8 @@ export async function GET(request: NextRequest) {
         activeCallers: uniqueCallers.size,
         activeTickers: uniqueTickers.size,
         avgPnl,
+        realLocations: realLocationCount,
+        totalLocationsInDb: callerLocations.size,
       },
     }, {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=60" },

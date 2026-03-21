@@ -40,6 +40,8 @@ export interface Author {
   tweet_count: number | null;
   x_joined_at: string | null;
   x_profile_fetched_at: string | null;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface LeaderboardEntry {

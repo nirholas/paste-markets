@@ -37,6 +37,9 @@ export interface Author {
   tweet_count: number | null;
   x_joined_at: string | null;
   x_profile_fetched_at: string | null;
+  // Geocoded coordinates (from location string)
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface LeaderboardEntry {
