@@ -96,21 +96,9 @@ export default async function HomePage() {
 
       {/* ── Hero w/ Globe ────────────────────────────────────────────── */}
       <section className="relative flex flex-col items-center px-4 pt-4 pb-8 overflow-hidden">
-        {/* Large logo behind globe */}
-        <div className="absolute inset-0 flex items-start justify-center pointer-events-none" style={{ paddingTop: "120px" }}>
-          <span className="text-[#f5f5f7] font-bold tracking-tight select-none opacity-[0.07]" style={{ fontSize: "clamp(80px, 12vw, 160px)" }}>
-            paste<span className="text-[#0066FF]">.</span>markets
-          </span>
-        </div>
-
         {/* Globe */}
-        <div className="relative z-[1] w-full max-w-3xl" style={{ height: "420px" }}>
+        <div className="relative w-full max-w-3xl" style={{ height: "420px" }}>
           <HeroGlobe />
-          {/* Fade bottom edge into bg */}
-          <div
-            className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-            style={{ background: "linear-gradient(to top, #0a0a1a, transparent)" }}
-          />
         </div>
 
         {/* Input + links overlaid below globe */}

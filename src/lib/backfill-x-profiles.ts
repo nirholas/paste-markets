@@ -14,7 +14,7 @@
  */
 
 import { neon } from "@neondatabase/serverless";
-import { fetchProfile } from "./twitter-fetch";
+import { Scraper } from "agent-twitter-client";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -22,7 +22,7 @@ const sql = neon(process.env.DATABASE_URL!);
 const args = process.argv.slice(2);
 function getArg(name: string, fallback: string): string {
   const idx = args.indexOf(`--${name}`);
-  return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
+  return idx !== -1 && args[idx + 1] ? args[idx + 1]! : fallback;
 }
 const force = args.includes("--force");
 const limit = parseInt(getArg("limit", "0"), 10);
@@ -35,20 +35,35 @@ const SKIP_HANDLES = new Set([
 
 function isValidHandle(handle: string): boolean {
   if (SKIP_HANDLES.has(handle)) return false;
-  if (handle.includes(" ")) return false; // "David Patterson", "Bob Sternfels"
-  if (handle.includes(".")) return false; // favicon.png
+  if (handle.includes(" ")) return false;
+  if (handle.includes(".")) return false;
   return true;
 }
 
+async function createScraper(): Promise<Scraper> {
+  const scraper = new Scraper();
+  const authToken = process.env["TWITTER_AUTH_TOKEN"];
+  const ct0 = process.env["TWITTER_CT0"];
+
+  if (!authToken || !ct0) {
+    throw new Error("TWITTER_AUTH_TOKEN and TWITTER_CT0 must be set in .env.local");
+  }
+
+  await scraper.setCookies([
+    `auth_token=${authToken}; Domain=.twitter.com; Path=/; Secure; HttpOnly`,
+    `ct0=${ct0}; Domain=.twitter.com; Path=/; Secure`,
+  ]);
+
+  return scraper;
+}
+
 async function backfill() {
+  const scraper = await createScraper();
+
   // Get authors to process
-  const condition = force ? "" : "AND x_profile_fetched_at IS NULL";
-  const rows = await sql`
-    SELECT handle, total_trades
-    FROM authors
-    WHERE handle IS NOT NULL ${force ? sql`` : sql`AND x_profile_fetched_at IS NULL`}
-    ORDER BY total_trades DESC
-  `;
+  const rows = force
+    ? await sql`SELECT handle, total_trades FROM authors WHERE handle IS NOT NULL ORDER BY total_trades DESC`
+    : await sql`SELECT handle, total_trades FROM authors WHERE handle IS NOT NULL AND x_profile_fetched_at IS NULL ORDER BY total_trades DESC`;
 
   let authors = rows.filter((r) => isValidHandle(r.handle as string));
   if (limit > 0) authors = authors.slice(0, limit);
@@ -61,53 +76,63 @@ async function backfill() {
   let skipped = 0;
 
   for (let i = 0; i < authors.length; i++) {
-    const handle = authors[i].handle as string;
-    const trades = authors[i].total_trades as number;
+    const handle = authors[i]!.handle as string;
+    const trades = authors[i]!.total_trades as number;
     const progress = `[${i + 1}/${authors.length}]`;
 
     try {
-      const profile = await fetchProfile(handle);
+      const profile = await scraper.getProfile(handle);
 
-      if (!profile) {
+      if (!profile || !profile.username) {
         console.log(`${progress} @${handle} — not found on X`);
-        // Mark as fetched so we don't retry every time
         await sql`UPDATE authors SET x_profile_fetched_at = NOW() WHERE handle = ${handle}`;
         skipped++;
-        continue;
+      } else {
+        const avatarUrl = profile.avatar ?? null;
+        const bannerUrl = profile.banner ?? null;
+        const displayName = profile.name ?? null;
+        const bio = profile.biography ?? null;
+        const location = profile.location ?? null;
+        const website = profile.website ?? null;
+        const verified = profile.isBlueVerified ?? profile.isVerified ?? false;
+        const followers = profile.followersCount ?? 0;
+        const following = profile.followingCount ?? 0;
+        const tweetCount = profile.tweetsCount ?? 0;
+        const joined = profile.joined ? profile.joined.toISOString() : null;
+
+        await sql`
+          UPDATE authors SET
+            avatar_url = ${avatarUrl},
+            banner_url = ${bannerUrl},
+            display_name = COALESCE(${displayName}, display_name),
+            bio = ${bio},
+            location = ${location},
+            website = ${website},
+            verified = ${verified},
+            followers = ${followers},
+            following = ${following},
+            tweet_count = ${tweetCount},
+            x_joined_at = ${joined},
+            x_profile_fetched_at = NOW()
+          WHERE handle = ${handle}
+        `;
+
+        const fmtFollowers = followers >= 1000
+          ? `${(followers / 1000).toFixed(1)}K`
+          : String(followers);
+
+        console.log(
+          `${progress} @${handle} — ${displayName || handle} | ${fmtFollowers} followers | ${verified ? "verified" : ""} | ${location || "no location"} | trades: ${trades}`,
+        );
+        success++;
       }
-
-      await sql`
-        UPDATE authors SET
-          avatar_url = ${profile.avatarUrl},
-          banner_url = ${profile.bannerUrl},
-          display_name = COALESCE(${profile.displayName}, display_name),
-          bio = ${profile.bio},
-          location = ${profile.location},
-          website = ${profile.website},
-          verified = ${profile.verified},
-          followers = ${profile.followers},
-          following = ${profile.following},
-          tweet_count = ${profile.tweetCount},
-          x_joined_at = ${profile.joined},
-          x_profile_fetched_at = NOW()
-        WHERE handle = ${handle}
-      `;
-
-      const followers = profile.followers >= 1000
-        ? `${(profile.followers / 1000).toFixed(1)}K`
-        : String(profile.followers);
-
-      console.log(
-        `${progress} @${handle} — ${profile.displayName || handle} | ${followers} followers | ${profile.verified ? "verified" : "unverified"} | ${profile.location || "no location"} | trades: ${trades}`,
-      );
-      success++;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`${progress} @${handle} — ERROR: ${msg}`);
       failed++;
     }
 
-    // Rate limit: wait between requests
+    // Rate limit
     if (i < authors.length - 1) {
       await new Promise((r) => setTimeout(r, delay));
     }
