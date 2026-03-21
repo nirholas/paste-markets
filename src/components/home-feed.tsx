@@ -74,42 +74,6 @@ function timeAgo(isoString: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// ─── Activity ticker ────────────────────────────────────────────────────────
-
-function ActivityTicker({ items }: { items: FeedItem[] }) {
-  if (items.length === 0) return null;
-
-  const segments = [...items, ...items]; // duplicate for seamless loop
-
-  return (
-    <div className="relative overflow-hidden border-y border-[#1a1a2e] py-1.5 bg-[#07071a]">
-      <div className="ticker-track flex gap-8 whitespace-nowrap" aria-hidden="true">
-        {segments.map((item, i) => {
-          const isLong = item.direction === "long" || item.direction === "yes";
-          const pnlColor = item.pnl_pct == null
-            ? "#555568"
-            : item.pnl_pct >= 0 ? "#2ecc71" : "#e74c3c";
-          const pnlLabel = item.pnl_pct == null
-            ? "OPEN"
-            : `${item.pnl_pct >= 0 ? "+" : ""}${item.pnl_pct.toFixed(1)}%`;
-
-          return (
-            <span key={i} className="inline-flex items-center gap-1.5 text-[11px] font-mono">
-              <span style={{ color: isLong ? "#2ecc71" : "#e74c3c" }}>
-                {item.direction.toUpperCase()}
-              </span>
-              <span className="text-[#f0f0f0] font-bold">${item.ticker.toUpperCase()}</span>
-              <span className="text-[#555568]">@{item.author_handle}</span>
-              <span style={{ color: pnlColor }}>{pnlLabel}</span>
-              <span className="text-[#1a1a2e]">·</span>
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── New trade toast ────────────────────────────────────────────────────────
 
 interface ToastItem { handle: string; ticker: string; direction: string }
@@ -409,7 +373,6 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
   const [toast, setToast] = useState<ToastItem | null>(null);
   const [assets, setAssets] = useState<AssetSummary[]>(initialAssets);
   const [callers, setCallers] = useState<TopCaller[]>(initialCallers);
-  const [tickerItems, setTickerItems] = useState<FeedItem[]>([]);
 
   // Persist filters across sessions
   useEffect(() => {
@@ -531,13 +494,6 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
         .then((d: { callers?: TopCaller[] }) => setCallers(d.callers ?? []))
         .catch(() => {});
     }
-    // Recent trades for ticker
-    fetch("/api/feed?tab=new&limit=10")
-      .then((r) => r.json())
-      .then((d: { trades?: FeedItem[]; items?: FeedItem[] }) => {
-        setTickerItems(d.trades ?? d.items ?? []);
-      })
-      .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Tab change ─────────────────────────────────────────────────────
@@ -575,9 +531,6 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
 
   return (
     <>
-      {/* Activity ticker */}
-      <ActivityTicker items={tickerItems} />
-
       {/* Three-column layout */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_220px] gap-6">

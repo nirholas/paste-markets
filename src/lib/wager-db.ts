@@ -55,14 +55,11 @@ const MAX_WAGER_PER_USER = 500; // USDC
 // ─── vault address ────────────────────────────────────────────────────────────
 
 /**
- * Deterministic vault identifier based on trade card ID.
- * In production this would be a Solana PDA derived from ["wager-vault", tradeCardId].
- * For now we return a placeholder string that communicates the pattern.
+ * Returns the on-chain Solana vault address for a trade card.
+ * Requires a deployed Solana program — returns null until integration is complete.
  */
-export function deriveVaultAddress(tradeCardId: string): string {
-  // Truncate + encode for a human-readable placeholder
-  const slug = tradeCardId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
-  return `wagerVault_${slug}`;
+export function deriveVaultAddress(_tradeCardId: string): string | null {
+  return null;
 }
 
 // ─── public API ───────────────────────────────────────────────────────────────
