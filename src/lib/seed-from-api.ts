@@ -82,7 +82,7 @@ async function fetchAllTrades(): Promise<Map<string, PasteTradeTrade[]>> {
 
   do {
     const url = new URL("/api/search", BASE_URL);
-    url.searchParams.set("top", "90d");
+    url.searchParams.set("top", "all");
     url.searchParams.set("limit", "200");
     if (cursor) url.searchParams.set("cursor", cursor);
 

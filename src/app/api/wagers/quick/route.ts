@@ -72,9 +72,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // For quick wagers, generate a placeholder tx signature
-  // In production this would be a real Solana tx
-  const txSignature = `quick_${randomUUID().replace(/-/g, "")}`;
+  // Real Solana transaction signature required — client must sign and submit the tx,
+  // then pass the confirmed signature here.
+  const txSignature = body["txSignature"] as string | undefined;
+  if (!txSignature) {
+    return NextResponse.json(
+      { error: "txSignature is required. Client must sign and submit the Solana transaction first." },
+      { status: 400 },
+    );
+  }
 
   const result = await submitWager({
     id: randomUUID(),

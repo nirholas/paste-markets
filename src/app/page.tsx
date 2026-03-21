@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SmartInput } from "@/components/smart-input";
 import { HomeFeed } from "@/components/home-feed";
-import { DailyTopCallers } from "@/components/daily-top-callers";
 import type { AssetSummary } from "@/lib/data";
 import type { SiteStats } from "@/app/api/stats/route";
 
@@ -146,9 +145,6 @@ export default async function HomePage() {
           </div>
         )}
       </section>
-
-      {/* ── Today's Top Callers ──────────────────────────────────────── */}
-      <DailyTopCallers />
 
       {/* ── Smart Feed ───────────────────────────────────────────────── */}
       <HomeFeed initialAssets={assets} initialCallers={callers} />
