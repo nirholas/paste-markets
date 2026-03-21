@@ -3,20 +3,62 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-interface Trade {
+// ---------------------------------------------------------------------------
+// Types (mirrors TradeExtraction from trade-extractor.ts)
+// ---------------------------------------------------------------------------
+
+interface ExtractedThesis {
+  id: string;
   ticker: string;
-  direction: string;
-  venue: string;
+  direction: "long" | "short" | "yes" | "no";
+  platform: "hyperliquid" | "robinhood" | "polymarket";
   confidence: number;
   reasoning: string;
-  timeframe: string;
+  quote: string;
+  timeframe: string | null;
+  priceAtExtraction: number | null;
+  conviction: "high" | "medium" | "low";
 }
 
-interface TradeResult {
-  thesis: string;
+interface TradeExtraction {
+  id: string;
+  source: {
+    type: string;
+    url: string | null;
+    title: string;
+    author: string | null;
+    publishedAt: string | null;
+    wordCount: number;
+  };
+  theses: ExtractedThesis[];
+  summary: string;
+  processingTime: number;
+  createdAt: string;
+}
+
+interface TrackedTrade {
+  thesisId: string;
+  tradeUrl: string;
+  ticker: string;
+  direction: string;
+  entryPrice: number | null;
+  pasteTradeId: string;
+}
+
+interface ExtractResponse {
+  extraction: TradeExtraction;
+  tracked: TrackedTrade[];
+  sourceUrl: string;
+}
+
+interface RecentExtraction {
+  id: string;
   source_type: string;
-  trades: Trade[];
-  analysis: string;
+  source_url: string | null;
+  title: string;
+  author: string | null;
+  thesis_count: number;
+  created_at: string;
 }
 
 interface SubmitState {
@@ -25,27 +67,46 @@ interface SubmitState {
   error?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 const LOADING_STEPS = [
-  "Analyzing source...",
-  "Extracting thesis...",
-  "Finding trades...",
+  "Detecting source type...",
+  "Fetching content...",
+  "Extracting trade theses...",
+  "Analyzing confidence levels...",
+  "Finding optimal venues...",
 ];
 
-function extractTwitterHandle(url: string): string | undefined {
-  const match = url.match(/(?:twitter\.com|x\.com)\/([A-Za-z0-9_]+)(?:\/|$)/i);
-  return match?.[1];
-}
+const SOURCE_LABELS: Record<string, string> = {
+  tweet: "Tweet",
+  thread: "Thread",
+  article: "Article",
+  youtube: "YouTube",
+  pdf: "PDF",
+  text: "Text",
+};
 
-function isUrl(text: string): boolean {
-  return /^https?:\/\//i.test(text.trim());
-}
-
-function venueToPayload(venue: string): { platform: string; instrument: string } {
-  const lower = venue.toLowerCase();
-  if (lower.includes("polymarket")) return { platform: "polymarket", instrument: "polymarket" };
-  if (lower.includes("robinhood")) return { platform: "robinhood", instrument: "shares" };
+function venueToPayload(platform: string): { platform: string; instrument: string } {
+  if (platform === "polymarket") return { platform: "polymarket", instrument: "polymarket" };
+  if (platform === "robinhood") return { platform: "robinhood", instrument: "shares" };
   return { platform: "hyperliquid", instrument: "perps" };
 }
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// ---------------------------------------------------------------------------
+// ConfidenceBar
+// ---------------------------------------------------------------------------
 
 function ConfidenceBar({ confidence }: { confidence: number }) {
   const totalBlocks = 10;
@@ -56,61 +117,79 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
 
   return (
     <div className="flex items-center gap-2 font-mono text-sm">
-      <span className="text-text-muted text-xs uppercase tracking-widest">Confidence</span>
+      <span className="text-text-muted text-xs uppercase tracking-widest">
+        Confidence
+      </span>
       <span className={colorClass}>{"█".repeat(filledBlocks)}</span>
       <span className="text-text-muted">{"░".repeat(emptyBlocks)}</span>
-      <span className={`${colorClass} text-xs`}>{confidence}</span>
+      <span className={`${colorClass} text-xs`}>{confidence}%</span>
     </div>
   );
 }
 
-function TradeCard({
-  trade,
+// ---------------------------------------------------------------------------
+// ThesisCard — single trade thesis
+// ---------------------------------------------------------------------------
+
+function ThesisCard({
   thesis,
+  index,
   sourceUrl,
   authorHandle,
+  tracked,
 }: {
-  trade: Trade;
-  thesis: string;
+  thesis: ExtractedThesis;
+  index: number;
   sourceUrl?: string;
   authorHandle?: string;
+  tracked?: TrackedTrade;
 }) {
-  const directionUpper = trade.direction.toUpperCase();
-  const directionColor =
-    directionUpper === "LONG" || directionUpper === "YES"
+  const dirUpper = thesis.direction.toUpperCase();
+  const dirColor =
+    dirUpper === "LONG" || dirUpper === "YES"
       ? "text-win"
-      : directionUpper === "SHORT" || directionUpper === "NO"
+      : dirUpper === "SHORT" || dirUpper === "NO"
         ? "text-loss"
         : "text-text-primary";
 
-  const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const convictionColor =
+    thesis.conviction === "high"
+      ? "text-win"
+      : thesis.conviction === "low"
+        ? "text-loss"
+        : "text-amber";
 
-  const handlePost = async () => {
+  const [submitState, setSubmitState] = useState<SubmitState>(
+    tracked ? { status: "success", tradeUrl: tracked.tradeUrl } : { status: "idle" },
+  );
+
+  const handleTrack = async () => {
     setSubmitState({ status: "loading" });
-    const { platform, instrument } = venueToPayload(trade.venue);
+    const { platform, instrument } = venueToPayload(thesis.platform);
 
     try {
       const res = await fetch("/api/submit-trade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ticker: trade.ticker,
-          direction: trade.direction,
+          ticker: thesis.ticker,
+          direction: thesis.direction,
           platform,
           instrument,
-          thesis,
+          thesis: thesis.quote || thesis.reasoning,
           source_url: sourceUrl,
           author_handle: authorHandle,
-          headline_quote: thesis.slice(0, 120),
-          explanation: trade.reasoning,
+          headline_quote: (thesis.quote || thesis.reasoning).slice(0, 120),
+          explanation: thesis.reasoning,
         }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         const msg =
-          typeof data.details === "string" ? data.details : data.error || `Error ${res.status}`;
+          typeof data.details === "string"
+            ? data.details
+            : data.error || `Error ${res.status}`;
         setSubmitState({ status: "error", error: msg });
         return;
       }
@@ -128,48 +207,67 @@ function TradeCard({
   };
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-6 space-y-4">
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-lg font-bold text-text-primary">
-          <span>${trade.ticker}</span>{" "}
-          <span className={directionColor}>{directionUpper}</span>
-        </h3>
-      </div>
-
-      <ConfidenceBar confidence={trade.confidence} />
-
-      <div className="flex gap-6 text-sm">
+    <div className="bg-surface border border-border rounded-lg p-5 space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between">
         <div>
-          <span className="text-text-muted text-xs uppercase tracking-widest">Venue</span>
-          <p className="text-text-secondary mt-1">{trade.venue}</p>
+          <span className="text-text-muted text-xs mr-2">Trade {index + 1}</span>
+          <span className="text-text-primary font-bold text-lg">{thesis.ticker}</span>{" "}
+          <span className={`font-bold ${dirColor}`}>{dirUpper}</span>
+          <span className="text-text-muted text-xs ml-2">on {thesis.platform}</span>
         </div>
-        <div>
-          <span className="text-text-muted text-xs uppercase tracking-widest">Timeframe</span>
-          <p className="text-text-secondary mt-1">{trade.timeframe}</p>
-        </div>
+        <ConfidenceBar confidence={thesis.confidence} />
       </div>
 
-      <div>
-        <span className="text-text-muted text-xs uppercase tracking-widest">Reasoning</span>
-        <p className="text-text-secondary text-sm mt-1 leading-relaxed">{trade.reasoning}</p>
+      {/* Quote */}
+      {thesis.quote && (
+        <blockquote className="border-l-2 border-border pl-3 text-text-secondary text-sm italic">
+          &ldquo;{thesis.quote}&rdquo;
+        </blockquote>
+      )}
+
+      {/* Reasoning */}
+      {thesis.reasoning && (
+        <p className="text-text-secondary text-sm leading-relaxed">{thesis.reasoning}</p>
+      )}
+
+      {/* Meta row */}
+      <div className="flex items-center gap-4 text-xs text-text-muted">
+        <span>
+          Conviction:{" "}
+          <span className={convictionColor}>{thesis.conviction.toUpperCase()}</span>
+        </span>
+        {thesis.timeframe && <span>{thesis.timeframe}</span>}
+        {thesis.priceAtExtraction != null && (
+          <span>
+            Entry: $
+            {thesis.priceAtExtraction.toLocaleString(undefined, {
+              maximumFractionDigits: 2,
+            })}
+          </span>
+        )}
       </div>
 
-      {/* Post to paste.trade */}
+      {/* Track button */}
       <div className="pt-2 border-t border-border">
         {submitState.status === "idle" && (
           <button
-            onClick={handlePost}
+            onClick={handleTrack}
             className="w-full border border-border rounded-lg px-4 py-2 text-sm font-bold text-text-primary hover:border-accent transition-colors"
           >
-            Post to paste.trade
+            Track This Trade
           </button>
         )}
         {submitState.status === "loading" && (
-          <p className="text-text-muted text-sm text-center animate-pulse">Posting trade...</p>
+          <p className="text-text-muted text-sm text-center animate-pulse">
+            Posting trade...
+          </p>
         )}
         {submitState.status === "success" && (
           <div className="space-y-2">
-            <p className="text-win text-sm font-bold">Trade posted. P&L tracking live.</p>
+            <p className="text-win text-sm font-bold">
+              Trade posted. P&L tracking live.
+            </p>
             <a
               href={submitState.tradeUrl}
               target="_blank"
@@ -182,7 +280,7 @@ function TradeCard({
         )}
         {submitState.status === "error" && (
           <div className="space-y-2">
-            <p className="text-loss text-sm">Failed to post: {submitState.error}</p>
+            <p className="text-loss text-sm">Failed: {submitState.error}</p>
             <button
               onClick={() => setSubmitState({ status: "idle" })}
               className="text-text-muted text-xs hover:text-text-secondary transition-colors"
@@ -196,6 +294,118 @@ function TradeCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// TrackAllButton
+// ---------------------------------------------------------------------------
+
+function TrackAllButton({
+  extraction,
+  onTracked,
+}: {
+  extraction: TradeExtraction;
+  onTracked: (tracked: TrackedTrade[]) => void;
+}) {
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  const handleTrackAll = async () => {
+    setState("loading");
+    try {
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: extraction.source.url || extraction.source.title,
+          trackAll: true,
+        }),
+      });
+
+      if (!res.ok) {
+        setState("error");
+        return;
+      }
+
+      const data: ExtractResponse = await res.json();
+      onTracked(data.tracked);
+      setState("done");
+    } catch {
+      setState("error");
+    }
+  };
+
+  if (state === "done") {
+    return (
+      <div className="text-center">
+        <p className="text-win text-sm font-bold">
+          All trades posted. P&L tracking live.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleTrackAll}
+      disabled={state === "loading"}
+      className="w-full border border-accent rounded-lg px-6 py-3 text-sm font-bold text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
+    >
+      {state === "loading"
+        ? "Tracking all trades..."
+        : state === "error"
+          ? "Retry Track All"
+          : `Track All ${extraction.theses.length} Trades`}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RecentExtractions
+// ---------------------------------------------------------------------------
+
+function RecentExtractions({ extractions }: { extractions: RecentExtraction[] }) {
+  if (extractions.length === 0) return null;
+
+  return (
+    <section>
+      <h2 className="text-xs uppercase tracking-widest text-text-muted mb-4">
+        Recent Extractions
+      </h2>
+      <div className="space-y-2">
+        {extractions.map((ext) => (
+          <a
+            key={ext.id}
+            href={`/source/${ext.id}`}
+            className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3 hover:border-accent/50 transition-colors group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-xs text-text-muted border border-border rounded px-1.5 py-0.5 flex-shrink-0">
+                {SOURCE_LABELS[ext.source_type] || ext.source_type}
+              </span>
+              <span className="text-sm text-text-primary truncate group-hover:text-accent transition-colors">
+                {ext.author ? `${ext.author} ` : ""}
+                {ext.title.length > 60
+                  ? ext.title.slice(0, 60) + "..."
+                  : ext.title}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+              <span className="text-xs text-text-secondary">
+                {ext.thesis_count} trade{ext.thesis_count !== 1 ? "s" : ""}
+              </span>
+              <span className="text-xs text-text-muted">
+                {timeAgo(ext.created_at)}
+              </span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TradeFinderInner
+// ---------------------------------------------------------------------------
+
 function TradeFinderInner() {
   const searchParams = useSearchParams();
   const prefilled = searchParams.get("q") ?? "";
@@ -203,22 +413,35 @@ function TradeFinderInner() {
   const [input, setInput] = useState(prefilled);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
-  const [result, setResult] = useState<TradeResult | null>(null);
+  const [result, setResult] = useState<ExtractResponse | null>(null);
+  const [trackedMap, setTrackedMap] = useState<Record<string, TrackedTrade>>({});
   const [error, setError] = useState<string | null>(null);
+  const [recentExtractions, setRecentExtractions] = useState<RecentExtraction[]>([]);
+
+  // Fetch recent extractions on mount
+  useEffect(() => {
+    fetch("/api/extract/recent")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setRecentExtractions(data);
+      })
+      .catch(() => {});
+  }, []);
 
   const analyze = useCallback(async (text: string) => {
     if (!text.trim()) return;
     setLoading(true);
     setLoadingStep(0);
     setResult(null);
+    setTrackedMap({});
     setError(null);
 
     const stepInterval = setInterval(() => {
       setLoadingStep((prev) => (prev < LOADING_STEPS.length - 1 ? prev + 1 : prev));
-    }, 2000);
+    }, 2500);
 
     try {
-      const res = await fetch("/api/trade", {
+      const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: text }),
@@ -229,8 +452,23 @@ function TradeFinderInner() {
         throw new Error(body || `Request failed with status ${res.status}`);
       }
 
-      const data: TradeResult = await res.json();
+      const data: ExtractResponse = await res.json();
       setResult(data);
+
+      // Build tracked map from initial response
+      const map: Record<string, TrackedTrade> = {};
+      for (const t of data.tracked) {
+        map[t.thesisId] = t;
+      }
+      setTrackedMap(map);
+
+      // Refresh recent extractions
+      fetch("/api/extract/recent")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((d) => {
+          if (Array.isArray(d)) setRecentExtractions(d);
+        })
+        .catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed. Try again.");
     } finally {
@@ -248,25 +486,39 @@ function TradeFinderInner() {
     analyze(input);
   };
 
-  const sourceUrl = isUrl(input) ? input : undefined;
-  const authorHandle = sourceUrl ? extractTwitterHandle(sourceUrl) : undefined;
+  const handleTrackedAll = (tracked: TrackedTrade[]) => {
+    const map = { ...trackedMap };
+    for (const t of tracked) {
+      map[t.thesisId] = t;
+    }
+    setTrackedMap(map);
+  };
+
+  const extraction = result?.extraction;
+  const sourceUrl = extraction?.source.url ?? undefined;
+  const authorHandle = extraction?.source.author?.replace(/^@/, "") ?? undefined;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-16 pb-20">
+    <div className="max-w-3xl mx-auto px-4 pt-16 pb-20">
+      {/* Header */}
       <section className="mb-10">
         <h1 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">
           What&apos;s The Trade?
         </h1>
-        <p className="text-text-secondary text-sm">
-          Paste a URL or describe a thesis. AI finds the trade.
+        <p className="text-text-secondary text-sm mb-1">
+          Paste any URL or text to find the trades
+        </p>
+        <p className="text-text-muted text-xs">
+          Supports: Tweets - Threads - Articles - YouTube - PDFs - Raw text
         </p>
       </section>
 
+      {/* Input */}
       <form onSubmit={handleSubmit} className="mb-10">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Paste a URL or type your thesis..."
+          placeholder={"https://x.com/taikimaeda/status/...\n\nOr paste article text directly..."}
           rows={4}
           disabled={loading}
           className="w-full bg-surface border border-border rounded-lg p-4 text-text-primary text-sm placeholder:text-text-muted resize-none focus:outline-none focus:border-accent transition-colors disabled:opacity-50"
@@ -276,10 +528,11 @@ function TradeFinderInner() {
           disabled={loading || !input.trim()}
           className="mt-4 w-full border border-border rounded-lg px-6 py-3 text-sm font-bold text-text-primary hover:border-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading ? "Analyzing..." : "Find The Trade"}
+          {loading ? "Extracting Trades..." : "Extract Trades"}
         </button>
       </form>
 
+      {/* Loading */}
       {loading && (
         <div className="bg-surface border border-border rounded-lg p-6 mb-10">
           <div className="space-y-3">
@@ -288,11 +541,17 @@ function TradeFinderInner() {
                 {i < loadingStep ? (
                   <span className="text-win text-xs w-4 text-center">--</span>
                 ) : i === loadingStep ? (
-                  <span className="text-accent text-xs w-4 text-center animate-pulse">&gt;</span>
+                  <span className="text-accent text-xs w-4 text-center animate-pulse">
+                    &gt;
+                  </span>
                 ) : (
                   <span className="text-text-muted text-xs w-4 text-center">..</span>
                 )}
-                <span className={i <= loadingStep ? "text-text-primary" : "text-text-muted"}>
+                <span
+                  className={
+                    i <= loadingStep ? "text-text-primary" : "text-text-muted"
+                  }
+                >
                   {step}
                 </span>
               </div>
@@ -301,68 +560,116 @@ function TradeFinderInner() {
         </div>
       )}
 
+      {/* Error */}
       {error && (
         <div className="bg-surface border border-loss/30 rounded-lg p-6 mb-10">
-          <p className="text-loss text-sm font-bold mb-1">Analysis failed</p>
+          <p className="text-loss text-sm font-bold mb-1">Extraction failed</p>
           <p className="text-text-secondary text-sm">{error}</p>
         </div>
       )}
 
-      {result && (
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">Thesis</h2>
-            <p className="text-text-secondary text-sm leading-relaxed">{result.thesis}</p>
-            <span className="inline-block mt-2 text-xs text-text-muted border border-border rounded px-2 py-0.5">
-              {result.source_type}
-            </span>
-          </div>
-
-          <div>
-            <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">Trades</h2>
-            <div className="space-y-4">
-              {result.trades.map((trade, i) => (
-                <TradeCard
-                  key={`${trade.ticker}-${i}`}
-                  trade={trade}
-                  thesis={result.thesis}
-                  sourceUrl={sourceUrl}
-                  authorHandle={authorHandle}
-                />
-              ))}
+      {/* Results */}
+      {extraction && (
+        <div className="space-y-8 mb-12">
+          {/* Source info */}
+          <div className="bg-surface border border-border rounded-lg p-6">
+            <div className="flex items-center gap-2 text-xs text-text-muted uppercase tracking-widest mb-2">
+              <span>Source</span>
+              <span>-</span>
+              <span>{SOURCE_LABELS[extraction.source.type] || extraction.source.type}</span>
+              {extraction.source.author && (
+                <>
+                  <span>-</span>
+                  <span>{extraction.source.author}</span>
+                </>
+              )}
+            </div>
+            <h2 className="text-lg font-bold text-text-primary mb-2">
+              {extraction.source.title}
+            </h2>
+            <p className="text-text-secondary text-sm leading-relaxed">
+              {extraction.summary}
+            </p>
+            <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
+              <span>{extraction.source.wordCount} words</span>
+              <span>{extraction.processingTime}ms</span>
+              {extraction.source.url && (
+                <a
+                  href={extraction.source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline"
+                >
+                  View source
+                </a>
+              )}
             </div>
           </div>
 
-          <div>
-            <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">Analysis</h2>
-            <div className="bg-surface border border-border rounded-lg p-6">
-              <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">
-                {result.analysis}
-              </p>
-            </div>
+          {/* Trades count header */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">
+              {extraction.theses.length} Trade{extraction.theses.length !== 1 ? "s" : ""}{" "}
+              Found
+            </h2>
+            <a
+              href={`/source/${extraction.id}`}
+              className="text-xs text-accent hover:underline"
+            >
+              View source page
+            </a>
           </div>
 
+          {/* Track All */}
+          {extraction.theses.length > 1 && (
+            <TrackAllButton
+              extraction={extraction}
+              onTracked={handleTrackedAll}
+            />
+          )}
+
+          {/* Thesis cards */}
+          <div className="space-y-4">
+            {extraction.theses.map((thesis, i) => (
+              <ThesisCard
+                key={thesis.id}
+                thesis={thesis}
+                index={i}
+                sourceUrl={sourceUrl}
+                authorHandle={authorHandle}
+                tracked={trackedMap[thesis.id]}
+              />
+            ))}
+          </div>
+
+          {/* Disclaimer */}
           <p className="text-text-muted text-xs text-center pt-4 border-t border-border">
             Not financial advice. AI-generated analysis. Do your own research.
           </p>
         </div>
       )}
+
+      {/* Recent extractions */}
+      {!loading && !extraction && (
+        <RecentExtractions extractions={recentExtractions} />
+      )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
 
 export function TradeFinder() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-2xl mx-auto px-4 pt-16 pb-20">
-          <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#3b82f6" }}>
-            paste.trade
-          </p>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: "#f0f0f0" }}>
-            Submit a Trade
+        <div className="max-w-3xl mx-auto px-4 pt-16 pb-20">
+          <h1 className="text-3xl font-bold mb-2 text-text-primary">
+            What&apos;s The Trade?
           </h1>
-          <p className="text-sm" style={{ color: "#c8c8d0" }}>Loading...</p>
+          <p className="text-sm text-text-secondary">Loading...</p>
         </div>
       }
     >

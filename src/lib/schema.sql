@@ -233,3 +233,198 @@ CREATE TABLE IF NOT EXISTS telegram_subs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_telegram_subs_handle ON telegram_subs(caller_handle);
+
+-- ─── Caller Watchlist (real-time streaming) ─────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS caller_watchlist (
+  handle TEXT PRIMARY KEY,
+  display_name TEXT,
+  tier TEXT DEFAULT 'C',
+  check_interval_ms INTEGER DEFAULT 1800000,
+  last_checked_at TEXT,
+  last_tweet_id TEXT,
+  enabled INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_watchlist_enabled ON caller_watchlist(enabled);
+
+-- Live signal detections from the poller
+CREATE TABLE IF NOT EXISTS live_signals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  handle TEXT NOT NULL,
+  tweet_id TEXT NOT NULL UNIQUE,
+  tweet_text TEXT NOT NULL,
+  tweet_url TEXT NOT NULL,
+  tweet_date TEXT NOT NULL,
+  ticker TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  platform TEXT,
+  confidence REAL NOT NULL,
+  entry_price REAL,
+  trade_url TEXT,
+  paste_trade_id TEXT,
+  detected_at TEXT DEFAULT (datetime('now')),
+  detection_latency_ms INTEGER,
+  FOREIGN KEY (handle) REFERENCES caller_watchlist(handle)
+);
+
+CREATE INDEX IF NOT EXISTS idx_live_signals_handle ON live_signals(handle);
+CREATE INDEX IF NOT EXISTS idx_live_signals_detected ON live_signals(detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_live_signals_confidence ON live_signals(confidence DESC);
+
+-- ─── Backtest Jobs ──────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS backtest_jobs (
+  id TEXT PRIMARY KEY,
+  handle TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',
+  phase TEXT DEFAULT 'fetching_tweets',
+  tweets_scanned INTEGER DEFAULT 0,
+  total_tweets INTEGER DEFAULT 0,
+  calls_found INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  completed_at TEXT,
+  error TEXT,
+  result_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_backtest_jobs_handle ON backtest_jobs(handle, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_backtest_jobs_status ON backtest_jobs(status);
+
+-- ─── Wager Events (social feed) ──────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS wager_events (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,              -- 'new_wager' | 'settled' | 'tip_earned'
+  trade_id TEXT NOT NULL,
+  caller_handle TEXT NOT NULL,
+  backer_handle TEXT,
+  amount REAL,
+  pnl_percent REAL,
+  tip_amount REAL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_wager_events_trade ON wager_events(trade_id);
+CREATE INDEX IF NOT EXISTS idx_wager_events_type ON wager_events(type);
+CREATE INDEX IF NOT EXISTS idx_wager_events_created ON wager_events(created_at DESC);
+
+-- ─── Event Markets (Polymarket sports/event betting) ─────────────────────────
+
+CREATE TABLE IF NOT EXISTS event_markets (
+  id TEXT PRIMARY KEY,
+  polymarket_id TEXT,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL,          -- 'sports' | 'politics' | 'crypto' | 'entertainment' | 'science' | 'economics'
+  subcategory TEXT,                -- 'NBA' | 'NFL' | 'UFC' | etc.
+  description TEXT,
+  current_probability REAL,
+  probability_24h_ago REAL,
+  volume REAL DEFAULT 0,
+  settlement_date TEXT,
+  settled INTEGER DEFAULT 0,
+  outcome TEXT,                    -- 'YES' | 'NO' | null
+  caller_count INTEGER DEFAULT 0,
+  market_url TEXT,
+  last_updated TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_markets_category ON event_markets(category);
+CREATE INDEX IF NOT EXISTS idx_event_markets_subcategory ON event_markets(category, subcategory);
+CREATE INDEX IF NOT EXISTS idx_event_markets_settlement ON event_markets(settlement_date);
+CREATE INDEX IF NOT EXISTS idx_event_markets_settled ON event_markets(settled);
+
+-- Caller positions on event markets
+CREATE TABLE IF NOT EXISTS event_market_calls (
+  id TEXT PRIMARY KEY,
+  market_id TEXT NOT NULL,
+  handle TEXT NOT NULL,
+  direction TEXT NOT NULL,         -- 'yes' | 'no'
+  entry_probability REAL NOT NULL,
+  called_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (market_id) REFERENCES event_markets(id),
+  UNIQUE(market_id, handle)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_calls_market ON event_market_calls(market_id);
+CREATE INDEX IF NOT EXISTS idx_event_calls_handle ON event_market_calls(handle);
+
+-- ─── Source Extractions (What's The Trade? multi-thesis) ────────────────────
+
+-- Each extraction run (one URL or text input → multiple theses)
+CREATE TABLE IF NOT EXISTS source_extractions (
+  id TEXT PRIMARY KEY,
+  source_type TEXT NOT NULL,          -- tweet | thread | article | youtube | pdf | text
+  source_url TEXT,
+  title TEXT NOT NULL,
+  author TEXT,
+  summary TEXT,
+  word_count INTEGER DEFAULT 0,
+  thesis_count INTEGER DEFAULT 0,
+  processing_time_ms INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_extractions_created ON source_extractions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_source_extractions_type ON source_extractions(source_type);
+
+-- Individual theses extracted from a source
+CREATE TABLE IF NOT EXISTS extracted_theses (
+  id TEXT PRIMARY KEY,
+  extraction_id TEXT NOT NULL,
+  ticker TEXT NOT NULL,
+  direction TEXT NOT NULL,            -- long | short | yes | no
+  platform TEXT NOT NULL,             -- hyperliquid | robinhood | polymarket
+  confidence INTEGER DEFAULT 50,
+  reasoning TEXT,
+  quote TEXT,
+  timeframe TEXT,
+  conviction TEXT DEFAULT 'medium',   -- high | medium | low
+  price_at_extraction REAL,
+  paste_trade_id TEXT,
+  paste_trade_url TEXT,
+  current_pnl REAL,
+  tracked_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (extraction_id) REFERENCES source_extractions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_extracted_theses_extraction ON extracted_theses(extraction_id);
+CREATE INDEX IF NOT EXISTS idx_extracted_theses_ticker ON extracted_theses(ticker);
+
+-- ─── Copytrading Alert Rules ────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS alert_rules (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  conditions TEXT NOT NULL,          -- JSON array of AlertCondition
+  channels TEXT NOT NULL,            -- JSON array of AlertChannel
+  enabled INTEGER DEFAULT 1,
+  match_count INTEGER DEFAULT 0,
+  last_matched_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_rules_user ON alert_rules(user_id);
+CREATE INDEX IF NOT EXISTS idx_alert_rules_enabled ON alert_rules(enabled);
+
+CREATE TABLE IF NOT EXISTS alert_notifications (
+  id TEXT PRIMARY KEY,
+  rule_id TEXT NOT NULL,
+  trade_id TEXT,
+  caller_handle TEXT,
+  ticker TEXT,
+  direction TEXT,
+  message TEXT NOT NULL,
+  channel TEXT NOT NULL,             -- 'browser' | 'telegram' | 'webhook'
+  delivered INTEGER DEFAULT 0,
+  read_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (rule_id) REFERENCES alert_rules(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_notifications_rule ON alert_notifications(rule_id);
+CREATE INDEX IF NOT EXISTS idx_alert_notifications_unread ON alert_notifications(delivered, read_at);

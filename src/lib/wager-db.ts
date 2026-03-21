@@ -395,3 +395,148 @@ export function getExpiredUnsettledConfigs(): TradeWagerConfig[] {
     )
     .all();
 }
+
+// ─── social / feed queries ───────────────────────────────────────────────────
+
+export interface BackerInfo {
+  handle: string | null;
+  backer_avatar_url: string | null;
+  amount: number;
+  wagered_at: string;
+}
+
+export interface WagerEventRow {
+  id: string;
+  type: string;
+  trade_id: string;
+  caller_handle: string;
+  backer_handle: string | null;
+  amount: number | null;
+  pnl_percent: number | null;
+  tip_amount: number | null;
+  created_at: string;
+}
+
+export interface CallerEarnings {
+  author_handle: string;
+  total_tips: number;
+  backed_trade_count: number;
+}
+
+const socialStmts = {
+  getBackersByTrade: db.prepare<[string], BackerInfo>(
+    `SELECT handle, backer_avatar_url, amount, wagered_at
+     FROM wagers WHERE trade_card_id = ? ORDER BY amount DESC`,
+  ),
+
+  getTopBacker: db.prepare<[string], BackerInfo>(
+    `SELECT handle, backer_avatar_url, amount, wagered_at
+     FROM wagers WHERE trade_card_id = ? ORDER BY amount DESC LIMIT 1`,
+  ),
+
+  insertWagerEvent: db.prepare(`
+    INSERT INTO wager_events (id, type, trade_id, caller_handle, backer_handle, amount, pnl_percent, tip_amount)
+    VALUES (@id, @type, @trade_id, @caller_handle, @backer_handle, @amount, @pnl_percent, @tip_amount)
+  `),
+
+  getWagerEvents: db.prepare<[], WagerEventRow>(
+    `SELECT * FROM wager_events ORDER BY created_at DESC LIMIT 100`,
+  ),
+
+  getWagerEventsByTrade: db.prepare<[string], WagerEventRow>(
+    `SELECT * FROM wager_events WHERE trade_id = ? ORDER BY created_at DESC`,
+  ),
+
+  // All active wager configs with stats, ordered by total wagered
+  getActiveConfigs: db.prepare<[], TradeWagerConfig>(
+    `SELECT * FROM trade_wager_config WHERE status = 'active' ORDER BY total_wagered DESC`,
+  ),
+
+  getSettledConfigs: db.prepare<[], TradeWagerConfig>(
+    `SELECT * FROM trade_wager_config WHERE status = 'settled' ORDER BY settled_at DESC`,
+  ),
+
+  getAllConfigs: db.prepare<[], TradeWagerConfig>(
+    `SELECT * FROM trade_wager_config ORDER BY created_at DESC`,
+  ),
+
+  // Wagers by wallet across all trades
+  getWagersByWallet: db.prepare<[string], Wager & { author_handle: string; ticker: string; direction: string }>(
+    `SELECT w.*, c.author_handle, c.ticker, c.direction
+     FROM wagers w
+     JOIN trade_wager_config c ON c.trade_card_id = w.trade_card_id
+     WHERE w.wallet_address = ?
+     ORDER BY w.wagered_at DESC`,
+  ),
+
+  // Caller earnings leaderboard
+  callerEarningsLeaderboard: db.prepare<[], CallerEarnings>(
+    `SELECT
+       author_handle,
+       SUM(caller_tip_earned) as total_tips,
+       COUNT(*) as backed_trade_count
+     FROM trade_wager_config
+     WHERE status = 'settled' AND caller_tip_earned > 0
+     GROUP BY author_handle
+     ORDER BY total_tips DESC
+     LIMIT 50`,
+  ),
+};
+
+export function getBackersByTrade(tradeCardId: string): BackerInfo[] {
+  return socialStmts.getBackersByTrade.all(tradeCardId);
+}
+
+export function getTopBacker(tradeCardId: string): BackerInfo | undefined {
+  return socialStmts.getTopBacker.get(tradeCardId) ?? undefined;
+}
+
+export function insertWagerEvent(event: {
+  id: string;
+  type: string;
+  tradeId: string;
+  callerHandle: string;
+  backerHandle?: string;
+  amount?: number;
+  pnlPercent?: number;
+  tipAmount?: number;
+}): void {
+  socialStmts.insertWagerEvent.run({
+    id: event.id,
+    type: event.type,
+    trade_id: event.tradeId,
+    caller_handle: event.callerHandle,
+    backer_handle: event.backerHandle ?? null,
+    amount: event.amount ?? null,
+    pnl_percent: event.pnlPercent ?? null,
+    tip_amount: event.tipAmount ?? null,
+  });
+}
+
+export function getWagerEvents(): WagerEventRow[] {
+  return socialStmts.getWagerEvents.all();
+}
+
+export function getWagerEventsByTrade(tradeId: string): WagerEventRow[] {
+  return socialStmts.getWagerEventsByTrade.all(tradeId);
+}
+
+export function getActiveWagerConfigs(): TradeWagerConfig[] {
+  return socialStmts.getActiveConfigs.all();
+}
+
+export function getSettledWagerConfigs(): TradeWagerConfig[] {
+  return socialStmts.getSettledConfigs.all();
+}
+
+export function getAllWagerConfigs(): TradeWagerConfig[] {
+  return socialStmts.getAllConfigs.all();
+}
+
+export function getWagersByWallet(walletAddress: string) {
+  return socialStmts.getWagersByWallet.all(walletAddress);
+}
+
+export function getCallerEarningsLeaderboard(): CallerEarnings[] {
+  return socialStmts.callerEarningsLeaderboard.all();
+}
