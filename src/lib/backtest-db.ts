@@ -4,7 +4,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { db } from "./db";
+import { sql } from "./db";
 
 export interface BacktestJob {
   id: string;
@@ -21,114 +21,88 @@ export interface BacktestJob {
   result_json: string | null;
 }
 
-const stmts = {
-  insertJob: db.prepare<[string, string]>(
-    "INSERT INTO backtest_jobs (id, handle) VALUES (?, ?)",
-  ),
-
-  getJob: db.prepare<[string], BacktestJob>(
-    "SELECT * FROM backtest_jobs WHERE id = ?",
-  ),
-
-  getCachedJob: db.prepare<[string], BacktestJob>(`
-    SELECT * FROM backtest_jobs
-    WHERE handle = ?
-      AND status IN ('queued', 'scanning', 'analyzing', 'complete')
-      AND created_at > datetime('now', '-24 hours')
-    ORDER BY created_at DESC
-    LIMIT 1
-  `),
-
-  getCachedReport: db.prepare<[string], BacktestJob>(`
-    SELECT * FROM backtest_jobs
-    WHERE handle = ?
-      AND status = 'complete'
-      AND created_at > datetime('now', '-24 hours')
-    ORDER BY created_at DESC
-    LIMIT 1
-  `),
-
-  setScanning: db.prepare(
-    "UPDATE backtest_jobs SET status = 'scanning', updated_at = datetime('now') WHERE id = ?",
-  ),
-
-  setAnalyzing: db.prepare(
-    "UPDATE backtest_jobs SET status = 'analyzing', updated_at = datetime('now') WHERE id = ?",
-  ),
-
-  updateProgress: db.prepare(`
-    UPDATE backtest_jobs
-    SET phase = ?, tweets_scanned = ?, total_tweets = ?, calls_found = ?,
-        updated_at = datetime('now')
-    WHERE id = ?
-  `),
-
-  completeJob: db.prepare(`
-    UPDATE backtest_jobs
-    SET status = 'complete', result_json = ?,
-        completed_at = datetime('now'), updated_at = datetime('now')
-    WHERE id = ?
-  `),
-
-  failJob: db.prepare(`
-    UPDATE backtest_jobs
-    SET status = 'failed', error = ?,
-        completed_at = datetime('now'), updated_at = datetime('now')
-    WHERE id = ?
-  `),
-
-  getRecentComplete: db.prepare<[], BacktestJob>(`
-    SELECT * FROM backtest_jobs
-    WHERE status = 'complete'
-    ORDER BY completed_at DESC
-    LIMIT 10
-  `),
-};
-
-export function createBacktestJob(handle: string): string {
+export async function createBacktestJob(handle: string): Promise<string> {
   const id = randomUUID();
-  stmts.insertJob.run(id, handle);
+  await sql`INSERT INTO backtest_jobs (id, handle) VALUES (${id}, ${handle})`;
   return id;
 }
 
-export function getBacktestJob(id: string): BacktestJob | undefined {
-  return stmts.getJob.get(id) ?? undefined;
+export async function getBacktestJob(id: string): Promise<BacktestJob | undefined> {
+  const rows = await sql`SELECT * FROM backtest_jobs WHERE id = ${id}`;
+  return (rows[0] as BacktestJob) ?? undefined;
 }
 
-export function getCachedBacktestForHandle(handle: string): BacktestJob | undefined {
-  return stmts.getCachedJob.get(handle) ?? undefined;
+export async function getCachedBacktestForHandle(handle: string): Promise<BacktestJob | undefined> {
+  const rows = await sql`
+    SELECT * FROM backtest_jobs
+    WHERE handle = ${handle}
+      AND status IN ('queued', 'scanning', 'analyzing', 'complete')
+      AND created_at > (NOW() - INTERVAL '24 hours')::text
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  return (rows[0] as BacktestJob) ?? undefined;
 }
 
-export function getCachedBacktestReport(handle: string): BacktestJob | undefined {
-  return stmts.getCachedReport.get(handle) ?? undefined;
+export async function getCachedBacktestReport(handle: string): Promise<BacktestJob | undefined> {
+  const rows = await sql`
+    SELECT * FROM backtest_jobs
+    WHERE handle = ${handle}
+      AND status = 'complete'
+      AND created_at > (NOW() - INTERVAL '24 hours')::text
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  return (rows[0] as BacktestJob) ?? undefined;
 }
 
-export function setBacktestScanning(id: string): void {
-  stmts.setScanning.run(id);
+export async function setBacktestScanning(id: string): Promise<void> {
+  await sql`UPDATE backtest_jobs SET status = 'scanning', updated_at = NOW()::text WHERE id = ${id}`;
 }
 
-export function setBacktestAnalyzing(id: string): void {
-  stmts.setAnalyzing.run(id);
+export async function setBacktestAnalyzing(id: string): Promise<void> {
+  await sql`UPDATE backtest_jobs SET status = 'analyzing', updated_at = NOW()::text WHERE id = ${id}`;
 }
 
-export function updateBacktestProgress(
+export async function updateBacktestProgress(
   id: string,
   phase: string,
   tweetsScanned: number,
   totalTweets: number,
   callsFound: number,
-): void {
-  stmts.updateProgress.run(phase, tweetsScanned, totalTweets, callsFound, id);
+): Promise<void> {
+  await sql`
+    UPDATE backtest_jobs
+    SET phase = ${phase}, tweets_scanned = ${tweetsScanned}, total_tweets = ${totalTweets},
+        calls_found = ${callsFound}, updated_at = NOW()::text
+    WHERE id = ${id}
+  `;
 }
 
-export function completeBacktestJob(id: string, result: unknown): void {
-  stmts.completeJob.run(JSON.stringify(result), id);
+export async function completeBacktestJob(id: string, result: unknown): Promise<void> {
+  await sql`
+    UPDATE backtest_jobs
+    SET status = 'complete', result_json = ${JSON.stringify(result)},
+        completed_at = NOW()::text, updated_at = NOW()::text
+    WHERE id = ${id}
+  `;
 }
 
-export function failBacktestJob(id: string, error: string): void {
-  stmts.failJob.run(error, id);
+export async function failBacktestJob(id: string, error: string): Promise<void> {
+  await sql`
+    UPDATE backtest_jobs
+    SET status = 'failed', error = ${error},
+        completed_at = NOW()::text, updated_at = NOW()::text
+    WHERE id = ${id}
+  `;
 }
 
-export function getRecentBacktests(): BacktestJob[] {
-  return stmts.getRecentComplete.all();
+export async function getRecentBacktests(): Promise<BacktestJob[]> {
+  const rows = await sql`
+    SELECT * FROM backtest_jobs
+    WHERE status = 'complete'
+    ORDER BY completed_at DESC
+    LIMIT 10
+  `;
+  return rows as BacktestJob[];
 }
