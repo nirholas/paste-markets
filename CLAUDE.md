@@ -18,7 +18,7 @@ A Next.js web dashboard built on the **paste.trade API** by @frankdegods. paste.
 - **Language:** TypeScript (strict)
 - **Styling:** Tailwind CSS v3
 - **Font:** JetBrains Mono (Bloomberg terminal aesthetic)
-- **Database:** SQLite via `better-sqlite3` (local dev), can migrate to Postgres later
+- **Database:** Neon Postgres via `@neondatabase/serverless` (serverless HTTP driver)
 - **OG Images:** `@vercel/og` (Satori) for dynamic image generation
 - **Deploy:** Vercel
 
@@ -129,7 +129,7 @@ paste-dashboard/
 │   │               └── route.tsx  ← dynamic OG image generation
 │   ├── lib/
 │   │   ├── paste-trade.ts       ← API client
-│   │   ├── db.ts                ← SQLite connection + queries
+│   │   ├── db.ts                ← Neon Postgres connection + queries
 │   │   ├── schema.sql           ← database schema
 │   │   ├── metrics.ts           ← shared P&L / win-rate calculations
 │   │   └── constants.ts         ← colors, labels, config
@@ -148,7 +148,7 @@ paste-dashboard/
 │   │   ├── wrapped-card.tsx
 │   │   └── trade-finder.tsx
 │   └── data/
-│       └── db.sqlite            ← gitignored, created at runtime
+│       └── (database is remote Neon Postgres)
 ├── public/
 │   └── fonts/
 │       └── JetBrainsMono-*.woff2
@@ -169,7 +169,7 @@ paste-dashboard/
 ```
 PASTE_TRADE_KEY=       # paste.trade API bearer token
 ANTHROPIC_API_KEY=     # for "What's The Trade?" AI feature (Claude Haiku)
-DATABASE_URL=          # optional, defaults to local SQLite
+DATABASE_URL=          # Neon Postgres connection string (required)
 NEXT_PUBLIC_BASE_URL=  # for OG image URLs, defaults to localhost:3000
 ```
 
