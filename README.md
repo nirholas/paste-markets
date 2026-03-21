@@ -1,111 +1,139 @@
-# paste.trade
+<p align="center">
+  <img src="public/logo.svg" alt="paste.markets" width="100%" />
+</p>
 
-Paste a source. AI finds the trade, captures the price when the author said it, tracks P&L from there.
+> Paste a source. AI finds the trade, captures the price from when the author said it, tracks P&L from there.
 
-Open source. [paste.trade](https://paste.trade) is where the trades live.
+Open source. Live platform at [paste.markets](https://paste.markets).
+
+---
 
 ## Why this exists
 
 You can already ask AI "what's the trade here?" and get a decent answer. Then you close the tab and it's gone.
 
-Paste.trade is designed to improve the answers and track them against the market.
+paste.markets fixes that: extract the thesis, lock the price, publish it, and let the market decide if it was right.
 
+---
 
 ## What it does
 
-```
- source                         trade card
-┌─────────────────────┐       ┌──────────────────────────────────┐
-│ @kansasangus         │       │ @kansasangus · Mar 18, 2026      │
-│                      │       │                                  │
-│ "Cow/calf markets    │       │ "Cow/calf is just beginning      │
-│  beginning to get    │  ──>  │  to get wild"                    │
-│  wild"               │       │                                  │
-│                      │       │  1  Severe drought across        │
-│                      │       │     Southern Plains              │
-│                      │       │  2  Herd liquidation + strike    │
-│                      │       │     shrink supply                │
-│                      │       │  3  DBA holds cattle & grain     │
-│                      │       │     exposed to same drought      │
-│                      │       │                                  │
-│                      │       │  DBA  LONG           +0.3%       │
-│                      │       │  $26.88 → $26.97     1 day ago   │
-└─────────────────────┘       └──────────────────────────────────┘
-```
+<p align="center">
+  <img src="public/diagram-flow.svg" alt="Source to trade card flow" width="800" />
+</p>
 
-Two prices on every trade:
-- **author price**: the moment the source was actually published (skill extracts this from source)
-- **paste price**: the moment it's uploaded to paste.trade
+Two timestamps on every trade:
+- **author price** — when the source was originally published (extracted from metadata)
+- **paste price** — when it entered paste.markets
+
+The gap between them is the head-start the author had before the market knew.
+
+---
 
 ## How it works
 
-```
-paste a URL or type a thesis
-    │
-    ▼
-read the source ── tweet, video, article, PDF, screenshot
-    │
-    ▼
-find tradeable ideas ── 1 to 5 per source
-    │
-    ▼
-research each one ── web search, instrument discovery
-    │
- ┌──┼──┐
- ▼  ▼  ▼
-compare candidates ── stocks, perps, prediction markets
- └──┼──┘
-    │
-    ▼
-pick best fit, explain why, lock price
-    │
-    ▼
-post to paste.trade ── P&L tracks from here
-```
+<p align="center">
+  <img src="public/diagram-pipeline.svg" alt="Processing pipeline" width="800" />
+</p>
 
-## Why it's built this way
+---
 
-Claude Code and OpenClaw are the tools we use everyday. So, making it as simple as "/trade [anything]" makes it the easiest path to use this.
+## Quickstart
+
+Paste the repo URL into Claude Code, Codex, or OpenClaw:
 
 ```
-┌─────────────────────────┐      ┌─────────────────────────────┐
-│  the skill               │      │  paste.trade                 │
-│                          │      │                              │
-│  reads sources           │ ───> │  tracks P&L                  │
-│  extracts theses         │ ───> │  streams progress live       │
-│  researches instruments  │ ───> │  publishes trade cards       │
-│  explains reasoning      │ ───> │  saves to your profile       │
-│                          │      │                              │
-│  runs in your agent      │      │  sharable link               │
-└─────────────────────────┘      └─────────────────────────────┘
+https://github.com/nirholas/paste-markets
 ```
 
-## Install
-
-Paste into Claude Code, Codex, or OpenClaw:
-
-```
-https://github.com/rohunvora/paste-trade
-```
+Then run:
 
 ```
 /trade https://x.com/someone/status/123456789
+/trade NVDA earnings beat but guidance was light, short the pop
 /trade update
 ```
+
+---
+
+## API
+
+Open. No auth required for reads.
+
+```
+GET https://paste.markets/api/search?author={handle}&top=30d
+GET https://paste.markets/api/search?ticker=NVDA
+GET https://paste.markets/api/leaderboard?timeframe=30d&sort=win_rate
+GET https://paste.markets/api/author/{handle}
+GET https://paste.markets/api/circle?timeframe=30d
+GET https://paste.markets/api/wrapped/{handle}
+GET https://paste.markets/api/vs?a={handle}&b={handle}
+```
+
+Full spec: [.well-known/openapi.yaml](.well-known/openapi.yaml)
+
+---
+
+## Build on top of it
+
+The API is designed to be built on. Here's an example:
+
+### paste.markets dashboard
+
+A full leaderboard dashboard built on the paste.trade API (this repo):
+
+- **Leaderboard** — CT traders ranked by real win rate and avg P&L
+- **Author Scorecards** — trade history, best call, win rate bar, streaks
+- **Head-to-Head** — 1v1 any two traders
+- **CT Wrapped** — Spotify-style trading personality report cards
+- **Caller Circle** — Twitter Circle-style visualization of top callers, shareable PNG + tweet
+- **What's the Trade?** — paste any URL, AI finds the optimal trade
+
+Dark Bloomberg terminal aesthetic. Everything server-rendered, cacheable, shareable OG images on every page.
+
+---
+
+## Why it's built this way
+
+Claude Code and OpenClaw are the tools we use every day. Making it `/trade [anything]` means zero friction.
+
+<p align="center">
+  <img src="public/diagram-architecture.svg" alt="Skill to platform architecture" width="800" />
+</p>
+
+---
 
 ## Works with
 
 ```
-sources:   tweets · youtube · podcasts · articles · PDFs · screenshots · typed hunches
+sources:   tweets · youtube · podcasts · articles · PDFs · screenshots · typed theses
 venues:    Robinhood (stocks) · Hyperliquid (perps) · Polymarket (prediction markets)
+agents:    Claude Code · Codex · OpenClaw
 ```
+
+---
 
 ## Prerequisites
 
 - [Bun](https://bun.sh)
-- `yt-dlp` for YouTube (skill offers to install on first run)
-- [env.example](env.example) for env vars
+- `yt-dlp` for YouTube (skill will offer to install on first run)
+- Copy [env.example](env.example) to `.env` and fill in your keys
+
+---
+
+## Docs
+
+| File | Description |
+|------|-------------|
+| [SKILLS.md](SKILLS.md) | Skill commands, source types, how `/trade` works |
+| [AGENTS.md](AGENTS.md) | API reference, agent patterns, MCP integration, data model |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Internal pipeline architecture |
+| [.well-known/ai-plugin.json](.well-known/ai-plugin.json) | AI plugin manifest |
+| [.well-known/openapi.yaml](.well-known/openapi.yaml) | Full OpenAPI spec |
+| [llms.txt](llms.txt) | Plain-text summary for LLM context windows |
+
+---
 
 ## Links
 
-[paste.trade](https://paste.trade) · [ARCHITECTURE.md](ARCHITECTURE.md) · [paste.trade/#changelog](https://paste.trade/#changelog)
+[paste.markets](https://paste.markets) · [Changelog](https://paste.markets/#changelog) · [@frankdegods](https://x.com/frankdegods)

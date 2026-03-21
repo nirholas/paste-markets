@@ -1,0 +1,46 @@
+app = "paste-markets"
+primary_region = "ord"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+
+# Secrets (set via `fly secrets set`, never stored here):
+#   PASTE_TRADE_KEY
+#   ANTHROPIC_API_KEY
+#   NEXT_PUBLIC_BASE_URL
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 80
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "10s"
+
+[[mounts]]
+  source = "data"
+  destination = "/app/data"
+  initial_size = "1gb"
+
+[[mounts]]
+  source = "config"
+  destination = "/app/config"
+  initial_size = "1gb"
