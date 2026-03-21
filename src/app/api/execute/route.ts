@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertExecutedTrade, updateTradeStatus } from "@/lib/execution-db";
+import { ensureExecutedTradesTable } from "@/lib/execution-db-init";
 import { checkRisk } from "@/lib/execution/risk";
 
 // POST /api/execute — execute a trade
 export async function POST(req: NextRequest) {
+  await ensureExecutedTradesTable();
   try {
     const body = await req.json();
 

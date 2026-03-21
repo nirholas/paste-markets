@@ -215,7 +215,9 @@ export async function signMessage(
     if (!solana) throw new Error("Phantom not available");
     const encoded = new TextEncoder().encode(message);
     const { signature } = await solana.signMessage(encoded, "utf8");
-    return Buffer.from(signature).toString("hex");
+    return Array.from(signature as Uint8Array)
+      .map((b: number) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   // EVM signing

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ensureExecutedTradesTable } from "@/lib/execution-db-init";
 import { closePosition } from "@/lib/execution/positions";
 
 // POST /api/positions/[id]/close — close a position
@@ -7,6 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  await ensureExecutedTradesTable();
 
   try {
     const body = await req.json();

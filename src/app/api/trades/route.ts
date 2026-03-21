@@ -14,6 +14,111 @@ export interface FeedTrade {
   author_handle: string;
 }
 
+type TradeRow = {
+  id: number;
+  ticker: string;
+  direction: string;
+  platform: string | null;
+  pnl_pct: number | null;
+  posted_at: string | null;
+  source_url: string | null;
+  author_handle: string;
+};
+
+async function queryByRecent(interval: string | null, platform: string | null, limit: number, offset: number) {
+  if (interval && platform) {
+    return sql`
+      SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+             COALESCE(t.posted_at, t.entry_date) AS posted_at,
+             t.source_url, t.author_handle
+      FROM trades t
+      WHERE COALESCE(t.posted_at, t.entry_date) > NOW() - ${interval}::interval
+        AND t.platform = ${platform} AND t.ticker IS NOT NULL
+      ORDER BY COALESCE(t.posted_at, t.entry_date) DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  if (interval) {
+    return sql`
+      SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+             COALESCE(t.posted_at, t.entry_date) AS posted_at,
+             t.source_url, t.author_handle
+      FROM trades t
+      WHERE COALESCE(t.posted_at, t.entry_date) > NOW() - ${interval}::interval
+        AND t.ticker IS NOT NULL
+      ORDER BY COALESCE(t.posted_at, t.entry_date) DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  if (platform) {
+    return sql`
+      SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+             COALESCE(t.posted_at, t.entry_date) AS posted_at,
+             t.source_url, t.author_handle
+      FROM trades t
+      WHERE t.platform = ${platform} AND t.ticker IS NOT NULL
+      ORDER BY COALESCE(t.posted_at, t.entry_date) DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  return sql`
+    SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+           COALESCE(t.posted_at, t.entry_date) AS posted_at,
+           t.source_url, t.author_handle
+    FROM trades t
+    WHERE t.ticker IS NOT NULL
+    ORDER BY COALESCE(t.posted_at, t.entry_date) DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
+async function queryByPnl(interval: string | null, platform: string | null, limit: number, offset: number) {
+  if (interval && platform) {
+    return sql`
+      SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+             COALESCE(t.posted_at, t.entry_date) AS posted_at,
+             t.source_url, t.author_handle
+      FROM trades t
+      WHERE COALESCE(t.posted_at, t.entry_date) > NOW() - ${interval}::interval
+        AND t.platform = ${platform} AND t.ticker IS NOT NULL
+      ORDER BY t.pnl_pct DESC NULLS LAST
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  if (interval) {
+    return sql`
+      SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+             COALESCE(t.posted_at, t.entry_date) AS posted_at,
+             t.source_url, t.author_handle
+      FROM trades t
+      WHERE COALESCE(t.posted_at, t.entry_date) > NOW() - ${interval}::interval
+        AND t.ticker IS NOT NULL
+      ORDER BY t.pnl_pct DESC NULLS LAST
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  if (platform) {
+    return sql`
+      SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+             COALESCE(t.posted_at, t.entry_date) AS posted_at,
+             t.source_url, t.author_handle
+      FROM trades t
+      WHERE t.platform = ${platform} AND t.ticker IS NOT NULL
+      ORDER BY t.pnl_pct DESC NULLS LAST
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  return sql`
+    SELECT t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
+           COALESCE(t.posted_at, t.entry_date) AS posted_at,
+           t.source_url, t.author_handle
+    FROM trades t
+    WHERE t.ticker IS NOT NULL
+    ORDER BY t.pnl_pct DESC NULLS LAST
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const timeframe = searchParams.get("timeframe") ?? "7d";
@@ -28,71 +133,12 @@ export async function GET(req: NextRequest) {
       "30d": "30 days",
       "90d": "90 days",
     };
-    const interval = intervalMap[timeframe] ?? "7 days";
+    const interval = timeframe !== "all" ? (intervalMap[timeframe] ?? "7 days") : null;
+    const platFilter = platform !== "all" && platform ? platform : null;
 
-    let rows;
-    const orderBy = sort === "pnl" ? "t.pnl_pct DESC NULLS LAST" : "COALESCE(t.posted_at, t.entry_date) DESC";
-
-    if (platform !== "all" && platform && timeframe !== "all") {
-      rows = await sql`
-        SELECT
-          t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
-          COALESCE(t.posted_at, t.entry_date) AS posted_at,
-          t.source_url, t.author_handle
-        FROM trades t
-        WHERE COALESCE(t.posted_at, t.entry_date) > NOW() - ${interval}::interval
-          AND t.platform = ${platform}
-          AND t.ticker IS NOT NULL
-        ORDER BY ${sort === "pnl" ? sql`t.pnl_pct DESC NULLS LAST` : sql`COALESCE(t.posted_at, t.entry_date) DESC`}
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-    } else if (platform !== "all" && platform) {
-      rows = await sql`
-        SELECT
-          t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
-          COALESCE(t.posted_at, t.entry_date) AS posted_at,
-          t.source_url, t.author_handle
-        FROM trades t
-        WHERE t.platform = ${platform}
-          AND t.ticker IS NOT NULL
-        ORDER BY ${sort === "pnl" ? sql`t.pnl_pct DESC NULLS LAST` : sql`COALESCE(t.posted_at, t.entry_date) DESC`}
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-    } else if (timeframe !== "all") {
-      rows = await sql`
-        SELECT
-          t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
-          COALESCE(t.posted_at, t.entry_date) AS posted_at,
-          t.source_url, t.author_handle
-        FROM trades t
-        WHERE COALESCE(t.posted_at, t.entry_date) > NOW() - ${interval}::interval
-          AND t.ticker IS NOT NULL
-        ORDER BY ${sort === "pnl" ? sql`t.pnl_pct DESC NULLS LAST` : sql`COALESCE(t.posted_at, t.entry_date) DESC`}
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-    } else {
-      rows = await sql`
-        SELECT
-          t.id, t.ticker, t.direction, t.platform, t.pnl_pct,
-          COALESCE(t.posted_at, t.entry_date) AS posted_at,
-          t.source_url, t.author_handle
-        FROM trades t
-        WHERE t.ticker IS NOT NULL
-        ORDER BY ${sort === "pnl" ? sql`t.pnl_pct DESC NULLS LAST` : sql`COALESCE(t.posted_at, t.entry_date) DESC`}
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-    }
-
-    type TradeRow = {
-      id: number;
-      ticker: string;
-      direction: string;
-      platform: string | null;
-      pnl_pct: number | null;
-      posted_at: string | null;
-      source_url: string | null;
-      author_handle: string;
-    };
+    const rows = sort === "pnl"
+      ? await queryByPnl(interval, platFilter, limit, offset)
+      : await queryByRecent(interval, platFilter, limit, offset);
 
     const trades: FeedTrade[] = (rows as TradeRow[]).map((r) => ({
       id: String(r.id),
