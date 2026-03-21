@@ -58,7 +58,7 @@ export function ShareButton({ tradeId, ticker, direction, handle, pnlPct, tradeU
 
   async function copyEmbed() {
     const origin = window.location.origin;
-    const code = `<iframe src="${origin}/embed/${tradeId}" width="400" height="200" frameborder="0" scrolling="no" style="border:none;overflow:hidden;"></iframe>`;
+    const code = `<iframe src="${origin}/embed/trade/${tradeId}" width="400" height="200" frameborder="0" scrolling="no" style="border:none;overflow:hidden;"></iframe>`;
     try {
       await navigator.clipboard.writeText(code);
       setEmbedCopied(true);
@@ -170,7 +170,7 @@ export function ShareButton({ tradeId, ticker, direction, handle, pnlPct, tradeU
             <div>
               <div className="text-[11px] uppercase tracking-widest text-text-muted mb-2">Embed</div>
               <div className="bg-[#0a0a1a] border border-border rounded-lg p-3 font-mono text-[11px] text-text-muted break-all">
-                {`<iframe src="paste.markets/embed/${tradeId}" width="400" height="200" frameborder="0"></iframe>`}
+                {`<iframe src="paste.markets/embed/trade/${tradeId}" width="400" height="200" frameborder="0"></iframe>`}
               </div>
               <button
                 onClick={copyEmbed}

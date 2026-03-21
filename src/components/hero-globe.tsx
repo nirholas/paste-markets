@@ -3,6 +3,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { TradePoint, TradeArc } from "@/lib/globe-types";
 
+interface VisitorRing {
+  lat: number;
+  lng: number;
+  maxR: number;
+  propagationSpeed: number;
+  repeatPeriod: number;
+  color: string;
+  city: string | null;
+  country: string | null;
+}
+
 function sanitize(text: string): string {
   return text.replace(/[<>&"']/g, (c) => {
     switch (c) {
@@ -22,7 +33,9 @@ export default function HeroGlobe() {
   const [initialized, setInitialized] = useState(false);
   const [points, setPoints] = useState<TradePoint[]>([]);
   const [arcs, setArcs] = useState<TradeArc[]>([]);
+  const [rings, setRings] = useState<VisitorRing[]>([]);
 
+  // Fetch trade data for points + arcs
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch("/api/globe?window=7d&limit=80");
@@ -35,9 +48,34 @@ export default function HeroGlobe() {
     }
   }, []);
 
+  // Fetch recent visitor rings
+  const fetchVisitors = useCallback(async () => {
+    try {
+      const res = await fetch("/api/globe/visitors");
+      if (!res.ok) return;
+      const data = await res.json();
+      setRings(data.rings ?? []);
+    } catch {
+      // silent fail
+    }
+  }, []);
+
+  // Ping this visitor's location on mount
+  useEffect(() => {
+    fetch("/api/globe/ping", { method: "POST" }).catch(() => {});
+  }, []);
+
+  // Fetch trade data once
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Poll visitor rings every 5 seconds
+  useEffect(() => {
+    fetchVisitors();
+    const interval = setInterval(fetchVisitors, 5000);
+    return () => clearInterval(interval);
+  }, [fetchVisitors]);
 
   // Initialize globe
   useEffect(() => {
@@ -61,6 +99,7 @@ export default function HeroGlobe() {
         .backgroundColor("rgba(0,0,0,0)")
         .atmosphereColor("#1a1a4a")
         .atmosphereAltitude(0.25)
+        // Trade points
         .pointsData(points)
         .pointLat("lat")
         .pointLng("lng")
@@ -72,6 +111,7 @@ export default function HeroGlobe() {
             <strong>${sanitize(d.label)}</strong>
           </div>`;
         })
+        // Trade arcs
         .arcsData(arcs)
         .arcStartLat("startLat")
         .arcStartLng("startLng")
@@ -93,7 +133,15 @@ export default function HeroGlobe() {
             <br/>
             <span style="color:${pnlColor};font-weight:700">${sign}${arc.pnl.toFixed(1)}%</span>
           </div>`;
-        })(container);
+        })
+        // Visitor rings — animated expanding circles
+        .ringsData(rings)
+        .ringLat("lat")
+        .ringLng("lng")
+        .ringMaxRadius("maxR")
+        .ringPropagationSpeed("propagationSpeed")
+        .ringRepeatPeriod("repeatPeriod")
+        .ringColor("color")(container);
 
       // Camera
       const controls = globe.controls();
@@ -129,6 +177,13 @@ export default function HeroGlobe() {
     if (!globe) return;
     globe.pointsData(points).arcsData(arcs);
   }, [points, arcs]);
+
+  // Update visitor rings
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    globe.ringsData(rings);
+  }, [rings]);
 
   return (
     <div

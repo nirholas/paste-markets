@@ -196,6 +196,28 @@ add(["chiang mai", "chiang mai, thailand"], { lat: 18.79, lng: 98.98, label: "Ch
 // USA catch-all
 add(["usa", "us", "united states", "united states of america", "america", "🇺🇸"], { lat: 39.83, lng: -98.58, label: "USA" });
 
+// X "Account based in" broad regions (from /about page transparency data)
+add(["east asia", "eastern asia"], { lat: 35.68, lng: 121.0, label: "East Asia" });
+add(["southeast asia", "south east asia", "southeastern asia"], { lat: 4.0, lng: 108.0, label: "Southeast Asia" });
+add(["south asia", "southern asia"], { lat: 20.59, lng: 78.96, label: "South Asia" });
+add(["central asia"], { lat: 41.20, lng: 74.77, label: "Central Asia" });
+add(["western asia", "west asia"], { lat: 29.31, lng: 47.48, label: "Western Asia" });
+add(["north america", "northern america"], { lat: 39.83, lng: -98.58, label: "North America" });
+add(["south america", "latin america", "central america"], { lat: -8.78, lng: -55.49, label: "South America" });
+add(["western europe", "west europe"], { lat: 48.86, lng: 2.35, label: "Western Europe" });
+add(["eastern europe", "east europe"], { lat: 50.45, lng: 30.52, label: "Eastern Europe" });
+add(["northern europe", "north europe", "scandinavia", "nordic"], { lat: 59.33, lng: 18.07, label: "Northern Europe" });
+add(["southern europe", "south europe"], { lat: 41.90, lng: 12.50, label: "Southern Europe" });
+add(["europe"], { lat: 50.11, lng: 8.68, label: "Europe" });
+add(["middle east", "mena"], { lat: 25.20, lng: 55.27, label: "Middle East" });
+add(["north africa", "northern africa"], { lat: 30.04, lng: 31.24, label: "North Africa" });
+add(["west africa", "western africa"], { lat: 6.52, lng: 3.38, label: "West Africa" });
+add(["east africa", "eastern africa"], { lat: -1.29, lng: 36.82, label: "East Africa" });
+add(["southern africa", "sub-saharan africa"], { lat: -26.20, lng: 28.05, label: "Southern Africa" });
+add(["africa"], { lat: 9.08, lng: 8.68, label: "Africa" });
+add(["oceania", "pacific", "asia pacific", "asia-pacific", "apac"], { lat: -25.27, lng: 133.78, label: "Oceania" });
+add(["caribbean"], { lat: 18.22, lng: -66.59, label: "Caribbean" });
+
 // ── Geocoding function ──────────────────────────────────────────────────────
 
 /**
