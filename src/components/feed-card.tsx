@@ -21,157 +21,157 @@ function formatPrice(price: number): string {
   return `$${price.toFixed(4)}`;
 }
 
-function DirectionBadge({ direction }: { direction: string }) {
-  const isLong = direction === "long" || direction === "yes";
-  return (
-    <span
-      className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 border ${
-        isLong ? "text-[#2ecc71] border-[#2ecc71]/50" : "text-[#e74c3c] border-[#e74c3c]/50"
-      }`}
-    >
-      {direction}
-    </span>
-  );
-}
-
-function TierBadge({ tier, alphaScore }: { tier: string | null; alphaScore: number | null }) {
-  if (!tier) return null;
-  const color = tierColor(tier as Parameters<typeof tierColor>[0]);
-  return (
-    <span
-      className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 border"
-      style={{ color, borderColor: `${color}50` }}
-    >
-      {tier}
-    </span>
-  );
-}
-
-function PnlBadge({ pnl }: { pnl: number | null }) {
-  if (pnl == null) {
-    return <span className="text-[#555568] text-xs font-mono">OPEN</span>;
-  }
-  const color = pnl >= 0 ? "#2ecc71" : "#e74c3c";
-  const label = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}%`;
-  return (
-    <span className="text-sm font-bold font-mono" style={{ color }}>
-      {label}
-    </span>
-  );
-}
-
 export interface FeedCardProps {
   item: FeedItem;
-  /** Show "Back This Call" CTA — only if wager is enabled */
   showWagerCta?: boolean;
   onWagerClick?: (item: FeedItem) => void;
 }
 
-export function FeedCard({ item, showWagerCta = false, onWagerClick }: FeedCardProps) {
-  const quote = (item.headline_quote ?? item.thesis ?? "").slice(0, 120);
+export function FeedCard({ item }: FeedCardProps) {
+  const quote = (item.headline_quote ?? item.thesis ?? "").slice(0, 160);
   const handle = item.author_handle.replace(/^@/, "");
   const isLong = item.direction === "long" || item.direction === "yes";
-  const accentColor = isLong ? "#2ecc71" : "#e74c3c";
+  const dirColor = isLong ? "#22c55e" : "#ef4444";
   const tradeHref = item.source_url ?? `/${handle}`;
+  const tierClr = item.author_tier ? tierColor(item.author_tier as Parameters<typeof tierColor>[0]) : null;
+
+  const pnlLabel =
+    item.pnl_pct == null
+      ? "OPEN"
+      : `${item.pnl_pct >= 0 ? "+" : ""}${item.pnl_pct.toFixed(1)}%`;
+  const pnlColor =
+    item.pnl_pct == null ? "#a1a1aa" : item.pnl_pct >= 0 ? "#22c55e" : "#ef4444";
 
   return (
-    <div
-      className="card-glow bg-[#0f0f22] border border-[#1a1a2e] rounded-lg p-4 space-y-3 relative overflow-hidden"
-      style={{ borderLeft: `2px solid ${accentColor}` }}
-    >
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <DirectionBadge direction={item.direction} />
-          <Link
-            href={`/ticker/${item.ticker.toUpperCase()}`}
-            className="text-base font-bold text-[#f0f0f0] hover:text-[#3b82f6] transition-colors tracking-tight"
-          >
-            ${item.ticker.toUpperCase()}
-          </Link>
-          {item.platform && (
-            <span className="text-[10px] uppercase tracking-widest text-[#555568] border border-[#1a1a2e] px-1.5 py-0.5">
-              {item.platform}
-            </span>
-          )}
-          {item.author_tier && (
-            <TierBadge tier={item.author_tier} alphaScore={item.author_alpha_score} />
-          )}
+    <div className="bg-[#12121a] border border-[#ffffff0d] rounded-2xl p-4 sm:p-5 hover:border-[#ffffff14] transition-colors">
+      {/* Author row */}
+      <div className="flex items-center gap-3 mb-3">
+        <Link href={`/${handle}`} className="shrink-0">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center text-white text-sm font-bold">
+            {handle[0]?.toUpperCase()}
+          </div>
+        </Link>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/${handle}`}
+              className="text-[#f5f5f7] font-semibold text-sm hover:text-[#6366f1] transition-colors truncate"
+            >
+              @{handle}
+            </Link>
+            {tierClr && (
+              <span
+                className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+                style={{ color: tierClr, backgroundColor: `${tierClr}18` }}
+              >
+                {item.author_tier}
+              </span>
+            )}
+            {item.win_rate != null && item.win_rate > 0 && (
+              <span className="text-[#52525b] text-xs">{Math.round(item.win_rate)}% WR</span>
+            )}
+          </div>
+          <span className="text-[#52525b] text-xs">{timeAgo(item.created_at)}</span>
         </div>
-        <span className="text-[11px] text-[#555568] shrink-0 font-mono">
-          {timeAgo(item.created_at)}
-        </span>
+
+        {/* P&L badge */}
+        <div
+          className="shrink-0 font-mono font-bold text-sm px-3 py-1.5 rounded-full"
+          style={{
+            color: pnlColor,
+            backgroundColor: item.pnl_pct == null ? "#ffffff08" : `${pnlColor}14`,
+          }}
+        >
+          {pnlLabel}
+        </div>
       </div>
 
-      {/* Author */}
-      <div className="flex items-center gap-2 text-xs">
-        <Link
-          href={`/${handle}`}
-          className="text-[#c8c8d0] hover:text-[#3b82f6] transition-colors font-mono"
+      {/* Trade call */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <span
+          className="text-xs font-bold uppercase px-2.5 py-1 rounded-full"
+          style={{ color: dirColor, backgroundColor: `${dirColor}14` }}
         >
-          @{handle}
+          {item.direction}
+        </span>
+        <Link
+          href={`/ticker/${item.ticker.toUpperCase()}`}
+          className="text-[#f5f5f7] font-bold text-lg hover:text-[#6366f1] transition-colors font-mono"
+        >
+          ${item.ticker.toUpperCase()}
         </Link>
-        {item.win_rate != null && item.win_rate > 0 && (
-          <span className="text-[#555568]">{Math.round(item.win_rate)}% WR</span>
+        {item.platform && (
+          <span className="text-[11px] text-[#52525b] bg-[#ffffff08] px-2 py-0.5 rounded-full">
+            {item.platform}
+          </span>
         )}
       </div>
 
-      {/* Headline quote */}
+      {/* Quote */}
       {quote && (
-        <p className="text-[#c8c8d0] text-xs border-l-2 border-[#1a1a2e] pl-3 leading-relaxed italic line-clamp-2">
+        <p className="text-[#a1a1aa] text-sm leading-relaxed mb-3 line-clamp-2">
           &ldquo;{quote}&rdquo;
         </p>
       )}
 
-      {/* Prices + PnL */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3 text-xs text-[#555568] font-mono">
+      {/* Price info */}
+      {(item.entry_price != null || item.current_price != null) && (
+        <div className="flex items-center gap-3 text-xs text-[#52525b] font-mono mb-3">
           {item.entry_price != null && (
             <span>
-              <span className="text-[#555568]">Entry </span>
-              <span className="text-[#c8c8d0]">{formatPrice(item.entry_price)}</span>
+              Entry <span className="text-[#a1a1aa]">{formatPrice(item.entry_price)}</span>
             </span>
           )}
           {item.entry_price != null && item.current_price != null && (
-            <span className="text-[#1a1a2e]">→</span>
+            <span className="text-[#ffffff14]">&rarr;</span>
           )}
           {item.current_price != null && (
             <span>
-              <span className="text-[#555568]">Now </span>
-              <span className="text-[#c8c8d0]">{formatPrice(item.current_price)}</span>
+              Now <span className="text-[#a1a1aa]">{formatPrice(item.current_price)}</span>
             </span>
           )}
         </div>
-        <PnlBadge pnl={item.pnl_pct} />
-      </div>
+      )}
 
-      {/* Wager social proof */}
+      {/* Social proof */}
       {item.wager_count > 0 && (
-        <div className="flex items-center gap-2 text-[11px] text-[#555568] font-mono">
-          <span className="text-[#f0f0f0]">&#x2B06; {item.wager_count}</span> backed
-          <span>·</span>
-          <span>{item.wager_total.toFixed(0)} USDC wagered</span>
+        <div className="flex items-center gap-2 text-xs text-[#52525b] mb-3">
+          <span className="text-[#6366f1] font-semibold">{item.wager_count} backed</span>
+          <span>&middot;</span>
+          <span>{item.wager_total.toFixed(0)} USDC</span>
         </div>
       )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-2 border-t border-[#1a1a2e]">
-        <div className="flex items-center gap-3">
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-3 border-t border-[#ffffff0d]">
+        <div className="flex items-center gap-1">
           <a
             href={tradeHref}
             target={item.source_url ? "_blank" : undefined}
             rel={item.source_url ? "noopener noreferrer" : undefined}
-            className="text-[11px] text-[#555568] hover:text-[#3b82f6] transition-colors font-mono"
+            className="text-[13px] text-[#a1a1aa] hover:text-[#f5f5f7] hover:bg-[#ffffff0a] px-3 py-1.5 rounded-lg transition-colors font-medium"
           >
-            View Trade
+            View
           </a>
+          <Link
+            href={`/${handle}`}
+            className="text-[13px] text-[#a1a1aa] hover:text-[#f5f5f7] hover:bg-[#ffffff0a] px-3 py-1.5 rounded-lg transition-colors font-medium"
+          >
+            Profile
+          </Link>
         </div>
         <a
-          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I'm backing @${handle}'s $${item.ticker.toUpperCase()} ${item.direction} call on paste.markets`)}`}
+          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`@${handle} called ${item.direction.toUpperCase()} $${item.ticker.toUpperCase()} on paste.markets — ${pnlLabel}`)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[11px] text-[#555568] hover:text-[#3b82f6] transition-colors font-mono"
+          className="flex items-center gap-1.5 text-[13px] text-[#a1a1aa] hover:text-[#6366f1] hover:bg-[#6366f1]/10 px-3 py-1.5 rounded-lg transition-colors font-medium"
         >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <polyline points="16 6 12 2 8 6" />
+            <line x1="12" y1="2" x2="12" y2="15" />
+          </svg>
           Share
         </a>
       </div>
