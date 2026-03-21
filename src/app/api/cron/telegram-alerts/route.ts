@@ -57,7 +57,7 @@ async function sendTelegram(
  * 2. Sends DM alerts to individual subscribers of those callers
  *
  * Designed for Vercel Cron — run every 1-2 minutes.
- * vercel.json: { "crons": [{ "path": "/api/cron/telegram-alerts", "schedule": "*/2 * * * *" }] }
+ * Cron schedule: every 2 minutes (vercel.json crons config)
  */
 export async function GET(req: NextRequest) {
   // Auth check

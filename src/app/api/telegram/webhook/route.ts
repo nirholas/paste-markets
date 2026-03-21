@@ -212,6 +212,20 @@ async function handleUpdate(update: TelegramUpdate) {
       break;
     }
 
+    case "unsubscribe": {
+      if (!args) {
+        await sendMessage(chatId, "Usage: `/unsubscribe handle`", "MarkdownV2");
+        return;
+      }
+      await handleUnsubscribe(chatId, args);
+      break;
+    }
+
+    case "mysubs": {
+      await handleMySubs(chatId);
+      break;
+    }
+
     default: {
       await sendMessage(chatId, "Unknown command\\. Type /help for available commands\\.");
       break;
