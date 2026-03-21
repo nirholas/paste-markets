@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;display=swap');
+
+      .bg { fill: #0a0a1a; }
+      .brand { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 48px; fill: #f0f0f0; }
+      .sub { font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 13px; fill: #555568; letter-spacing: 2px; }
+      .dot { fill: #3b82f6; }
+      .green { fill: #2ecc71; }
+      .red { fill: #e74c3c; }
+      .amber { fill: #f39c12; }
+      .muted { fill: #555568; }
+      .accent { fill: #3b82f6; }
+      .border { stroke: #1a1a2e; stroke-width: 1; fill: none; }
+      .surface { fill: #0f0f22; }
+
+      .cursor {
+        animation: blink 1.1s step-end infinite;
+      }
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      .bar1 { animation: rise 2.4s ease-out forwards; transform-origin: bottom; }
+      .bar2 { animation: rise 2.4s 0.15s ease-out forwards; transform-origin: bottom; }
+      .bar3 { animation: rise 2.4s 0.3s ease-out forwards; transform-origin: bottom; }
+      .bar4 { animation: rise 2.4s 0.45s ease-out forwards; transform-origin: bottom; }
+      .bar5 { animation: rise 2.4s 0.6s ease-out forwards; transform-origin: bottom; }
+      .bar6 { animation: rise 2.4s 0.75s ease-out forwards; transform-origin: bottom; }
+
+      @keyframes rise {
+        from { opacity: 0; transform: scaleY(0); }
+        to   { opacity: 1; transform: scaleY(1); }
+      }
+
+      .line-draw {
+        stroke-dasharray: 200;
+        stroke-dashoffset: 200;
+        animation: draw 1.8s 0.5s ease-out forwards;
+      }
+      @keyframes draw {
+        to { stroke-dashoffset: 0; }
+      }
+
+      .fade-in { animation: fadein 1s 1s ease-out both; }
+      @keyframes fadein {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+
+      .pulse {
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.6; r: 4; }
+        50%       { opacity: 1;   r: 6; }
+      }
+    </style>
+
+    <!-- Glow filter for the accent dot -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="200" class="bg" rx="12"/>
+
+  <!-- Mini chart panel (right side) -->
+  <rect x="560" y="24" width="212" height="152" rx="6" class="surface"/>
+  <rect x="560" y="24" width="212" height="152" rx="6" class="border"/>
+
+  <!-- Chart label -->
+  <text x="576" y="46" class="sub" font-size="9">P&amp;L TRACKER</text>
+
+  <!-- Chart bars (green = win, red = loss) -->
+  <!-- bar base y = 148, max height = 80 -->
+  <rect class="bar1 green" x="580" y="108" width="14" height="40" fill="#2ecc71" opacity="0.85"/>
+  <rect class="bar2 green" x="600" y="98"  width="14" height="50" fill="#2ecc71" opacity="0.85"/>
+  <rect class="bar3 red"   x="620" y="128" width="14" height="20" fill="#e74c3c" opacity="0.85"/>
+  <rect class="bar4 green" x="640" y="88"  width="14" height="60" fill="#2ecc71" opacity="0.85"/>
+  <rect class="bar5 green" x="660" y="78"  width="14" height="70" fill="#2ecc71" opacity="0.85"/>
+  <rect class="bar6 amber" x="680" y="108" width="14" height="40" fill="#f39c12" opacity="0.85"/>
+
+  <!-- Baseline -->
+  <line x1="572" y1="148" x2="708" y2="148" stroke="#1a1a2e" stroke-width="1"/>
+
+  <!-- Trend line -->
+  <polyline class="line-draw" points="587,108 607,98 627,128 647,88 667,78 687,108"
+    stroke="#3b82f6" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Live dot -->
+  <circle cx="694" cy="108" class="pulse" fill="#3b82f6" filter="url(#glow)"/>
+
+  <!-- P&L stat -->
+  <text x="576" y="172" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#2ecc71" class="fade-in">+24.7%  avg P&amp;L</text>
+
+  <!-- Left side: brand -->
+  <text x="40" y="85" class="brand">paste</text>
+  <!-- accent dot -->
+  <text x="186" y="85" class="brand" fill="#3b82f6">.</text>
+  <text x="205" y="85" class="brand">markets</text>
+
+  <!-- Blinking cursor -->
+  <rect class="cursor" x="513" y="56" width="4" height="32" fill="#3b82f6"/>
+
+  <!-- Tagline -->
+  <text x="40" y="118" class="sub">REAL P&amp;L · REAL CALLERS · CRYPTO TWITTER</text>
+
+  <!-- Feature pills -->
+  <g class="fade-in">
+    <rect x="40" y="138" width="80" height="20" rx="3" fill="#0f0f22" stroke="#1a1a2e"/>
+    <text x="80" y="152" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#2ecc71">Leaderboard</text>
+
+    <rect x="128" y="138" width="72" height="20" rx="3" fill="#0f0f22" stroke="#1a1a2e"/>
+    <text x="164" y="152" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#555568">CT Wrapped</text>
+
+    <rect x="208" y="138" width="64" height="20" rx="3" fill="#0f0f22" stroke="#1a1a2e"/>
+    <text x="240" y="152" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#555568">Caller Circle</text>
+
+    <rect x="280" y="138" width="52" height="20" rx="3" fill="#0f0f22" stroke="#1a1a2e"/>
+    <text x="306" y="152" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#555568">Head-to-Head</text>
+
+    <rect x="340" y="138" width="72" height="20" rx="3" fill="#0f0f22" stroke="#1a1a2e"/>
+    <text x="376" y="152" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#555568">Trade Finder</text>
+  </g>
+
+  <!-- Bottom border line -->
+  <line x1="40" y1="178" x2="520" y2="178" stroke="#1a1a2e" stroke-width="1" class="fade-in"/>
+  <text x="40" y="192" font-family="'JetBrains Mono', monospace" font-size="9" fill="#555568" class="fade-in">Powered by paste.trade · @frankdegods</text>
+</svg>

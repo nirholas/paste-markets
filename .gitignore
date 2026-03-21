@@ -1,6 +1,11 @@
-.env
-.DS_Store
 node_modules/
-data/
-*.log
-.scratch/
+dist/
+.next/
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+.env
+.env.local
+.env.*
+!.env.example

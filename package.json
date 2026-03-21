@@ -1,6 +1,35 @@
 {
-  "name": "paste-trade-skill",
-  "version": "1.0.0",
+  "name": "paste-dashboard",
+  "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:seed": "tsx src/lib/seed.ts",
+    "db:sync": "tsx src/lib/seed-from-api.ts",
+    "postinstall": "playwright install chromium --with-deps"
+  },
+  "dependencies": {
+    "@vercel/og": "^0.11.1",
+    "better-sqlite3": "^12.8.0",
+    "next": "^15.5.14",
+    "playwright": "^1.58.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.1",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
 }

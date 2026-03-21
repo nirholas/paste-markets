@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.nirholas/paste-dashboard",
+  "title": "paste.markets MCP Server",
+  "description": "CT trader leaderboards, profiles, head-to-head comparisons, trending callers, and AI trade analysis.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/nirholas/paste-markets",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@nirholas/paste-dashboard-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PASTE_DASHBOARD_URL",
+          "description": "Base URL of your deployed paste-dashboard instance. Defaults to http://localhost:3000.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string",
+          "placeholder": "https://paste.rank"
+        }
+      ]
+    }
+  ]
+}

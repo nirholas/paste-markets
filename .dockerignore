@@ -1,0 +1,8 @@
+node_modules
+.next
+config/x-session.json
+config/*.png
+data/*.sqlite
+.env
+.env.local
+.env*.local
