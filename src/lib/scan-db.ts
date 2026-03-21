@@ -1,10 +1,10 @@
 /**
  * DB operations for bulk caller scan jobs and rate limiting.
- * Uses the shared better-sqlite3 instance from db.ts.
+ * Uses the shared Neon connection from db.ts.
  */
 
 import { randomUUID } from "node:crypto";
-import { db } from "./db";
+import { sql } from "./db";
 
 export interface ScanJob {
   id: string;
@@ -19,110 +19,82 @@ export interface ScanJob {
   result_json: string | null;
 }
 
-const stmts = {
-  insertJob: db.prepare<[string, string]>(
-    "INSERT INTO scan_jobs (id, handle) VALUES (?, ?)",
-  ),
+export async function createScanJob(handle: string): Promise<string> {
+  const id = randomUUID();
+  await sql`INSERT INTO scan_jobs (id, handle) VALUES (${id}, ${handle})`;
+  return id;
+}
 
-  getJob: db.prepare<[string], ScanJob>(
-    "SELECT * FROM scan_jobs WHERE id = ?",
-  ),
+export async function getScanJob(id: string): Promise<ScanJob | undefined> {
+  const rows = await sql`SELECT * FROM scan_jobs WHERE id = ${id}`;
+  return (rows[0] as ScanJob) ?? undefined;
+}
 
-  // Return a recent complete/running/queued job for this handle (within 6h cache window)
-  getCachedJob: db.prepare<[string], ScanJob>(`
+export async function getCachedScanForHandle(handle: string): Promise<ScanJob | undefined> {
+  const rows = await sql`
     SELECT * FROM scan_jobs
-    WHERE handle = ?
+    WHERE handle = ${handle}
       AND status IN ('queued', 'running', 'complete')
-      AND created_at > datetime('now', '-6 hours')
+      AND created_at > (NOW() - INTERVAL '6 hours')::text
     ORDER BY created_at DESC
     LIMIT 1
-  `),
+  `;
+  return (rows[0] as ScanJob) ?? undefined;
+}
 
-  setRunning: db.prepare(
-    "UPDATE scan_jobs SET status = 'running', updated_at = datetime('now') WHERE id = ?",
-  ),
+export async function setJobRunning(id: string): Promise<void> {
+  await sql`UPDATE scan_jobs SET status = 'running', updated_at = NOW()::text WHERE id = ${id}`;
+}
 
-  updateProgress: db.prepare(`
+export async function updateJobProgress(
+  id: string,
+  tweetsScanned: number,
+  callsFound: number,
+): Promise<void> {
+  await sql`
     UPDATE scan_jobs
-    SET tweets_scanned = ?, calls_found = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `),
+    SET tweets_scanned = ${tweetsScanned}, calls_found = ${callsFound}, updated_at = NOW()::text
+    WHERE id = ${id}
+  `;
+}
 
-  completeJob: db.prepare(`
+export async function completeJob(id: string, result: unknown): Promise<void> {
+  await sql`
     UPDATE scan_jobs
-    SET status = 'complete', result_json = ?,
-        completed_at = datetime('now'), updated_at = datetime('now')
-    WHERE id = ?
-  `),
+    SET status = 'complete', result_json = ${JSON.stringify(result)},
+        completed_at = NOW()::text, updated_at = NOW()::text
+    WHERE id = ${id}
+  `;
+}
 
-  failJob: db.prepare(`
+export async function failJob(id: string, error: string): Promise<void> {
+  await sql`
     UPDATE scan_jobs
-    SET status = 'failed', error = ?,
-        completed_at = datetime('now'), updated_at = datetime('now')
-    WHERE id = ?
-  `),
+    SET status = 'failed', error = ${error},
+        completed_at = NOW()::text, updated_at = NOW()::text
+    WHERE id = ${id}
+  `;
+}
 
-  getRecentComplete: db.prepare<[], ScanJob>(`
+export async function getRecentScans(): Promise<ScanJob[]> {
+  const rows = await sql`
     SELECT * FROM scan_jobs
     WHERE status = 'complete'
     ORDER BY completed_at DESC
     LIMIT 10
-  `),
+  `;
+  return rows as ScanJob[];
+}
 
-  countRecentByIp: db.prepare<[string], { count: number }>(`
+export async function checkRateLimit(ip: string): Promise<{ allowed: boolean; count: number }> {
+  const rows = await sql`
     SELECT COUNT(*) AS count FROM scan_rate_limits
-    WHERE ip = ? AND created_at > datetime('now', '-1 hour')
-  `),
-
-  recordRequest: db.prepare(
-    "INSERT INTO scan_rate_limits (ip) VALUES (?)",
-  ),
-};
-
-export function createScanJob(handle: string): string {
-  const id = randomUUID();
-  stmts.insertJob.run(id, handle);
-  return id;
-}
-
-export function getScanJob(id: string): ScanJob | undefined {
-  return stmts.getJob.get(id) ?? undefined;
-}
-
-export function getCachedScanForHandle(handle: string): ScanJob | undefined {
-  return stmts.getCachedJob.get(handle) ?? undefined;
-}
-
-export function setJobRunning(id: string): void {
-  stmts.setRunning.run(id);
-}
-
-export function updateJobProgress(
-  id: string,
-  tweetsScanned: number,
-  callsFound: number,
-): void {
-  stmts.updateProgress.run(tweetsScanned, callsFound, id);
-}
-
-export function completeJob(id: string, result: unknown): void {
-  stmts.completeJob.run(JSON.stringify(result), id);
-}
-
-export function failJob(id: string, error: string): void {
-  stmts.failJob.run(error, id);
-}
-
-export function getRecentScans(): ScanJob[] {
-  return stmts.getRecentComplete.all();
-}
-
-export function checkRateLimit(ip: string): { allowed: boolean; count: number } {
-  const row = stmts.countRecentByIp.get(ip);
-  const count = row?.count ?? 0;
+    WHERE ip = ${ip} AND created_at > (NOW() - INTERVAL '1 hour')::text
+  `;
+  const count = Number(rows[0]?.count ?? 0);
   return { allowed: count < 3, count };
 }
 
-export function recordScanRequest(ip: string): void {
-  stmts.recordRequest.run(ip);
+export async function recordScanRequest(ip: string): Promise<void> {
+  await sql`INSERT INTO scan_rate_limits (ip) VALUES (${ip})`;
 }
