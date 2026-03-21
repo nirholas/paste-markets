@@ -94,105 +94,101 @@ export default async function HomePage() {
       />
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="hero-glow relative flex flex-col items-center justify-center px-4 pt-24 pb-10 overflow-hidden">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-[#3b82f6] mb-4 font-mono">
-          Financialized Doomscrolling
-        </p>
-        <h1 className="text-4xl md:text-5xl font-bold text-[#f0f0f0] mb-3 text-center leading-tight relative z-10">
-          Turn any tweet into a trade.
-        </h1>
-        <p className="text-[#555568] text-sm mb-8 text-center max-w-md relative z-10">
-          Track your calls forever. Real P&amp;L. No cap.
-        </p>
+      <section className="relative flex flex-col items-center justify-center px-4 pt-16 sm:pt-24 pb-12 overflow-hidden">
+        {/* Background gradient */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.12), transparent 60%)",
+          }}
+        />
 
-        <div className="w-full max-w-xl relative z-10">
-          <SmartInput />
-        </div>
+        <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[#f5f5f7] mb-4 text-center leading-[1.1] tracking-tight">
+            Turn any tweet
+            <br />
+            <span className="bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] bg-clip-text text-transparent">
+              into a trade.
+            </span>
+          </h1>
+          <p className="text-[#a1a1aa] text-base sm:text-lg mb-8 text-center max-w-md">
+            Track calls from CT forever. Real P&amp;L. No cap.
+          </p>
 
-        <p className="text-[#555568] text-xs mt-4 relative z-10">
-          Paste a tweet URL, YouTube link, or article →{" "}
-          <Link
-            href="/submit"
-            className="text-[#3b82f6] hover:text-[#3b82f6]/70 transition-colors"
-          >
-            Submit a trade
-          </Link>
-        </p>
-
-        {/* Global stats bar */}
-        {stats && (
-          <div className="mt-8 flex flex-wrap justify-center items-center gap-x-1 gap-y-2 text-xs font-mono relative z-10">
-            <div className="flex items-center gap-2 bg-[#0f0f22]/80 border border-[#1a1a2e] rounded-full px-4 py-1.5">
-              <span className="text-[#c8c8d0] font-bold">
-                {stats.total_trades.toLocaleString()}
-              </span>
-              <span className="text-[#555568]">trades</span>
-            </div>
-            <div className="flex items-center gap-2 bg-[#0f0f22]/80 border border-[#1a1a2e] rounded-full px-4 py-1.5">
-              <span className="text-[#c8c8d0] font-bold">
-                {stats.total_callers.toLocaleString()}
-              </span>
-              <span className="text-[#555568]">callers</span>
-            </div>
-            <div className="flex items-center gap-2 bg-[#0f0f22]/80 border border-[#1a1a2e] rounded-full px-4 py-1.5">
-              <span
-                className="font-bold"
-                style={{ color: stats.avg_win_rate >= 50 ? "#2ecc71" : "#e74c3c" }}
-              >
-                {stats.avg_win_rate.toFixed(1)}%
-              </span>
-              <span className="text-[#555568]">avg WR</span>
-            </div>
+          <div className="w-full max-w-lg">
+            <SmartInput />
           </div>
-        )}
+
+          <p className="text-[#52525b] text-sm mt-5">
+            Paste a tweet, search a trader, or{" "}
+            <Link
+              href="/submit"
+              className="text-[#6366f1] hover:text-[#8b5cf6] transition-colors font-medium"
+            >
+              submit a call
+            </Link>
+          </p>
+
+          {/* Stats pills */}
+          {stats && (
+            <div className="mt-8 flex flex-wrap justify-center items-center gap-3">
+              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-full px-4 py-2 text-sm">
+                <span className="text-[#f5f5f7] font-semibold font-mono">
+                  {stats.total_trades.toLocaleString()}
+                </span>
+                <span className="text-[#52525b]">trades</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-full px-4 py-2 text-sm">
+                <span className="text-[#f5f5f7] font-semibold font-mono">
+                  {stats.total_callers.toLocaleString()}
+                </span>
+                <span className="text-[#52525b]">callers</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-full px-4 py-2 text-sm">
+                <span
+                  className="font-semibold font-mono"
+                  style={{ color: stats.avg_win_rate >= 50 ? "#22c55e" : "#ef4444" }}
+                >
+                  {stats.avg_win_rate.toFixed(1)}%
+                </span>
+                <span className="text-[#52525b]">avg WR</span>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
-      {/* ── Smart Feed ───────────────────────────────────────────────── */}
+      {/* ── Feed ────────────────────────────────────────────────────── */}
       <HomeFeed initialAssets={assets} initialCallers={callers} />
 
-      {/* ── Footer ───────────────────────────────────────────────────── */}
-      <footer className="border-t border-[#1a1a2e] py-12 px-4 text-center text-xs text-[#555568]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-center flex-wrap gap-6 mb-8">
-            <Link href="/leaderboard" className="hover:text-[#c8c8d0] transition-colors">Leaderboard</Link>
-            <Link href="/callers" className="hover:text-[#c8c8d0] transition-colors">Callers</Link>
-            <Link href="/feed" className="hover:text-[#c8c8d0] transition-colors">Feed</Link>
-            <Link href="/alpha" className="hover:text-[#c8c8d0] transition-colors">Alpha</Link>
-            <Link href="/heatmap" className="hover:text-[#c8c8d0] transition-colors">Heatmap</Link>
-            <Link href="/consensus" className="hover:text-[#c8c8d0] transition-colors">Consensus</Link>
+      {/* ── Footer ──────────────────────────────────────────────────── */}
+      <footer className="border-t border-[#ffffff0d] py-12 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-center flex-wrap gap-6 mb-8 text-sm">
+            <Link href="/leaderboard" className="text-[#52525b] hover:text-[#a1a1aa] transition-colors">Leaderboard</Link>
+            <Link href="/callers" className="text-[#52525b] hover:text-[#a1a1aa] transition-colors">Callers</Link>
+            <Link href="/feed" className="text-[#52525b] hover:text-[#a1a1aa] transition-colors">Feed</Link>
+            <Link href="/alpha" className="text-[#52525b] hover:text-[#a1a1aa] transition-colors">Alpha</Link>
+            <Link href="/heatmap" className="text-[#52525b] hover:text-[#a1a1aa] transition-colors">Heatmap</Link>
+            <Link href="/consensus" className="text-[#52525b] hover:text-[#a1a1aa] transition-colors">Consensus</Link>
           </div>
-          <div className="h-px w-16 mx-auto bg-[#1a1a2e] mb-6" />
-          <p>
-            paste<span className="text-[#3b82f6]">.</span>markets — Real P&amp;L data from{" "}
-            <a
-              href="https://paste.trade"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#3b82f6] transition-colors"
-            >
-              paste.trade
-            </a>{" "}
-            by{" "}
-            <a
-              href="https://x.com/frankdegods"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#3b82f6] transition-colors"
-            >
-              @frankdegods
-            </a>
-          </p>
-          <p className="mt-1">
-            Built by{" "}
-            <a
-              href="https://x.com/swarminged"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#3b82f6] transition-colors"
-            >
-              @swarminged
-            </a>
-          </p>
+          <div className="text-center text-[13px] text-[#52525b]">
+            <p>
+              Real P&amp;L data from{" "}
+              <a href="https://paste.trade" target="_blank" rel="noopener noreferrer" className="hover:text-[#a1a1aa] transition-colors">
+                paste.trade
+              </a>{" "}
+              by{" "}
+              <a href="https://x.com/frankdegods" target="_blank" rel="noopener noreferrer" className="hover:text-[#a1a1aa] transition-colors">
+                @frankdegods
+              </a>
+              {" "}/{" "}
+              Built by{" "}
+              <a href="https://x.com/swarminged" target="_blank" rel="noopener noreferrer" className="hover:text-[#a1a1aa] transition-colors">
+                @swarminged
+              </a>
+            </p>
+          </div>
         </div>
       </footer>
     </main>
