@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
   const cat = validCategories.includes(category) ? category : "all";
 
   const offset = (page - 1) * limit;
-  const posts = getWallPosts(cat, limit, offset);
-  const total = getWallCount(cat);
+  const posts = await getWallPosts(cat, limit, offset);
+  const total = await getWallCount(cat);
 
   return NextResponse.json({
     posts,

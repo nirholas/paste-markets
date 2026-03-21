@@ -86,14 +86,9 @@ async function fetchTickerStats(ticker: string): Promise<string | null> {
 
 async function handleSubscribe(chatId: number | string, handle: string) {
   try {
-    const useSqlite = process.env["USE_SQLITE"] !== "false";
-    if (useSqlite) {
-      const { addTelegramSub } = await import("@/lib/telegram-db");
-      addTelegramSub(String(chatId), handle.toLowerCase().replace(/^@/, ""));
-      await sendMessage(chatId, `Subscribed to alerts for *@${handle.replace(/^@/, "")}*\\. You'll get notified on new calls\\.`);
-    } else {
-      await sendMessage(chatId, "Subscriptions are not available in serverless mode\\.");
-    }
+    const { addTelegramSub } = await import("@/lib/telegram-db");
+    await addTelegramSub(String(chatId), handle.toLowerCase().replace(/^@/, ""));
+    await sendMessage(chatId, `Subscribed to alerts for *@${handle.replace(/^@/, "")}*\\. You'll get notified on new calls\\.`);
   } catch {
     await sendMessage(chatId, "Failed to subscribe\\. Try again later\\.");
   }

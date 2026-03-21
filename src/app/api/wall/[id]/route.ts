@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const post = getWallPostById(id);
+  const post = await getWallPostById(id);
 
   if (!post) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

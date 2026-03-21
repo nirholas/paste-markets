@@ -18,11 +18,15 @@ const INITIAL_AUTHORS = [
   "Pentosh1",
 ];
 
-console.log("Seeding database with initial authors...");
+async function main() {
+  console.log("Seeding database with initial authors...");
 
-for (const handle of INITIAL_AUTHORS) {
-  const author = getOrCreateAuthor(handle);
-  console.log(`  + @${author.handle}`);
+  for (const handle of INITIAL_AUTHORS) {
+    const author = await getOrCreateAuthor(handle);
+    console.log(`  + @${author.handle}`);
+  }
+
+  console.log(`Done. ${INITIAL_AUTHORS.length} authors seeded.`);
 }
 
-console.log(`Done. ${INITIAL_AUTHORS.length} authors seeded.`);
+main();

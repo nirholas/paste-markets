@@ -54,16 +54,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Only available in SQLite mode
-  const useSqlite = process.env["USE_SQLITE"] !== "false";
-  if (!useSqlite) {
-    return NextResponse.json({
-      message: "Tweet monitoring requires SQLite mode",
-      checked: 0,
-      deleted: 0,
-    });
-  }
-
   let db: Awaited<typeof import("@/lib/db")>;
   try {
     db = await import("@/lib/db");
@@ -72,7 +62,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
   }
 
-  const trades = db.getLiveTradesForMonitor();
+  const trades = await db.getLiveTradesForMonitor();
   console.log(`[tweet-monitor] Checking ${trades.length} tweets for deletion`);
 
   let checked = 0;
@@ -87,7 +77,7 @@ export async function POST(request: NextRequest) {
         const exists = await tweetExists(trade.tweet_id);
         checked++;
         if (!exists) {
-          db.markTweetDeleted(trade.tweet_id);
+          await db.markTweetDeleted(trade.tweet_id);
           deleted++;
           console.log(
             `[tweet-monitor] Tweet ${trade.tweet_id} (${trade.author_handle}/${trade.ticker}) marked deleted`,
@@ -112,15 +102,9 @@ export async function POST(request: NextRequest) {
 
 /** GET for health check / manual trigger status */
 export async function GET() {
-  const useSqlite = process.env["USE_SQLITE"] !== "false";
-
-  if (!useSqlite) {
-    return NextResponse.json({ status: "inactive", reason: "Requires SQLite mode" });
-  }
-
   try {
     const db = await import("@/lib/db");
-    const trades = db.getLiveTradesForMonitor();
+    const trades = await db.getLiveTradesForMonitor();
     return NextResponse.json({
       status: "ready",
       pendingChecks: trades.length,

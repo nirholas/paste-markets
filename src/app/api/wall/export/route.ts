@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
   const featured = searchParams.get("featured");
 
   const posts = featured === "true"
-    ? getFeaturedWallPosts()
-    : getWallPosts("all", 1000, 0);
+    ? await getFeaturedWallPosts()
+    : await getWallPosts("all", 1000, 0);
 
   const cards = posts.map((p) => ({
     id: p.id,

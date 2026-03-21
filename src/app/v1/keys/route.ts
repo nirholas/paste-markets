@@ -38,16 +38,13 @@ export async function POST(req: NextRequest) {
 
   const key = generateApiKey();
 
-  // Persist to SQLite if available
   let persisted = false;
-  if (process.env["USE_SQLITE"] !== "false") {
-    try {
-      const { insertApiKey } = await import("@/lib/db");
-      insertApiKey(key, handle, requestedTier);
-      persisted = true;
-    } catch (err) {
-      console.error("[v1/keys] Failed to persist key to SQLite:", err);
-    }
+  try {
+    const { insertApiKey } = await import("@/lib/db");
+    await insertApiKey(key, handle, requestedTier);
+    persisted = true;
+  } catch (err) {
+    console.error("[v1/keys] Failed to persist key:", err);
   }
 
   return okResponse(
@@ -86,25 +83,22 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (process.env["USE_SQLITE"] !== "false") {
-    try {
-      const { getApiKeysByHandle } = await import("@/lib/db");
-      const rows = getApiKeysByHandle(handle);
-      return okResponse(
-        rows.map((r) => ({
-          key: r.key.slice(0, 8) + "...", // redact most of the key
-          tier: r.tier,
-          createdAt: r.created_at,
-          lastUsed: r.last_used,
-          requestCount: r.request_count,
-        })),
-        undefined,
-        auth.rateLimitHeaders,
-      );
-    } catch (err) {
-      console.error("[v1/keys GET] Error:", err);
-    }
+  try {
+    const { getApiKeysByHandle } = await import("@/lib/db");
+    const rows = await getApiKeysByHandle(handle);
+    return okResponse(
+      rows.map((r) => ({
+        key: r.key.slice(0, 8) + "...", // redact most of the key
+        tier: r.tier,
+        createdAt: r.created_at,
+        lastUsed: r.last_used,
+        requestCount: r.request_count,
+      })),
+      undefined,
+      auth.rateLimitHeaders,
+    );
+  } catch (err) {
+    console.error("[v1/keys GET] Error:", err);
+    return errorResponse("SERVER_ERROR", "Key lookup failed.", 500, auth.rateLimitHeaders);
   }
-
-  return errorResponse("SERVER_ERROR", "Key lookup unavailable in serverless mode.", 501, auth.rateLimitHeaders);
 }

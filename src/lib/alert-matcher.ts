@@ -18,8 +18,8 @@ import {
  * Match a detected trade against all enabled alert rules.
  * Returns the list of rules that matched, along with their channels.
  */
-export function matchAlerts(trade: DetectedTrade): MatchedAlert[] {
-  const rules = getAllEnabledAlertRules();
+export async function matchAlerts(trade: DetectedTrade): Promise<MatchedAlert[]> {
+  const rules = await getAllEnabledAlertRules();
   const matches: MatchedAlert[] = [];
 
   for (const rule of rules) {
@@ -76,7 +76,7 @@ function escTg(text: string): string {
 export async function dispatchAlerts(matches: MatchedAlert[]): Promise<void> {
   for (const match of matches) {
     // Update match count on the rule
-    incrementAlertRuleMatch(match.rule.id);
+    await incrementAlertRuleMatch(match.rule.id);
 
     const message = formatAlertMessage(match);
 
@@ -85,7 +85,7 @@ export async function dispatchAlerts(matches: MatchedAlert[]): Promise<void> {
 
       // Always store browser notifications in DB
       if (channel.type === "browser") {
-        insertAlertNotification({
+        await insertAlertNotification({
           id: notifId,
           ruleId: match.rule.id,
           tradeId: match.trade.id,
@@ -103,7 +103,7 @@ export async function dispatchAlerts(matches: MatchedAlert[]): Promise<void> {
         if (chatId) {
           await sendTelegramAlert(chatId, formatTelegramMessage(match));
         }
-        insertAlertNotification({
+        await insertAlertNotification({
           id: notifId,
           ruleId: match.rule.id,
           tradeId: match.trade.id,
@@ -121,7 +121,7 @@ export async function dispatchAlerts(matches: MatchedAlert[]): Promise<void> {
         if (url) {
           await sendWebhookAlert(url, match);
         }
-        insertAlertNotification({
+        await insertAlertNotification({
           id: notifId,
           ruleId: match.rule.id,
           tradeId: match.trade.id,
@@ -194,7 +194,7 @@ async function sendWebhookAlert(url: string, match: MatchedAlert): Promise<void>
 // ── Convenience: match + dispatch in one call ────────────────────────────────
 
 export async function processTradeSignal(trade: DetectedTrade): Promise<number> {
-  const matches = matchAlerts(trade);
+  const matches = await matchAlerts(trade);
   if (matches.length > 0) {
     await dispatchAlerts(matches);
   }

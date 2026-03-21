@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function WallPage() {
-  const posts = getWallPosts("all", 20, 0);
-  const total = getWallCount("all");
+export default async function WallPage() {
+  const posts = await getWallPosts("all", 20, 0);
+  const total = await getWallCount("all");
 
   return (
     <main className="min-h-screen">

@@ -24,12 +24,12 @@ export function isStale(lastFetched: string | null, maxAgeMs = DEFAULT_MAX_AGE_M
 
 export async function syncAuthor(handle: string): Promise<AuthorMetrics> {
   // Ensure author exists
-  getOrCreateAuthor(handle);
+  await getOrCreateAuthor(handle);
 
   // Check staleness
-  const author = getAuthorRecord(handle);
+  const author = await getAuthorRecord(handle);
   if (author && !isStale(author.last_fetched)) {
-    const existing = getAuthorMetrics(handle);
+    const existing = await getAuthorMetrics(handle);
     if (existing) return existing;
   }
 
@@ -37,11 +37,11 @@ export async function syncAuthor(handle: string): Promise<AuthorMetrics> {
   const trades = await fetchFromApi(handle);
 
   if (trades.length > 0) {
-    upsertTrades(handle, trades);
+    await upsertTrades(handle, trades);
   }
 
   // Recompute metrics from all cached trades
-  const metrics = getAuthorMetrics(handle);
+  const metrics = await getAuthorMetrics(handle);
   if (!metrics) {
     // No trades at all — return empty metrics
     return {
@@ -63,7 +63,7 @@ export async function syncAuthor(handle: string): Promise<AuthorMetrics> {
   }
 
   // Update author record with latest metrics
-  updateAuthorRecord(handle, metrics);
+  await updateAuthorRecord(handle, metrics);
 
   return metrics;
 }
