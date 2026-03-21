@@ -61,21 +61,68 @@ export async function GET(
     // Re-read for rank after potential sync
     const refreshed = await getOrCreateAuthor(handle);
 
-    // Fetch avatar + display name from full trade data (async, best-effort)
-    let avatarUrl: string | null = null;
-    let displayName: string | null = refreshed.display_name;
-    try {
-      const fullTrades = await searchFullTrades({ author: handle, top: "30d", limit: 3 });
-      for (const t of fullTrades) {
-        if (t.author_avatar_url) {
-          const raw = t.author_avatar_url;
-          avatarUrl = raw.startsWith("/") ? `${PASTE_TRADE_BASE}${raw}` : raw;
-          break;
+    // Fetch X profile data if stale (best-effort, non-blocking)
+    let xProfile = {
+      avatarUrl: refreshed.avatar_url as string | null,
+      bannerUrl: refreshed.banner_url as string | null,
+      displayName: refreshed.display_name as string | null,
+      bio: refreshed.bio as string | null,
+      location: refreshed.location as string | null,
+      website: refreshed.website as string | null,
+      verified: refreshed.verified ?? false,
+      followers: refreshed.followers as number | null,
+      following: refreshed.following as number | null,
+      tweetCount: refreshed.tweet_count as number | null,
+      joinedAt: refreshed.x_joined_at as string | null,
+    };
+
+    if (isXProfileStale(refreshed.x_profile_fetched_at)) {
+      try {
+        const profile = await fetchProfile(handle);
+        if (profile) {
+          xProfile = {
+            avatarUrl: profile.avatarUrl,
+            bannerUrl: profile.bannerUrl,
+            displayName: profile.displayName,
+            bio: profile.bio,
+            location: profile.location,
+            website: profile.website,
+            verified: profile.verified,
+            followers: profile.followers,
+            following: profile.following,
+            tweetCount: profile.tweetCount,
+            joinedAt: profile.joined,
+          };
+          await updateXProfile(handle, {
+            ...xProfile,
+            followers: xProfile.followers ?? 0,
+            following: xProfile.following ?? 0,
+            tweetCount: xProfile.tweetCount ?? 0,
+          });
         }
+      } catch {
+        // X profile is optional — silently skip
       }
-    } catch {
-      // avatar is optional — silently skip
     }
+
+    // Fallback avatar from paste.trade if X didn't provide one
+    let avatarUrl = xProfile.avatarUrl;
+    if (!avatarUrl) {
+      try {
+        const fullTrades = await searchFullTrades({ author: handle, top: "30d", limit: 3 });
+        for (const t of fullTrades) {
+          if (t.author_avatar_url) {
+            const raw = t.author_avatar_url;
+            avatarUrl = raw.startsWith("/") ? `${PASTE_TRADE_BASE}${raw}` : raw;
+            break;
+          }
+        }
+      } catch {
+        // avatar is optional
+      }
+    }
+
+    const displayName = xProfile.displayName ?? refreshed.display_name;
 
     // Determine joinedAt: earliest trade date
     const allDates = metrics.recentTrades
@@ -130,8 +177,15 @@ export async function GET(
       handle,
       displayName: displayName ?? handle,
       avatarUrl,
-      verified: false,
-      bio: "",
+      bannerUrl: xProfile.bannerUrl,
+      verified: xProfile.verified,
+      bio: xProfile.bio ?? "",
+      location: xProfile.location,
+      website: xProfile.website,
+      followers: xProfile.followers,
+      following: xProfile.following,
+      tweetCount: xProfile.tweetCount,
+      xJoinedAt: xProfile.joinedAt,
       joinedAt,
       rank: refreshed.rank ?? null,
       stats: {

@@ -257,18 +257,19 @@ export async function fetchProfile(handle: string): Promise<TwitterProfile | nul
         const raw = await scrapeProfile(page, handle);
         if (!raw || (!raw.username && !raw.name)) return null;
 
+        const rawAny = raw as Record<string, unknown>;
         return {
           handle: raw.username || handle,
           displayName: raw.name || null,
           avatarUrl: raw.avatar || null,
-          bannerUrl: raw.banner || null,
+          bannerUrl: (rawAny.banner as string) || null,
           bio: raw.bio || null,
-          location: raw.location || null,
-          website: raw.website || null,
+          location: (rawAny.location as string) || null,
+          website: (rawAny.website as string) || null,
           verified: raw.verified ?? false,
           followers: parseMetricCount(raw.followers),
           following: parseMetricCount(raw.following),
-          tweetCount: parseMetricCount(raw.tweets),
+          tweetCount: parseMetricCount(rawAny.tweets as string),
           joined: null,
         };
       } finally {
