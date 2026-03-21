@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enableWager, submitWager } from "@/lib/wager-db";
 import { randomUUID } from "crypto";
+import { isValidSolanaSignature, verifySolanaTransaction } from "@/lib/solana";
 
 export const dynamic = "force-dynamic";
 

@@ -28,6 +28,7 @@ export function WagerModal({
   const [amount, setAmount] = useState<string>("50");
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [handle, setHandle] = useState<string>("");
+  const [txSignature, setTxSignature] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [successWagerId, setSuccessWagerId] = useState<string>("");
 
@@ -47,12 +48,15 @@ export function WagerModal({
       return;
     }
 
+    const trimmedSig = txSignature.trim();
+    if (!trimmedSig) {
+      setError("Paste your Solana transaction signature");
+      return;
+    }
+
     setStep("submitting");
 
     try {
-      // MVP: generate a mock tx signature (in production, user signs with wallet)
-      const mockTxSignature = `sig_${Date.now()}_${walletAddress.slice(0, 8)}`;
-
       const res = await fetch("/api/wager", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,7 +65,7 @@ export function WagerModal({
           tradeCardId: tradeId,
           walletAddress,
           amount: amountNum,
-          txSignature: mockTxSignature,
+          txSignature: trimmedSig,
           handle: handle.replace(/^@/, "") || undefined,
           currency: "USDC",
         }),
@@ -190,6 +194,24 @@ export function WagerModal({
           disabled={step === "submitting"}
           className="w-full bg-background border border-border rounded px-3 py-2 text-sm font-mono text-text-primary focus:border-accent outline-none placeholder-text-muted"
         />
+      </div>
+
+      {/* Transaction signature */}
+      <div className="mb-4">
+        <label className="text-[11px] uppercase tracking-widest text-text-muted block mb-1">
+          Transaction Signature
+        </label>
+        <input
+          type="text"
+          placeholder="Paste Solana tx signature…"
+          value={txSignature}
+          onChange={(e) => setTxSignature(e.target.value.trim())}
+          disabled={step === "submitting"}
+          className="w-full bg-background border border-border rounded px-3 py-2 text-xs font-mono text-text-primary focus:border-accent outline-none placeholder-text-muted"
+        />
+        <div className="text-[10px] text-text-muted mt-1">
+          Transfer {amount || "0"} USDC first, then paste the tx signature here
+        </div>
       </div>
 
       {/* Disclosure */}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -7,8 +8,9 @@ const ADMIN_KEY = process.env["ADMIN_KEY"] ?? "";
 
 function isAdmin(request: NextRequest): boolean {
   if (!ADMIN_KEY) return false;
-  const auth = request.headers.get("x-admin-key");
-  return auth === ADMIN_KEY;
+  const auth = request.headers.get("x-admin-key") ?? "";
+  if (auth.length !== ADMIN_KEY.length) return false;
+  return timingSafeEqual(Buffer.from(auth), Buffer.from(ADMIN_KEY));
 }
 
 export async function POST(request: NextRequest) {

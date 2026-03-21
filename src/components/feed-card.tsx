@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
 import { tierColor } from "@/lib/alpha";
-import { DoubleDownButton } from "@/components/double-down-popover";
 
 function timeAgo(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
@@ -155,17 +154,9 @@ export function FeedCard({ item, showWagerCta = false, onWagerClick }: FeedCardP
         </div>
       )}
 
-      {/* Footer: CTAs + Double Down */}
+      {/* Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-[#1a1a2e]">
         <div className="flex items-center gap-3">
-          <DoubleDownButton
-            tradeId={item.id}
-            ticker={item.ticker}
-            direction={item.direction}
-            authorHandle={handle}
-            totalWagered={item.wager_total}
-            backerCount={item.wager_count}
-          />
           <a
             href={tradeHref}
             target={item.source_url ? "_blank" : undefined}

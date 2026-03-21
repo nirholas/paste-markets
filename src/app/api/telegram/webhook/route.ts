@@ -14,6 +14,7 @@ import {
 } from "@/lib/telegram-format";
 
 const BOT_TOKEN = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
+const WEBHOOK_SECRET = process.env["TELEGRAM_WEBHOOK_SECRET"] ?? "";
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 // ---------- Telegram helpers ----------
@@ -196,6 +197,14 @@ async function handleUpdate(update: TelegramUpdate) {
 export async function POST(req: NextRequest) {
   if (!BOT_TOKEN) {
     return NextResponse.json({ error: "TELEGRAM_BOT_TOKEN not configured" }, { status: 500 });
+  }
+
+  // Validate the secret token set when registering the webhook via setWebhook({ secret_token })
+  if (WEBHOOK_SECRET) {
+    const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
+    if (headerSecret !== WEBHOOK_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   try {

@@ -163,7 +163,7 @@ paste-markets/
 │   │       ├── alerts/          ← alert management
 │   │       ├── wager/           ← wager endpoints
 │   │       └── ...              ← many more
-│   ├── lib/                     ← 30+ modules
+│   ├── lib/                     ← 45 modules
 │   │   ├── paste-trade.ts       ← paste.trade API client
 │   │   ├── db.ts                ← Neon Postgres connection + queries
 │   │   ├── schema.sql           ← database schema
