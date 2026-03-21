@@ -35,18 +35,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { db } = await import("@/lib/db");
+    const { sql } = await import("@/lib/db");
     const { start, end } = getDateRange(dateParam);
 
     // Get all trades for the date (using entry_date or posted_at)
-    const trades = db
-      .prepare(
-        `SELECT t.author_handle, t.ticker, t.direction, t.pnl_pct, t.platform, t.entry_date, t.posted_at
-         FROM trades t
-         WHERE (t.entry_date BETWEEN ? AND ? OR t.posted_at BETWEEN ? AND ?)
-         ORDER BY t.entry_date DESC`,
-      )
-      .all(start, end, start, end) as Array<{
+    const trades = (await sql`
+      SELECT t.author_handle, t.ticker, t.direction, t.pnl_pct, t.platform, t.entry_date, t.posted_at
+      FROM trades t
+      WHERE (t.entry_date BETWEEN ${start} AND ${end} OR t.posted_at BETWEEN ${start} AND ${end})
+      ORDER BY t.entry_date DESC
+    `) as Array<{
       author_handle: string;
       ticker: string;
       direction: string;
@@ -92,26 +90,22 @@ export async function GET(request: NextRequest) {
 
     // Hot streak — find caller with longest current win streak from rankings
     let hotStreak: RecapData["hot_streak"] = null;
-    const streakRows = db
-      .prepare(
-        `SELECT author_handle, streak FROM rankings
-         WHERE timeframe = '30d' AND streak > 0
-         ORDER BY streak DESC LIMIT 1`,
-      )
-      .all() as Array<{ author_handle: string; streak: number }>;
+    const streakRows = (await sql`
+      SELECT author_handle, streak FROM rankings
+      WHERE timeframe = '30d' AND streak > 0
+      ORDER BY streak DESC LIMIT 1
+    `) as Array<{ author_handle: string; streak: number }>;
     const topStreak = streakRows[0];
     if (topStreak) {
       hotStreak = { handle: topStreak.author_handle, streak: topStreak.streak };
     }
 
     // New callers — authors whose first trade is on this date
-    const newCallerRows = db
-      .prepare(
-        `SELECT a.handle FROM authors a
-         WHERE a.added_at BETWEEN ? AND ?
-         ORDER BY a.added_at ASC`,
-      )
-      .all(start, end) as Array<{ handle: string }>;
+    const newCallerRows = (await sql`
+      SELECT a.handle FROM authors a
+      WHERE a.added_at BETWEEN ${start} AND ${end}
+      ORDER BY a.added_at ASC
+    `) as Array<{ handle: string }>;
     const newCallers = newCallerRows.map((r) => `@${r.handle}`);
 
     // Venue breakdown

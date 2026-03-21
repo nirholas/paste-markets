@@ -5,25 +5,8 @@
  * polling intervals (S=2m, A=5m, B=15m, C=30m).
  */
 
-import Database from "better-sqlite3";
-import { readFileSync, mkdirSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { sql } from "./db";
 import type { CallerTier } from "./alpha";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = resolve(__dirname, "../data/db.sqlite");
-const SCHEMA_PATH = resolve(__dirname, "schema.sql");
-
-mkdirSync(dirname(DB_PATH), { recursive: true });
-
-const db = new Database(DB_PATH);
-db.pragma("journal_mode = WAL");
-db.pragma("busy_timeout = 5000");
-
-// Ensure watchlist tables exist
-const schema = readFileSync(SCHEMA_PATH, "utf-8");
-db.exec(schema);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,107 +52,6 @@ export function tierToInterval(tier: CallerTier): number {
   return TIER_INTERVALS[tier] ?? TIER_INTERVALS.C;
 }
 
-// ── Prepared statements ──────────────────────────────────────────────────────
-
-const stmts = {
-  getAll: db.prepare(`
-    SELECT handle, display_name, tier, check_interval_ms,
-           last_checked_at, last_tweet_id, enabled, created_at
-    FROM caller_watchlist
-    ORDER BY tier ASC, handle ASC
-  `),
-
-  getEnabled: db.prepare(`
-    SELECT handle, display_name, tier, check_interval_ms,
-           last_checked_at, last_tweet_id, enabled, created_at
-    FROM caller_watchlist
-    WHERE enabled = 1
-    ORDER BY tier ASC, handle ASC
-  `),
-
-  getByHandle: db.prepare<[string]>(`
-    SELECT handle, display_name, tier, check_interval_ms,
-           last_checked_at, last_tweet_id, enabled, created_at
-    FROM caller_watchlist
-    WHERE handle = ?
-  `),
-
-  insert: db.prepare(`
-    INSERT OR IGNORE INTO caller_watchlist (handle, display_name, tier, check_interval_ms, enabled)
-    VALUES (@handle, @display_name, @tier, @check_interval_ms, @enabled)
-  `),
-
-  update: db.prepare(`
-    UPDATE caller_watchlist SET
-      display_name = COALESCE(@display_name, display_name),
-      tier = COALESCE(@tier, tier),
-      check_interval_ms = COALESCE(@check_interval_ms, check_interval_ms),
-      enabled = COALESCE(@enabled, enabled)
-    WHERE handle = @handle
-  `),
-
-  remove: db.prepare("DELETE FROM caller_watchlist WHERE handle = ?"),
-
-  updateLastChecked: db.prepare(`
-    UPDATE caller_watchlist SET
-      last_checked_at = @last_checked_at,
-      last_tweet_id = COALESCE(@last_tweet_id, last_tweet_id)
-    WHERE handle = @handle
-  `),
-
-  count: db.prepare("SELECT COUNT(*) as total FROM caller_watchlist"),
-  countEnabled: db.prepare("SELECT COUNT(*) as total FROM caller_watchlist WHERE enabled = 1"),
-
-  // Live signals
-  insertSignal: db.prepare(`
-    INSERT OR IGNORE INTO live_signals (
-      handle, tweet_id, tweet_text, tweet_url, tweet_date,
-      ticker, direction, platform, confidence,
-      entry_price, trade_url, paste_trade_id, detection_latency_ms
-    ) VALUES (
-      @handle, @tweet_id, @tweet_text, @tweet_url, @tweet_date,
-      @ticker, @direction, @platform, @confidence,
-      @entry_price, @trade_url, @paste_trade_id, @detection_latency_ms
-    )
-  `),
-
-  getRecentSignals: db.prepare<[number]>(`
-    SELECT * FROM live_signals
-    ORDER BY detected_at DESC
-    LIMIT ?
-  `),
-
-  getSignalsByConfidence: db.prepare<[number, number]>(`
-    SELECT * FROM live_signals
-    WHERE confidence >= ?
-    ORDER BY detected_at DESC
-    LIMIT ?
-  `),
-
-  getSignalsToday: db.prepare(`
-    SELECT COUNT(*) as total FROM live_signals
-    WHERE detected_at >= date('now')
-  `),
-
-  getChecksToday: db.prepare(`
-    SELECT COUNT(*) as total FROM caller_watchlist
-    WHERE last_checked_at >= date('now')
-  `),
-
-  getLastSignal: db.prepare(`
-    SELECT detected_at FROM live_signals
-    ORDER BY detected_at DESC
-    LIMIT 1
-  `),
-
-  getAvgLatency: db.prepare(`
-    SELECT AVG(detection_latency_ms) as avg_latency
-    FROM live_signals
-    WHERE detected_at >= date('now')
-      AND detection_latency_ms IS NOT NULL
-  `),
-};
-
 // ── Row mapper ───────────────────────────────────────────────────────────────
 
 interface WatchlistRow {
@@ -179,7 +61,7 @@ interface WatchlistRow {
   check_interval_ms: number;
   last_checked_at: string | null;
   last_tweet_id: string | null;
-  enabled: number;
+  enabled: number | boolean;
   created_at: string;
 }
 
@@ -191,7 +73,7 @@ function mapRow(row: WatchlistRow): WatchedCaller {
     lastChecked: row.last_checked_at,
     lastTweetId: row.last_tweet_id,
     checkIntervalMs: row.check_interval_ms,
-    enabled: row.enabled === 1,
+    enabled: row.enabled === 1 || row.enabled === true,
     createdAt: row.created_at,
   };
 }
@@ -236,72 +118,107 @@ function mapSignal(row: SignalRow): LiveSignal {
 
 // ── CRUD ─────────────────────────────────────────────────────────────────────
 
-export function getAllWatched(): WatchedCaller[] {
-  return (stmts.getAll.all() as WatchlistRow[]).map(mapRow);
+export async function getAllWatched(): Promise<WatchedCaller[]> {
+  const rows = await sql`
+    SELECT handle, display_name, tier, check_interval_ms,
+           last_checked_at, last_tweet_id, enabled, created_at
+    FROM caller_watchlist
+    ORDER BY tier ASC, handle ASC
+  `;
+  return (rows as WatchlistRow[]).map(mapRow);
 }
 
-export function getEnabledWatched(): WatchedCaller[] {
-  return (stmts.getEnabled.all() as WatchlistRow[]).map(mapRow);
+export async function getEnabledWatched(): Promise<WatchedCaller[]> {
+  const rows = await sql`
+    SELECT handle, display_name, tier, check_interval_ms,
+           last_checked_at, last_tweet_id, enabled, created_at
+    FROM caller_watchlist
+    WHERE enabled = true
+    ORDER BY tier ASC, handle ASC
+  `;
+  return (rows as WatchlistRow[]).map(mapRow);
 }
 
-export function getWatchedCaller(handle: string): WatchedCaller | null {
-  const row = stmts.getByHandle.get(handle) as WatchlistRow | undefined;
+export async function getWatchedCaller(handle: string): Promise<WatchedCaller | null> {
+  const rows = await sql`
+    SELECT handle, display_name, tier, check_interval_ms,
+           last_checked_at, last_tweet_id, enabled, created_at
+    FROM caller_watchlist
+    WHERE handle = ${handle}
+  `;
+  const row = rows[0] as WatchlistRow | undefined;
   return row ? mapRow(row) : null;
 }
 
-export function addToWatchlist(
+export async function addToWatchlist(
   handle: string,
   tier: CallerTier = "C",
   displayName?: string,
-): boolean {
-  const result = stmts.insert.run({
-    handle: handle.toLowerCase().replace(/^@/, ""),
-    display_name: displayName ?? null,
-    tier,
-    check_interval_ms: tierToInterval(tier),
-    enabled: 1,
-  });
-  return result.changes > 0;
+): Promise<boolean> {
+  const cleanHandle = handle.toLowerCase().replace(/^@/, "");
+  const display_name = displayName ?? null;
+  const check_interval_ms = tierToInterval(tier);
+  const rows = await sql`
+    INSERT INTO caller_watchlist (handle, display_name, tier, check_interval_ms, enabled)
+    VALUES (${cleanHandle}, ${display_name}, ${tier}, ${check_interval_ms}, true)
+    ON CONFLICT DO NOTHING
+    RETURNING *
+  `;
+  return rows.length > 0;
 }
 
-export function updateWatchedCaller(
+export async function updateWatchedCaller(
   handle: string,
   updates: {
     tier?: CallerTier;
     displayName?: string;
     enabled?: boolean;
   },
-): boolean {
-  const interval = updates.tier ? tierToInterval(updates.tier) : undefined;
-  const result = stmts.update.run({
-    handle: handle.toLowerCase().replace(/^@/, ""),
-    display_name: updates.displayName ?? null,
-    tier: updates.tier ?? null,
-    check_interval_ms: interval ?? null,
-    enabled: updates.enabled != null ? (updates.enabled ? 1 : 0) : null,
-  });
-  return result.changes > 0;
+): Promise<boolean> {
+  const cleanHandle = handle.toLowerCase().replace(/^@/, "");
+  const interval = updates.tier ? tierToInterval(updates.tier) : null;
+  const display_name = updates.displayName ?? null;
+  const tier = updates.tier ?? null;
+  const enabled = updates.enabled != null ? updates.enabled : null;
+  const rows = await sql`
+    UPDATE caller_watchlist SET
+      display_name = COALESCE(${display_name}, display_name),
+      tier = COALESCE(${tier}, tier),
+      check_interval_ms = COALESCE(${interval}, check_interval_ms),
+      enabled = COALESCE(${enabled}, enabled)
+    WHERE handle = ${cleanHandle}
+    RETURNING *
+  `;
+  return rows.length > 0;
 }
 
-export function removeFromWatchlist(handle: string): boolean {
-  const result = stmts.remove.run(handle.toLowerCase().replace(/^@/, ""));
-  return result.changes > 0;
+export async function removeFromWatchlist(handle: string): Promise<boolean> {
+  const cleanHandle = handle.toLowerCase().replace(/^@/, "");
+  const rows = await sql`
+    DELETE FROM caller_watchlist WHERE handle = ${cleanHandle}
+    RETURNING *
+  `;
+  return rows.length > 0;
 }
 
-export function updateLastChecked(
+export async function updateLastChecked(
   handle: string,
   lastTweetId?: string,
-): void {
-  stmts.updateLastChecked.run({
-    handle: handle.toLowerCase().replace(/^@/, ""),
-    last_checked_at: new Date().toISOString(),
-    last_tweet_id: lastTweetId ?? null,
-  });
+): Promise<void> {
+  const cleanHandle = handle.toLowerCase().replace(/^@/, "");
+  const last_checked_at = new Date().toISOString();
+  const last_tweet_id = lastTweetId ?? null;
+  await sql`
+    UPDATE caller_watchlist SET
+      last_checked_at = ${last_checked_at},
+      last_tweet_id = COALESCE(${last_tweet_id}, last_tweet_id)
+    WHERE handle = ${cleanHandle}
+  `;
 }
 
 // ── Signal storage ───────────────────────────────────────────────────────────
 
-export function insertSignal(signal: {
+export async function insertSignal(signal: {
   handle: string;
   tweetId: string;
   tweetText: string;
@@ -315,31 +232,45 @@ export function insertSignal(signal: {
   tradeUrl?: string;
   pasteTradeId?: string;
   detectionLatencyMs?: number;
-}): boolean {
-  const result = stmts.insertSignal.run({
-    handle: signal.handle,
-    tweet_id: signal.tweetId,
-    tweet_text: signal.tweetText,
-    tweet_url: signal.tweetUrl,
-    tweet_date: signal.tweetDate,
-    ticker: signal.ticker,
-    direction: signal.direction,
-    platform: signal.platform ?? null,
-    confidence: signal.confidence,
-    entry_price: signal.entryPrice ?? null,
-    trade_url: signal.tradeUrl ?? null,
-    paste_trade_id: signal.pasteTradeId ?? null,
-    detection_latency_ms: signal.detectionLatencyMs ?? null,
-  });
-  return result.changes > 0;
+}): Promise<boolean> {
+  const platform = signal.platform ?? null;
+  const entry_price = signal.entryPrice ?? null;
+  const trade_url = signal.tradeUrl ?? null;
+  const paste_trade_id = signal.pasteTradeId ?? null;
+  const detection_latency_ms = signal.detectionLatencyMs ?? null;
+  const rows = await sql`
+    INSERT INTO live_signals (
+      handle, tweet_id, tweet_text, tweet_url, tweet_date,
+      ticker, direction, platform, confidence,
+      entry_price, trade_url, paste_trade_id, detection_latency_ms
+    ) VALUES (
+      ${signal.handle}, ${signal.tweetId}, ${signal.tweetText}, ${signal.tweetUrl}, ${signal.tweetDate},
+      ${signal.ticker}, ${signal.direction}, ${platform}, ${signal.confidence},
+      ${entry_price}, ${trade_url}, ${paste_trade_id}, ${detection_latency_ms}
+    )
+    ON CONFLICT DO NOTHING
+    RETURNING *
+  `;
+  return rows.length > 0;
 }
 
-export function getRecentSignals(limit = 50): LiveSignal[] {
-  return (stmts.getRecentSignals.all(limit) as SignalRow[]).map(mapSignal);
+export async function getRecentSignals(limit = 50): Promise<LiveSignal[]> {
+  const rows = await sql`
+    SELECT * FROM live_signals
+    ORDER BY detected_at DESC
+    LIMIT ${limit}
+  `;
+  return (rows as SignalRow[]).map(mapSignal);
 }
 
-export function getHighConfidenceSignals(minConfidence = 0.75, limit = 50): LiveSignal[] {
-  return (stmts.getSignalsByConfidence.all(minConfidence, limit) as SignalRow[]).map(mapSignal);
+export async function getHighConfidenceSignals(minConfidence = 0.75, limit = 50): Promise<LiveSignal[]> {
+  const rows = await sql`
+    SELECT * FROM live_signals
+    WHERE confidence >= ${minConfidence}
+    ORDER BY detected_at DESC
+    LIMIT ${limit}
+  `;
+  return (rows as SignalRow[]).map(mapSignal);
 }
 
 // ── Stats ────────────────────────────────────────────────────────────────────
@@ -353,13 +284,23 @@ export interface WatchlistStats {
   lastSignalAt: string | null;
 }
 
-export function getWatchlistStats(): WatchlistStats {
-  const total = (stmts.count.get() as { total: number }).total;
-  const active = (stmts.countEnabled.get() as { total: number }).total;
-  const checksToday = (stmts.getChecksToday.get() as { total: number }).total;
-  const tradesFoundToday = (stmts.getSignalsToday.get() as { total: number }).total;
-  const lastSignal = stmts.getLastSignal.get() as { detected_at: string } | undefined;
-  const avgLatency = stmts.getAvgLatency.get() as { avg_latency: number | null } | undefined;
+export async function getWatchlistStats(): Promise<WatchlistStats> {
+  const [totalRows, activeRows, checksTodayRows, tradesTodayRows, lastSignalRows, avgLatencyRows] =
+    await Promise.all([
+      sql`SELECT COUNT(*) as total FROM caller_watchlist`,
+      sql`SELECT COUNT(*) as total FROM caller_watchlist WHERE enabled = true`,
+      sql`SELECT COUNT(*) as total FROM caller_watchlist WHERE last_checked_at >= CURRENT_DATE`,
+      sql`SELECT COUNT(*) as total FROM live_signals WHERE detected_at >= CURRENT_DATE`,
+      sql`SELECT detected_at FROM live_signals ORDER BY detected_at DESC LIMIT 1`,
+      sql`SELECT AVG(detection_latency_ms) as avg_latency FROM live_signals WHERE detected_at >= CURRENT_DATE AND detection_latency_ms IS NOT NULL`,
+    ]);
+
+  const total = (totalRows[0] as { total: number }).total;
+  const active = (activeRows[0] as { total: number }).total;
+  const checksToday = (checksTodayRows[0] as { total: number }).total;
+  const tradesFoundToday = (tradesTodayRows[0] as { total: number }).total;
+  const lastSignal = lastSignalRows[0] as { detected_at: string } | undefined;
+  const avgLatency = avgLatencyRows[0] as { avg_latency: number | null } | undefined;
 
   return {
     totalCallers: total,
@@ -374,7 +315,8 @@ export function getWatchlistStats(): WatchlistStats {
 // ── Auto-populate from leaderboard ───────────────────────────────────────────
 
 export async function autoPopulateFromLeaderboard(): Promise<number> {
-  const existing = (stmts.count.get() as { total: number }).total;
+  const countRows = await sql`SELECT COUNT(*) as total FROM caller_watchlist`;
+  const existing = (countRows[0] as { total: number }).total;
   if (existing > 0) return 0;
 
   try {
@@ -394,7 +336,7 @@ export async function autoPopulateFromLeaderboard(): Promise<number> {
     let added = 0;
     for (const entry of data.entries) {
       const tier = entry.tier ?? "C";
-      const ok = addToWatchlist(entry.handle, tier);
+      const ok = await addToWatchlist(entry.handle, tier);
       if (ok) added++;
     }
 

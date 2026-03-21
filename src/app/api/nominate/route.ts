@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -13,48 +13,6 @@ interface SubmissionRow {
   status: string;
   created_at: string;
 }
-
-const stmts = {
-  getByHandle: db.prepare<[string], SubmissionRow>(
-    "SELECT * FROM submissions WHERE caller_handle = ? LIMIT 1",
-  ),
-  incrementUpvotes: db.prepare(
-    "UPDATE submissions SET upvotes = upvotes + 1 WHERE caller_handle = ?",
-  ),
-  insert: db.prepare(`
-    INSERT INTO submissions (caller_handle, submitted_by, reason, example_tweet_url)
-    VALUES (@caller_handle, @submitted_by, @reason, @example_tweet_url)
-  `),
-  listByUpvotes: db.prepare<[number, number], SubmissionRow>(`
-    SELECT * FROM submissions
-    ORDER BY
-      CASE status
-        WHEN 'tracked' THEN 3
-        WHEN 'approved' THEN 2
-        WHEN 'pending' THEN 1
-        ELSE 0
-      END DESC,
-      upvotes DESC
-    LIMIT ? OFFSET ?
-  `),
-  listByStatus: db.prepare<[string, number, number], SubmissionRow>(`
-    SELECT * FROM submissions
-    WHERE status = ?
-    ORDER BY upvotes DESC
-    LIMIT ? OFFSET ?
-  `),
-  listByRecent: db.prepare<[number, number], SubmissionRow>(`
-    SELECT * FROM submissions
-    ORDER BY created_at DESC
-    LIMIT ? OFFSET ?
-  `),
-  getCount: db.prepare<[], { count: number }>(
-    "SELECT COUNT(*) as count FROM submissions",
-  ),
-  getCountByStatus: db.prepare<[string], { count: number }>(
-    "SELECT COUNT(*) as count FROM submissions WHERE status = ?",
-  ),
-};
 
 function sanitizeHandle(raw: string): string {
   return raw.replace(/^@/, "").trim().toLowerCase();
@@ -90,10 +48,12 @@ export async function POST(request: NextRequest) {
         : null;
 
     // Deduplicate: if handle already submitted, increment upvotes
-    const existing = stmts.getByHandle.get(handle);
+    const existingRows = await sql`SELECT * FROM submissions WHERE caller_handle = ${handle} LIMIT 1`;
+    const existing = existingRows[0] as SubmissionRow | undefined;
     if (existing) {
-      stmts.incrementUpvotes.run(handle);
-      const updated = stmts.getByHandle.get(handle)!;
+      await sql`UPDATE submissions SET upvotes = upvotes + 1 WHERE caller_handle = ${handle}`;
+      const updatedRows = await sql`SELECT * FROM submissions WHERE caller_handle = ${handle} LIMIT 1`;
+      const updated = updatedRows[0] as SubmissionRow;
       return NextResponse.json({
         ok: true,
         submission: updated,
@@ -101,14 +61,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    stmts.insert.run({
-      caller_handle: handle,
-      submitted_by: submittedBy,
-      reason,
-      example_tweet_url: exampleUrl,
-    });
+    await sql`
+      INSERT INTO submissions (caller_handle, submitted_by, reason, example_tweet_url)
+      VALUES (${handle}, ${submittedBy}, ${reason}, ${exampleUrl})
+    `;
 
-    const created = stmts.getByHandle.get(handle)!;
+    const createdRows = await sql`SELECT * FROM submissions WHERE caller_handle = ${handle} LIMIT 1`;
+    const created = createdRows[0] as SubmissionRow;
     return NextResponse.json({
       ok: true,
       submission: created,
@@ -135,14 +94,37 @@ export async function GET(request: NextRequest) {
     let total: number;
 
     if (status) {
-      submissions = stmts.listByStatus.all(status, limit, offset);
-      total = (stmts.getCountByStatus.get(status) as { count: number }).count;
+      submissions = await sql`
+        SELECT * FROM submissions
+        WHERE status = ${status}
+        ORDER BY upvotes DESC
+        LIMIT ${limit} OFFSET ${offset}
+      ` as SubmissionRow[];
+      const countRows = await sql`SELECT COUNT(*) as count FROM submissions WHERE status = ${status}`;
+      total = (countRows[0] as { count: number }).count;
     } else if (sort === "recent") {
-      submissions = stmts.listByRecent.all(limit, offset);
-      total = (stmts.getCount.get() as { count: number }).count;
+      submissions = await sql`
+        SELECT * FROM submissions
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      ` as SubmissionRow[];
+      const countRows = await sql`SELECT COUNT(*) as count FROM submissions`;
+      total = (countRows[0] as { count: number }).count;
     } else {
-      submissions = stmts.listByUpvotes.all(limit, offset);
-      total = (stmts.getCount.get() as { count: number }).count;
+      submissions = await sql`
+        SELECT * FROM submissions
+        ORDER BY
+          CASE status
+            WHEN 'tracked' THEN 3
+            WHEN 'approved' THEN 2
+            WHEN 'pending' THEN 1
+            ELSE 0
+          END DESC,
+          upvotes DESC
+        LIMIT ${limit} OFFSET ${offset}
+      ` as SubmissionRow[];
+      const countRows = await sql`SELECT COUNT(*) as count FROM submissions`;
+      total = (countRows[0] as { count: number }).count;
     }
 
     return NextResponse.json({ ok: true, submissions, total });

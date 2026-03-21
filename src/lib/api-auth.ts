@@ -13,7 +13,7 @@
 
 import type { NextRequest } from "next/server";
 
-export type ApiTier = "anon" | "free" | "developer";
+export type ApiTier = "anon" | "free" | "developer" | "builder" | "pro";
 
 export interface ApiKeyRecord {
   key: string;
@@ -71,9 +71,14 @@ async function lookupKey(key: string): Promise<ApiKeyRecord | null> {
         if (item && typeof item === "object") {
           const rec = item as Record<string, unknown>;
           if (rec["key"] === key) {
+            const validTiers = ["free", "developer", "builder", "pro"] as const;
+            const rawTier = rec["tier"] as string;
+            const tier = validTiers.includes(rawTier as typeof validTiers[number])
+              ? (rawTier as "free" | "developer" | "builder" | "pro")
+              : "free";
             return {
               key,
-              tier: rec["tier"] === "developer" ? "developer" : "free",
+              tier,
               handle: typeof rec["handle"] === "string" ? rec["handle"] : undefined,
             };
           }
@@ -96,6 +101,8 @@ const LIMITS: Record<ApiTier, { max: number; windowMs: number }> = {
   anon:      { max: 60,     windowMs: 60 * 60 * 1000 },           // 60/hour
   free:      { max: 100,    windowMs: 24 * 60 * 60 * 1000 },      // 100/day
   developer: { max: 10_000, windowMs: 24 * 60 * 60 * 1000 },      // 10k/day
+  builder:   { max: 1_000,  windowMs: 60 * 60 * 1000 },           // 1k/hour
+  pro:       { max: 10_000, windowMs: 60 * 60 * 1000 },           // 10k/hour
 };
 
 interface RateEntry { count: number; resetAt: number }

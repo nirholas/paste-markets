@@ -1,9 +1,10 @@
 /**
  * Wagering database layer.
  * All wager state lives in trade_wager_config + wagers tables.
+ * Uses @neondatabase/serverless via the shared `sql` tagged-template client.
  */
 
-import { db } from "./db";
+import { sql } from "./db";
 
 export interface TradeWagerConfig {
   trade_card_id: string;
@@ -64,87 +65,11 @@ export function deriveVaultAddress(tradeCardId: string): string {
   return `wagerVault_${slug}`;
 }
 
-// ─── config ───────────────────────────────────────────────────────────────────
-
-const stmts = {
-  getConfig: db.prepare<[string], TradeWagerConfig>(
-    "SELECT * FROM trade_wager_config WHERE trade_card_id = ?",
-  ),
-
-  insertConfig: db.prepare(`
-    INSERT OR IGNORE INTO trade_wager_config
-      (trade_card_id, author_handle, ticker, direction, entry_price,
-       wager_deadline, settlement_date, caller_tip_bps, wager_vault_address)
-    VALUES
-      (@trade_card_id, @author_handle, @ticker, @direction, @entry_price,
-       @wager_deadline, @settlement_date, @caller_tip_bps, @wager_vault_address)
-  `),
-
-  incrementTotals: db.prepare(`
-    UPDATE trade_wager_config
-    SET total_wagered = total_wagered + @amount,
-        wager_count   = wager_count + 1
-    WHERE trade_card_id = @trade_card_id
-  `),
-
-  settleConfig: db.prepare(`
-    UPDATE trade_wager_config
-    SET status           = 'settled',
-        settled_at       = datetime('now'),
-        caller_tip_earned = @caller_tip_earned
-    WHERE trade_card_id = @trade_card_id
-  `),
-
-  getConfigsByAuthor: db.prepare<[string], TradeWagerConfig>(
-    "SELECT * FROM trade_wager_config WHERE author_handle = ? ORDER BY created_at DESC",
-  ),
-
-  sumTipsEarned: db.prepare<[string], { total: number | null }>(
-    "SELECT SUM(caller_tip_earned) as total FROM trade_wager_config WHERE author_handle = ? AND status = 'settled' AND caller_tip_earned > 0",
-  ),
-};
-
-const wagerStmts = {
-  insert: db.prepare(`
-    INSERT INTO wagers
-      (id, trade_card_id, wallet_address, handle, amount, currency, tx_signature)
-    VALUES
-      (@id, @trade_card_id, @wallet_address, @handle, @amount, @currency, @tx_signature)
-  `),
-
-  getByTrade: db.prepare<[string], Wager>(
-    "SELECT * FROM wagers WHERE trade_card_id = ? ORDER BY wagered_at ASC",
-  ),
-
-  getByWallet: db.prepare<[string, string], Wager>(
-    "SELECT * FROM wagers WHERE trade_card_id = ? AND wallet_address = ?",
-  ),
-
-  settleWager: db.prepare(`
-    UPDATE wagers
-    SET status     = @status,
-        settled_at = datetime('now'),
-        pnl_amount = @pnl_amount
-    WHERE trade_card_id = @trade_card_id AND wallet_address = @wallet_address
-  `),
-
-  settleAll: db.prepare(`
-    UPDATE wagers SET status = @status, settled_at = datetime('now')
-    WHERE trade_card_id = @trade_card_id AND status = 'active'
-  `),
-
-  sumByAuthor: db.prepare<[string], { total_earned: number | null }>(`
-    SELECT SUM(w.pnl_amount) as total_earned
-    FROM wagers w
-    JOIN trade_wager_config c ON c.trade_card_id = w.trade_card_id
-    WHERE c.author_handle = ? AND w.status = 'won'
-  `),
-};
-
 // ─── public API ───────────────────────────────────────────────────────────────
 
-export function getWagerConfig(tradeCardId: string): TradeWagerConfig | undefined {
-  return stmts.getConfig.get(tradeCardId) ?? undefined;
+export async function getWagerConfig(tradeCardId: string): Promise<TradeWagerConfig | undefined> {
+  const rows = await sql`SELECT * FROM trade_wager_config WHERE trade_card_id = ${tradeCardId}`;
+  return (rows[0] as TradeWagerConfig) ?? undefined;
 }
 
 export interface EnableWagerParams {
@@ -160,7 +85,7 @@ export interface EnableWagerParams {
   callerTipBps?: number;
 }
 
-export function enableWager(p: EnableWagerParams): TradeWagerConfig {
+export async function enableWager(p: EnableWagerParams): Promise<TradeWagerConfig> {
   const windowH = p.wagerWindowHours ?? 24;
   const settleDays = p.settlementDays ?? 7;
 
@@ -168,19 +93,21 @@ export function enableWager(p: EnableWagerParams): TradeWagerConfig {
   const settlement = new Date(Date.now() + settleDays * 86_400_000).toISOString();
   const vault = deriveVaultAddress(p.tradeCardId);
 
-  stmts.insertConfig.run({
-    trade_card_id: p.tradeCardId,
-    author_handle: p.authorHandle,
-    ticker: p.ticker,
-    direction: p.direction,
-    entry_price: p.entryPrice ?? null,
-    wager_deadline: deadline,
-    settlement_date: settlement,
-    caller_tip_bps: p.callerTipBps ?? 1000,
-    wager_vault_address: vault,
-  });
+  const entryPrice = p.entryPrice ?? null;
+  const callerTipBps = p.callerTipBps ?? 1000;
 
-  return stmts.getConfig.get(p.tradeCardId) as TradeWagerConfig;
+  await sql`
+    INSERT INTO trade_wager_config
+      (trade_card_id, author_handle, ticker, direction, entry_price,
+       wager_deadline, settlement_date, caller_tip_bps, wager_vault_address)
+    VALUES
+      (${p.tradeCardId}, ${p.authorHandle}, ${p.ticker}, ${p.direction}, ${entryPrice},
+       ${deadline}, ${settlement}, ${callerTipBps}, ${vault})
+    ON CONFLICT DO NOTHING
+  `;
+
+  const rows = await sql`SELECT * FROM trade_wager_config WHERE trade_card_id = ${p.tradeCardId}`;
+  return rows[0] as TradeWagerConfig;
 }
 
 export interface SubmitWagerParams {
@@ -197,8 +124,9 @@ export type SubmitWagerResult =
   | { ok: true; wager: Wager }
   | { ok: false; error: string };
 
-export function submitWager(p: SubmitWagerParams): SubmitWagerResult {
-  const config = stmts.getConfig.get(p.tradeCardId);
+export async function submitWager(p: SubmitWagerParams): Promise<SubmitWagerResult> {
+  const configRows = await sql`SELECT * FROM trade_wager_config WHERE trade_card_id = ${p.tradeCardId}`;
+  const config = configRows[0] as TradeWagerConfig | undefined;
   if (!config) return { ok: false, error: "Trade not found or wagering not enabled" };
   if (config.status !== "active") return { ok: false, error: "Wagering is closed for this call" };
 
@@ -217,34 +145,40 @@ export function submitWager(p: SubmitWagerParams): SubmitWagerResult {
   }
 
   // Check if wallet already wagered
-  const existing = wagerStmts.getByWallet.get(p.tradeCardId, p.walletAddress);
-  if (existing) return { ok: false, error: "This wallet has already wagered on this call" };
+  const existingRows = await sql`SELECT * FROM wagers WHERE trade_card_id = ${p.tradeCardId} AND wallet_address = ${p.walletAddress}`;
+  if (existingRows.length > 0) return { ok: false, error: "This wallet has already wagered on this call" };
 
-  const insertAndIncrement = db.transaction(() => {
-    wagerStmts.insert.run({
-      id: p.id,
-      trade_card_id: p.tradeCardId,
-      wallet_address: p.walletAddress,
-      handle: p.handle ?? null,
-      amount: p.amount,
-      currency: p.currency ?? "USDC",
-      tx_signature: p.txSignature,
-    });
-    stmts.incrementTotals.run({ amount: p.amount, trade_card_id: p.tradeCardId });
-  });
+  const handle = p.handle ?? null;
+  const currency = p.currency ?? "USDC";
 
-  insertAndIncrement();
+  // Sequential awaits instead of transaction
+  await sql`
+    INSERT INTO wagers
+      (id, trade_card_id, wallet_address, handle, amount, currency, tx_signature)
+    VALUES
+      (${p.id}, ${p.tradeCardId}, ${p.walletAddress}, ${handle}, ${p.amount}, ${currency}, ${p.txSignature})
+  `;
 
-  const wager = wagerStmts.getByWallet.get(p.tradeCardId, p.walletAddress) as Wager;
+  await sql`
+    UPDATE trade_wager_config
+    SET total_wagered = total_wagered + ${p.amount},
+        wager_count   = wager_count + 1
+    WHERE trade_card_id = ${p.tradeCardId}
+  `;
+
+  const wagerRows = await sql`SELECT * FROM wagers WHERE trade_card_id = ${p.tradeCardId} AND wallet_address = ${p.walletAddress}`;
+  const wager = wagerRows[0] as Wager;
   return { ok: true, wager };
 }
 
-export function getWagersByTrade(tradeCardId: string): Wager[] {
-  return wagerStmts.getByTrade.all(tradeCardId);
+export async function getWagersByTrade(tradeCardId: string): Promise<Wager[]> {
+  const rows = await sql`SELECT * FROM wagers WHERE trade_card_id = ${tradeCardId} ORDER BY wagered_at ASC`;
+  return rows as Wager[];
 }
 
-export function getWagerStats(tradeCardId: string): WagerStats | null {
-  const config = stmts.getConfig.get(tradeCardId);
+export async function getWagerStats(tradeCardId: string): Promise<WagerStats | null> {
+  const configRows = await sql`SELECT * FROM trade_wager_config WHERE trade_card_id = ${tradeCardId}`;
+  const config = configRows[0] as TradeWagerConfig | undefined;
   if (!config) return null;
 
   const now = new Date();
@@ -285,12 +219,14 @@ export interface SettlementResult {
   }>;
 }
 
-export function settleWagers(p: SettleParams): SettlementResult | { error: string } {
-  const config = stmts.getConfig.get(p.tradeCardId);
+export async function settleWagers(p: SettleParams): Promise<SettlementResult | { error: string }> {
+  const configRows = await sql`SELECT * FROM trade_wager_config WHERE trade_card_id = ${p.tradeCardId}`;
+  const config = configRows[0] as TradeWagerConfig | undefined;
   if (!config) return { error: "Trade wager config not found" };
   if (config.status !== "active") return { error: "Already settled or cancelled" };
 
-  const wagers = wagerStmts.getByTrade.all(p.tradeCardId).filter((w) => w.status === "active");
+  const allWagers = await sql`SELECT * FROM wagers WHERE trade_card_id = ${p.tradeCardId} ORDER BY wagered_at ASC`;
+  const wagers = (allWagers as Wager[]).filter((w) => w.status === "active");
 
   const entryPrice = config.entry_price;
   let pnlPct: number;
@@ -327,37 +263,40 @@ export function settleWagers(p: SettleParams): SettlementResult | { error: strin
 
   const wagererResults: SettlementResult["wagererResults"] = [];
 
-  const settle = db.transaction(() => {
-    for (const w of wagers) {
-      const share = totalWagered > 0 ? w.amount / totalWagered : 0;
-      const wagerPnl = isProfit
-        ? share * netToWagerers       // proportional profit share
-        : share * Math.abs(netToWagerers) * -1; // proportional loss
-      const status: "won" | "lost" = wagerPnl >= 0 ? "won" : "lost";
+  // Sequential awaits instead of transaction
+  for (const w of wagers) {
+    const share = totalWagered > 0 ? w.amount / totalWagered : 0;
+    const wagerPnl = isProfit
+      ? share * netToWagerers       // proportional profit share
+      : share * Math.abs(netToWagerers) * -1; // proportional loss
+    const status: "won" | "lost" = wagerPnl >= 0 ? "won" : "lost";
+    const pnlAmount = parseFloat(wagerPnl.toFixed(6));
 
-      wagerStmts.settleWager.run({
-        status,
-        pnl_amount: parseFloat(wagerPnl.toFixed(6)),
-        trade_card_id: p.tradeCardId,
-        wallet_address: w.wallet_address,
-      });
+    await sql`
+      UPDATE wagers
+      SET status     = ${status},
+          settled_at = NOW(),
+          pnl_amount = ${pnlAmount}
+      WHERE trade_card_id = ${p.tradeCardId} AND wallet_address = ${w.wallet_address}
+    `;
 
-      wagererResults.push({
-        walletAddress: w.wallet_address,
-        handle: w.handle,
-        principal: w.amount,
-        pnl: parseFloat(wagerPnl.toFixed(6)),
-        status,
-      });
-    }
-
-    stmts.settleConfig.run({
-      caller_tip_earned: parseFloat(callerTip.toFixed(6)),
-      trade_card_id: p.tradeCardId,
+    wagererResults.push({
+      walletAddress: w.wallet_address,
+      handle: w.handle,
+      principal: w.amount,
+      pnl: pnlAmount,
+      status,
     });
-  });
+  }
 
-  settle();
+  const callerTipEarned = parseFloat(callerTip.toFixed(6));
+  await sql`
+    UPDATE trade_wager_config
+    SET status           = 'settled',
+        settled_at       = NOW(),
+        caller_tip_earned = ${callerTipEarned}
+    WHERE trade_card_id = ${p.tradeCardId}
+  `;
 
   return {
     callerTip: parseFloat(callerTip.toFixed(6)),
@@ -370,30 +309,35 @@ export function settleWagers(p: SettleParams): SettlementResult | { error: strin
 
 // ─── caller stats ─────────────────────────────────────────────────────────────
 
-export function getCallerTipsEarned(authorHandle: string): number {
-  const row = stmts.sumTipsEarned.get(authorHandle);
-  return row?.total ?? 0;
+export async function getCallerTipsEarned(authorHandle: string): Promise<number> {
+  const rows = await sql`
+    SELECT SUM(caller_tip_earned) as total FROM trade_wager_config
+    WHERE author_handle = ${authorHandle} AND status = 'settled' AND caller_tip_earned > 0
+  `;
+  return (rows[0] as { total: number | null })?.total ?? 0;
 }
 
-export function getCallerWagerHistory(authorHandle: string): TradeWagerConfig[] {
-  return stmts.getConfigsByAuthor.all(authorHandle);
+export async function getCallerWagerHistory(authorHandle: string): Promise<TradeWagerConfig[]> {
+  const rows = await sql`
+    SELECT * FROM trade_wager_config WHERE author_handle = ${authorHandle} ORDER BY created_at DESC
+  `;
+  return rows as TradeWagerConfig[];
 }
 
 // ─── cron helpers ─────────────────────────────────────────────────────────────
 
 /**
  * Returns all active wager configs whose settlement_date has passed and have
- * at least one wager — ready for cron-triggered settlement.
+ * at least one wager -- ready for cron-triggered settlement.
  */
-export function getExpiredUnsettledConfigs(): TradeWagerConfig[] {
-  return db
-    .prepare<[], TradeWagerConfig>(
-      `SELECT * FROM trade_wager_config
-       WHERE status = 'active'
-         AND settlement_date <= datetime('now')
-         AND wager_count > 0`,
-    )
-    .all();
+export async function getExpiredUnsettledConfigs(): Promise<TradeWagerConfig[]> {
+  const rows = await sql`
+    SELECT * FROM trade_wager_config
+    WHERE status = 'active'
+      AND settlement_date <= NOW()
+      AND wager_count > 0
+  `;
+  return rows as TradeWagerConfig[];
 }
 
 // ─── social / feed queries ───────────────────────────────────────────────────
@@ -423,75 +367,23 @@ export interface CallerEarnings {
   backed_trade_count: number;
 }
 
-const socialStmts = {
-  getBackersByTrade: db.prepare<[string], BackerInfo>(
-    `SELECT handle, backer_avatar_url, amount, wagered_at
-     FROM wagers WHERE trade_card_id = ? ORDER BY amount DESC`,
-  ),
-
-  getTopBacker: db.prepare<[string], BackerInfo>(
-    `SELECT handle, backer_avatar_url, amount, wagered_at
-     FROM wagers WHERE trade_card_id = ? ORDER BY amount DESC LIMIT 1`,
-  ),
-
-  insertWagerEvent: db.prepare(`
-    INSERT INTO wager_events (id, type, trade_id, caller_handle, backer_handle, amount, pnl_percent, tip_amount)
-    VALUES (@id, @type, @trade_id, @caller_handle, @backer_handle, @amount, @pnl_percent, @tip_amount)
-  `),
-
-  getWagerEvents: db.prepare<[], WagerEventRow>(
-    `SELECT * FROM wager_events ORDER BY created_at DESC LIMIT 100`,
-  ),
-
-  getWagerEventsByTrade: db.prepare<[string], WagerEventRow>(
-    `SELECT * FROM wager_events WHERE trade_id = ? ORDER BY created_at DESC`,
-  ),
-
-  // All active wager configs with stats, ordered by total wagered
-  getActiveConfigs: db.prepare<[], TradeWagerConfig>(
-    `SELECT * FROM trade_wager_config WHERE status = 'active' ORDER BY total_wagered DESC`,
-  ),
-
-  getSettledConfigs: db.prepare<[], TradeWagerConfig>(
-    `SELECT * FROM trade_wager_config WHERE status = 'settled' ORDER BY settled_at DESC`,
-  ),
-
-  getAllConfigs: db.prepare<[], TradeWagerConfig>(
-    `SELECT * FROM trade_wager_config ORDER BY created_at DESC`,
-  ),
-
-  // Wagers by wallet across all trades
-  getWagersByWallet: db.prepare<[string], Wager & { author_handle: string; ticker: string; direction: string }>(
-    `SELECT w.*, c.author_handle, c.ticker, c.direction
-     FROM wagers w
-     JOIN trade_wager_config c ON c.trade_card_id = w.trade_card_id
-     WHERE w.wallet_address = ?
-     ORDER BY w.wagered_at DESC`,
-  ),
-
-  // Caller earnings leaderboard
-  callerEarningsLeaderboard: db.prepare<[], CallerEarnings>(
-    `SELECT
-       author_handle,
-       SUM(caller_tip_earned) as total_tips,
-       COUNT(*) as backed_trade_count
-     FROM trade_wager_config
-     WHERE status = 'settled' AND caller_tip_earned > 0
-     GROUP BY author_handle
-     ORDER BY total_tips DESC
-     LIMIT 50`,
-  ),
-};
-
-export function getBackersByTrade(tradeCardId: string): BackerInfo[] {
-  return socialStmts.getBackersByTrade.all(tradeCardId);
+export async function getBackersByTrade(tradeCardId: string): Promise<BackerInfo[]> {
+  const rows = await sql`
+    SELECT handle, backer_avatar_url, amount, wagered_at
+    FROM wagers WHERE trade_card_id = ${tradeCardId} ORDER BY amount DESC
+  `;
+  return rows as BackerInfo[];
 }
 
-export function getTopBacker(tradeCardId: string): BackerInfo | undefined {
-  return socialStmts.getTopBacker.get(tradeCardId) ?? undefined;
+export async function getTopBacker(tradeCardId: string): Promise<BackerInfo | undefined> {
+  const rows = await sql`
+    SELECT handle, backer_avatar_url, amount, wagered_at
+    FROM wagers WHERE trade_card_id = ${tradeCardId} ORDER BY amount DESC LIMIT 1
+  `;
+  return (rows[0] as BackerInfo) ?? undefined;
 }
 
-export function insertWagerEvent(event: {
+export async function insertWagerEvent(event: {
   id: string;
   type: string;
   tradeId: string;
@@ -500,43 +392,65 @@ export function insertWagerEvent(event: {
   amount?: number;
   pnlPercent?: number;
   tipAmount?: number;
-}): void {
-  socialStmts.insertWagerEvent.run({
-    id: event.id,
-    type: event.type,
-    trade_id: event.tradeId,
-    caller_handle: event.callerHandle,
-    backer_handle: event.backerHandle ?? null,
-    amount: event.amount ?? null,
-    pnl_percent: event.pnlPercent ?? null,
-    tip_amount: event.tipAmount ?? null,
-  });
+}): Promise<void> {
+  const backerHandle = event.backerHandle ?? null;
+  const amount = event.amount ?? null;
+  const pnlPercent = event.pnlPercent ?? null;
+  const tipAmount = event.tipAmount ?? null;
+
+  await sql`
+    INSERT INTO wager_events (id, type, trade_id, caller_handle, backer_handle, amount, pnl_percent, tip_amount)
+    VALUES (${event.id}, ${event.type}, ${event.tradeId}, ${event.callerHandle}, ${backerHandle}, ${amount}, ${pnlPercent}, ${tipAmount})
+  `;
 }
 
-export function getWagerEvents(): WagerEventRow[] {
-  return socialStmts.getWagerEvents.all();
+export async function getWagerEvents(): Promise<WagerEventRow[]> {
+  const rows = await sql`SELECT * FROM wager_events ORDER BY created_at DESC LIMIT 100`;
+  return rows as WagerEventRow[];
 }
 
-export function getWagerEventsByTrade(tradeId: string): WagerEventRow[] {
-  return socialStmts.getWagerEventsByTrade.all(tradeId);
+export async function getWagerEventsByTrade(tradeId: string): Promise<WagerEventRow[]> {
+  const rows = await sql`SELECT * FROM wager_events WHERE trade_id = ${tradeId} ORDER BY created_at DESC`;
+  return rows as WagerEventRow[];
 }
 
-export function getActiveWagerConfigs(): TradeWagerConfig[] {
-  return socialStmts.getActiveConfigs.all();
+export async function getActiveWagerConfigs(): Promise<TradeWagerConfig[]> {
+  const rows = await sql`SELECT * FROM trade_wager_config WHERE status = 'active' ORDER BY total_wagered DESC`;
+  return rows as TradeWagerConfig[];
 }
 
-export function getSettledWagerConfigs(): TradeWagerConfig[] {
-  return socialStmts.getSettledConfigs.all();
+export async function getSettledWagerConfigs(): Promise<TradeWagerConfig[]> {
+  const rows = await sql`SELECT * FROM trade_wager_config WHERE status = 'settled' ORDER BY settled_at DESC`;
+  return rows as TradeWagerConfig[];
 }
 
-export function getAllWagerConfigs(): TradeWagerConfig[] {
-  return socialStmts.getAllConfigs.all();
+export async function getAllWagerConfigs(): Promise<TradeWagerConfig[]> {
+  const rows = await sql`SELECT * FROM trade_wager_config ORDER BY created_at DESC`;
+  return rows as TradeWagerConfig[];
 }
 
-export function getWagersByWallet(walletAddress: string) {
-  return socialStmts.getWagersByWallet.all(walletAddress);
+export async function getWagersByWallet(walletAddress: string): Promise<(Wager & { author_handle: string; ticker: string; direction: string })[]> {
+  const rows = await sql`
+    SELECT w.*, c.author_handle, c.ticker, c.direction
+    FROM wagers w
+    JOIN trade_wager_config c ON c.trade_card_id = w.trade_card_id
+    WHERE w.wallet_address = ${walletAddress}
+    ORDER BY w.wagered_at DESC
+  `;
+  return rows as (Wager & { author_handle: string; ticker: string; direction: string })[];
 }
 
-export function getCallerEarningsLeaderboard(): CallerEarnings[] {
-  return socialStmts.callerEarningsLeaderboard.all();
+export async function getCallerEarningsLeaderboard(): Promise<CallerEarnings[]> {
+  const rows = await sql`
+    SELECT
+      author_handle,
+      SUM(caller_tip_earned) as total_tips,
+      COUNT(*) as backed_trade_count
+    FROM trade_wager_config
+    WHERE status = 'settled' AND caller_tip_earned > 0
+    GROUP BY author_handle
+    ORDER BY total_tips DESC
+    LIMIT 50
+  `;
+  return rows as CallerEarnings[];
 }

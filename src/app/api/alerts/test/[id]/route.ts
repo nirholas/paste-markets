@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAlertRuleById } from "@/lib/db";
 import { evaluateRule } from "@/lib/alert-rules";
 import type { DetectedTrade } from "@/lib/alert-rules";
-import { db } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -25,34 +25,30 @@ interface RecentTradeRow {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 
-  const rule = getAlertRuleById(id);
+  const rule = await getAlertRuleById(id);
   if (!rule) {
     return NextResponse.json({ error: "Rule not found" }, { status: 404 });
   }
 
   // Get recent trades + live_signals, convert to DetectedTrade format
-  const recentTrades = db
-    .prepare<[], RecentTradeRow>(`
-      SELECT t.author_handle, t.ticker, t.direction, t.platform, t.pnl_pct, t.posted_at,
-             NULL as confidence, w.tier
-      FROM trades t
-      LEFT JOIN caller_watchlist w ON w.handle = t.author_handle
-      WHERE t.posted_at >= datetime('now', '-30 days')
-      ORDER BY t.posted_at DESC
-      LIMIT 200
-    `)
-    .all();
+  const recentTrades = await sql`
+    SELECT t.author_handle, t.ticker, t.direction, t.platform, t.pnl_pct, t.posted_at,
+           NULL as confidence, w.tier
+    FROM trades t
+    LEFT JOIN caller_watchlist w ON w.handle = t.author_handle
+    WHERE t.posted_at >= (NOW() - INTERVAL '30 days')::text
+    ORDER BY t.posted_at DESC
+    LIMIT 200
+  ` as RecentTradeRow[];
 
-  const recentSignals = db
-    .prepare<[], { handle: string; ticker: string; direction: string; platform: string | null; confidence: number; tier: string | null }>(`
-      SELECT ls.handle, ls.ticker, ls.direction, ls.platform, ls.confidence, w.tier
-      FROM live_signals ls
-      LEFT JOIN caller_watchlist w ON w.handle = ls.handle
-      WHERE ls.detected_at >= datetime('now', '-30 days')
-      ORDER BY ls.detected_at DESC
-      LIMIT 100
-    `)
-    .all();
+  const recentSignals = await sql`
+    SELECT ls.handle, ls.ticker, ls.direction, ls.platform, ls.confidence, w.tier
+    FROM live_signals ls
+    LEFT JOIN caller_watchlist w ON w.handle = ls.handle
+    WHERE ls.detected_at >= (NOW() - INTERVAL '30 days')::text
+    ORDER BY ls.detected_at DESC
+    LIMIT 100
+  ` as { handle: string; ticker: string; direction: string; platform: string | null; confidence: number; tier: string | null }[];
 
   const trades: DetectedTrade[] = [
     ...recentTrades.map((t) => ({

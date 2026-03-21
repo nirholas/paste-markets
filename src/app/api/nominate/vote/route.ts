@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -9,15 +9,6 @@ interface SubmissionRow {
   upvotes: number;
   status: string;
 }
-
-const stmts = {
-  getById: db.prepare<[number], SubmissionRow>(
-    "SELECT id, caller_handle, upvotes, status FROM submissions WHERE id = ?",
-  ),
-  incrementUpvotes: db.prepare(
-    "UPDATE submissions SET upvotes = upvotes + 1 WHERE id = ?",
-  ),
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +20,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const submission = stmts.getById.get(body.submission_id);
+    const rows = await sql`SELECT id, caller_handle, upvotes, status FROM submissions WHERE id = ${body.submission_id}`;
+    const submission = rows[0] as SubmissionRow | undefined;
     if (!submission) {
       return NextResponse.json(
         { ok: false, error: "Submission not found" },
@@ -37,8 +29,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    stmts.incrementUpvotes.run(body.submission_id);
-    const updated = stmts.getById.get(body.submission_id)!;
+    await sql`UPDATE submissions SET upvotes = upvotes + 1 WHERE id = ${body.submission_id}`;
+    const updatedRows = await sql`SELECT id, caller_handle, upvotes, status FROM submissions WHERE id = ${body.submission_id}`;
+    const updated = updatedRows[0] as SubmissionRow;
 
     return NextResponse.json({
       ok: true,
