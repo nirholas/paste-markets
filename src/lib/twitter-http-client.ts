@@ -23,6 +23,10 @@ export interface TwitterUser {
   tweetCount: number;
   verified: boolean;
   profileImageUrl?: string;
+  bannerUrl?: string;
+  location?: string;
+  website?: string;
+  joined?: Date;
 }
 
 export interface TwitterTweet {
@@ -117,6 +121,10 @@ export class TwitterHttpClient {
         tweetCount: profile.tweetsCount ?? 0,
         verified: profile.isBlueVerified ?? profile.isVerified ?? false,
         profileImageUrl: profile.avatar ?? undefined,
+        bannerUrl: profile.banner ?? undefined,
+        location: profile.location ?? undefined,
+        website: profile.website ?? undefined,
+        joined: profile.joined ?? undefined,
       };
     } catch {
       return null;

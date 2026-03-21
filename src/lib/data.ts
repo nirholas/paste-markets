@@ -28,6 +28,18 @@ export interface Author {
   best_ticker: string | null;
   worst_ticker: string | null;
   rank: number | null;
+  // X profile data
+  avatar_url: string | null;
+  banner_url: string | null;
+  bio: string | null;
+  location: string | null;
+  website: string | null;
+  verified: boolean;
+  followers: number | null;
+  following: number | null;
+  tweet_count: number | null;
+  x_joined_at: string | null;
+  x_profile_fetched_at: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -50,6 +62,16 @@ export function isStale(lastFetched: string | null, maxAgeMs = 60 * 60 * 1000): 
 
 export async function getOrCreateAuthor(handle: string): Promise<Author> {
   return db.getOrCreateAuthor(handle);
+}
+
+export type { XProfileData } from "./db";
+
+export async function updateXProfile(handle: string, profile: db.XProfileData): Promise<void> {
+  return db.updateXProfile(handle, profile);
+}
+
+export function isXProfileStale(fetchedAt: string | null): boolean {
+  return db.isXProfileStale(fetchedAt);
 }
 
 export async function getAuthorMetrics(handle: string): Promise<AuthorMetrics | null> {

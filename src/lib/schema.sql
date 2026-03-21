@@ -16,7 +16,19 @@ CREATE TABLE IF NOT EXISTS authors (
   worst_pnl REAL,
   best_ticker TEXT,
   worst_ticker TEXT,
-  rank INTEGER
+  rank INTEGER,
+  -- X (Twitter) profile data
+  avatar_url TEXT,
+  banner_url TEXT,
+  bio TEXT,
+  location TEXT,
+  website TEXT,
+  verified BOOLEAN DEFAULT FALSE,
+  followers INTEGER,
+  following INTEGER,
+  tweet_count INTEGER,
+  x_joined_at TIMESTAMPTZ,
+  x_profile_fetched_at TIMESTAMPTZ
 );
 
 -- Individual trades (cached from paste.trade)

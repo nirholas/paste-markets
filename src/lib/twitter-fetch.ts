@@ -37,10 +37,15 @@ export interface TwitterProfile {
   handle: string;
   displayName: string | null;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   bio: string | null;
+  location: string | null;
+  website: string | null;
   verified: boolean;
   followers: number;
   following: number;
+  tweetCount: number;
+  joined: string | null; // ISO 8601
 }
 
 // ─── Feature flag ───────────────────────────────────────────────────────────
@@ -227,10 +232,15 @@ export async function fetchProfile(handle: string): Promise<TwitterProfile | nul
         handle: user.username,
         displayName: user.name,
         avatarUrl: user.profileImageUrl ?? null,
+        bannerUrl: user.bannerUrl ?? null,
         bio: user.bio,
+        location: user.location ?? null,
+        website: user.website ?? null,
         verified: user.verified,
         followers: user.followersCount,
         following: user.followingCount,
+        tweetCount: user.tweetCount,
+        joined: user.joined ? user.joined.toISOString() : null,
       };
     }
   }
@@ -251,10 +261,15 @@ export async function fetchProfile(handle: string): Promise<TwitterProfile | nul
           handle: raw.username || handle,
           displayName: raw.name || null,
           avatarUrl: raw.avatar || null,
+          bannerUrl: raw.banner || null,
           bio: raw.bio || null,
+          location: raw.location || null,
+          website: raw.website || null,
           verified: raw.verified ?? false,
           followers: parseMetricCount(raw.followers),
           following: parseMetricCount(raw.following),
+          tweetCount: parseMetricCount(raw.tweets),
+          joined: null,
         };
       } finally {
         await browser.close();

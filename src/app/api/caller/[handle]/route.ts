@@ -6,8 +6,11 @@ import {
   getAuthorMetrics,
   recordView,
   getTradesForReputation,
+  updateXProfile,
+  isXProfileStale,
 } from "@/lib/data";
 import { searchFullTrades } from "@/lib/paste-trade";
+import { fetchProfile } from "@/lib/twitter-fetch";
 import {
   calculateReputationScore,
   getCachedScore,

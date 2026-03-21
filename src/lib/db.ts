@@ -25,6 +25,18 @@ export interface Author {
   best_ticker: string | null;
   worst_ticker: string | null;
   rank: number | null;
+  // X profile data
+  avatar_url: string | null;
+  banner_url: string | null;
+  bio: string | null;
+  location: string | null;
+  website: string | null;
+  verified: boolean;
+  followers: number | null;
+  following: number | null;
+  tweet_count: number | null;
+  x_joined_at: string | null;
+  x_profile_fetched_at: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -44,6 +56,47 @@ export async function getOrCreateAuthor(handle: string): Promise<Author> {
   await sql`INSERT INTO authors (handle) VALUES (${handle}) ON CONFLICT DO NOTHING`;
   const rows = await sql`SELECT * FROM authors WHERE handle = ${handle}`;
   return rows[0] as Author;
+}
+
+export interface XProfileData {
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  displayName: string | null;
+  bio: string | null;
+  location: string | null;
+  website: string | null;
+  verified: boolean;
+  followers: number;
+  following: number;
+  tweetCount: number;
+  joinedAt: string | null;
+}
+
+/** Update author row with X profile data */
+export async function updateXProfile(handle: string, profile: XProfileData): Promise<void> {
+  await sql`
+    UPDATE authors SET
+      avatar_url = ${profile.avatarUrl},
+      banner_url = ${profile.bannerUrl},
+      display_name = COALESCE(${profile.displayName}, display_name),
+      bio = ${profile.bio},
+      location = ${profile.location},
+      website = ${profile.website},
+      verified = ${profile.verified},
+      followers = ${profile.followers},
+      following = ${profile.following},
+      tweet_count = ${profile.tweetCount},
+      x_joined_at = ${profile.joinedAt},
+      x_profile_fetched_at = NOW()
+    WHERE handle = ${handle}
+  `;
+}
+
+/** Check if X profile data is stale (older than 24 hours) */
+export function isXProfileStale(fetchedAt: string | null): boolean {
+  if (!fetchedAt) return true;
+  const age = Date.now() - new Date(fetchedAt).getTime();
+  return age > 24 * 60 * 60 * 1000; // 24 hours
 }
 
 export async function upsertTrades(handle: string, trades: PasteTradeTrade[]): Promise<void> {
