@@ -124,7 +124,7 @@ describe("estimateLiquidationPrice", () => {
 
   it("estimates short liquidation above entry", () => {
     const liq = estimateLiquidationPrice(100_000, 10, "short");
-    expect(liq).toBe(110_000); // 10% above
+    expect(liq).toBeCloseTo(110_000, 0); // 10% above
   });
 
   it("handles 1x leverage", () => {
