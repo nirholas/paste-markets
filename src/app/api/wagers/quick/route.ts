@@ -53,12 +53,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Auto-enable wagering if not already enabled
-  let config = getWagerConfig(tradeId);
+  let config = await getWagerConfig(tradeId);
   if (!config) {
     // For quick wagers, we auto-create a config with defaults.
     // The tradeId acts as both trade_card_id and ticker placeholder.
     try {
-      enableWager({
+      await enableWager({
         tradeCardId: tradeId,
         authorHandle: "unknown",
         ticker: "UNKNOWN",
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         wagerWindowHours: 24,
         settlementDays: 7,
       });
-      config = getWagerConfig(tradeId);
+      config = await getWagerConfig(tradeId);
     } catch {
       return NextResponse.json({ error: "Failed to initialize wager" }, { status: 500 });
     }
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   // In production this would be a real Solana tx
   const txSignature = `quick_${randomUUID().replace(/-/g, "")}`;
 
-  const result = submitWager({
+  const result = await submitWager({
     id: randomUUID(),
     tradeCardId: tradeId,
     walletAddress,
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
   // Record wager event for the feed
   try {
-    insertWagerEvent({
+    await insertWagerEvent({
       id: randomUUID(),
       type: "new_wager",
       tradeId,
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Get updated stats
-  const stats = getWagerStats(tradeId);
+  const stats = await getWagerStats(tradeId);
 
   return NextResponse.json(
     {

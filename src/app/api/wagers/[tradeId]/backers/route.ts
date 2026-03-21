@@ -15,19 +15,19 @@ interface RouteContext {
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { tradeId } = await params;
 
-  const stats = getWagerStats(tradeId);
+  const stats = await getWagerStats(tradeId);
   if (!stats) {
     return NextResponse.json({ backers: [], stats: null });
   }
 
-  const backers = getBackersByTrade(tradeId).map((b) => ({
+  const backers = (await getBackersByTrade(tradeId)).map((b) => ({
     handle: b.handle,
     backer_avatar_url: b.backer_avatar_url,
     amount: b.amount,
     wagered_at: b.wagered_at,
   }));
 
-  const topBacker = getTopBacker(tradeId);
+  const topBacker = await getTopBacker(tradeId);
 
   return NextResponse.json({
     backers,

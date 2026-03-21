@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { handle } = await params;
   const normalized = handle.toLowerCase().replace(/^@/, "");
 
-  const job = getCachedBacktestReport(normalized);
+  const job = await getCachedBacktestReport(normalized);
   let report: BacktestReport | null = null;
   if (job?.result_json) {
     try {
@@ -50,7 +50,7 @@ export default async function BacktestPage({ params }: Props) {
 
   // Try to load cached report
   let cachedReport: BacktestReport | null = null;
-  const job = getCachedBacktestReport(normalized);
+  const job = await getCachedBacktestReport(normalized);
   if (job?.result_json) {
     try {
       cachedReport = JSON.parse(job.result_json) as BacktestReport;

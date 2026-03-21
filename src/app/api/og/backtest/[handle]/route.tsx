@@ -43,7 +43,7 @@ export async function GET(
 
   let report: BacktestReport | null = null;
   try {
-    const job = getCachedBacktestReport(normalized);
+    const job = await getCachedBacktestReport(normalized);
     if (job?.result_json) {
       report = JSON.parse(job.result_json) as BacktestReport;
     }

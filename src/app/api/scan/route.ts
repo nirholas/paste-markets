@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
 
   // Rate limit
-  const { allowed, count } = checkRateLimit(ip);
+  const { allowed, count } = await checkRateLimit(ip);
   if (!allowed) {
     return NextResponse.json(
       {
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   const handle = raw.toLowerCase();
 
   // Return cached result if a scan already ran in the last 6 hours
-  const cached = getCachedScanForHandle(handle);
+  const cached = await getCachedScanForHandle(handle);
   if (cached) {
     return NextResponse.json(
       { jobId: cached.id, status: cached.status, cached: true },
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Create job and start background processing
-  recordScanRequest(ip);
-  const jobId = createScanJob(handle);
+  await recordScanRequest(ip);
+  const jobId = await createScanJob(handle);
 
   // Fire-and-forget in Node.js runtime (response is sent before this completes)
   processScanJob(jobId, handle).catch((err) => {

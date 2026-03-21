@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   // If wallet param provided, return that wallet's wagers
   if (wallet) {
     try {
-      const wagers = getWagersByWallet(wallet).map((w) => ({
+      const wagers = (await getWagersByWallet(wallet)).map((w) => ({
         id: w.id,
         trade_card_id: w.trade_card_id,
         amount: w.amount,
@@ -39,9 +39,9 @@ export async function GET(req: NextRequest) {
 
   // Otherwise return feed data
   try {
-    const active = getActiveWagerConfigs();
-    const settled = getSettledWagerConfigs();
-    const events = getWagerEvents();
+    const active = await getActiveWagerConfigs();
+    const settled = await getSettledWagerConfigs();
+    const events = await getWagerEvents();
 
     return NextResponse.json({ active, settled, events });
   } catch {

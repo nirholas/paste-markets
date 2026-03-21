@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
   const platform = searchParams.get("platform") ?? "";
 
   let signals = minConfidence > 0.65
-    ? getHighConfidenceSignals(minConfidence, limit * 2) // over-fetch for filtering
-    : getRecentSignals(limit * 2);
+    ? await getHighConfidenceSignals(minConfidence, limit * 2) // over-fetch for filtering
+    : await getRecentSignals(limit * 2);
 
   // Apply filters
   if (direction) {

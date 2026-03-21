@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const expired = getExpiredUnsettledConfigs();
+  const expired = await getExpiredUnsettledConfigs();
 
   if (expired.length === 0) {
     return NextResponse.json({ settled: 0, skipped: 0, errors: [] });
@@ -59,13 +59,13 @@ export async function GET(req: NextRequest) {
       }
 
       // Re-check config hasn't been settled concurrently
-      const fresh = getWagerConfig(config.trade_card_id);
+      const fresh = await getWagerConfig(config.trade_card_id);
       if (!fresh || fresh.status !== "active") {
         skippedCount++;
         continue;
       }
 
-      const result = settleWagers({
+      const result = await settleWagers({
         tradeCardId: config.trade_card_id,
         exitPrice: trade.currentPrice ?? 0,
         pnlPctOverride,

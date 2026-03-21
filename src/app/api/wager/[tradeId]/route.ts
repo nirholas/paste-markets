@@ -10,7 +10,7 @@ interface RouteContext {
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { tradeId } = await params;
 
-  const stats = getWagerStats(tradeId);
+  const stats = await getWagerStats(tradeId);
   if (!stats) {
     // Not yet configured — return empty stats so UI can still render
     return NextResponse.json({
@@ -20,8 +20,8 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     });
   }
 
-  const config = getWagerConfig(tradeId);
-  const wagers = getWagersByTrade(tradeId).map((w) => ({
+  const config = await getWagerConfig(tradeId);
+  const wagers = (await getWagersByTrade(tradeId)).map((w) => ({
     id: w.id,
     handle: w.handle,
     amount: w.amount,

@@ -47,8 +47,8 @@ function parseRecentScans(jobs: ScanJob[]): RecentScan[] {
   });
 }
 
-export default function ScanPage() {
-  const recentJobs = getRecentScans();
+export default async function ScanPage() {
+  const recentJobs = await getRecentScans();
   const recentScans = parseRecentScans(recentJobs);
 
   return (
