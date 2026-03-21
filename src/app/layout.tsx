@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import Nav from "@/components/ui/nav";
+import TradeTicker from "@/components/trade-ticker";
+import { SearchOverlay } from "@/components/search-bar";
 import "./globals.css";
 
 const jetbrains = JetBrains_Mono({
@@ -67,7 +69,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={jetbrains.variable}>
       <body className="font-mono antialiased min-h-screen">
+        <TradeTicker />
         <Nav />
+        <SearchOverlay />
         {children}
       </body>
     </html>

@@ -173,6 +173,104 @@ export function computeMetrics(handle: string, trades: TradeSummary[]): AuthorMe
   };
 }
 
+export interface FadeStats {
+  // Original caller stats
+  originalWinRate: number;
+  originalAvgPnl: number;
+  originalTotalPnl: number;
+  // Fade stats (what you'd get trading the opposite)
+  fadeWinRate: number;
+  fadeAvgPnl: number;
+  fadeTotalPnl: number;
+  bestFade: { ticker: string; direction: string; pnl: number; date: string } | null;
+  worstFade: { ticker: string; direction: string; pnl: number; date: string } | null;
+  totalTrades: number;
+  // Rating: S/A/B/C/D/F based on how profitable fading is
+  fadeRating: "S" | "A" | "B" | "C" | "D" | "F";
+  isProfitableFade: boolean; // fade win rate > 60%
+}
+
+function computeFadeRating(fadeWinRate: number, fadeAvgPnl: number): FadeStats["fadeRating"] {
+  // Composite: weight win rate (60%) and avg pnl profitability (40%)
+  // Higher = better to fade
+  const wrScore = fadeWinRate; // 0-100
+  const pnlScore = Math.min(Math.max(fadeAvgPnl + 10, 0), 30) * (100 / 30); // normalize -10..+20 → 0..100
+  const composite = wrScore * 0.6 + pnlScore * 0.4;
+
+  if (composite >= 80) return "S";
+  if (composite >= 65) return "A";
+  if (composite >= 50) return "B";
+  if (composite >= 40) return "C";
+  if (composite >= 30) return "D";
+  return "F";
+}
+
+export function computeFadeScore(trades: TradeSummary[]): FadeStats {
+  const withPnl = trades.filter((t) => t.pnl_pct != null);
+
+  // Original stats
+  const originalWinRate = computeWinRate(withPnl);
+  const originalAvgPnl = computeAvgPnl(withPnl);
+  const originalTotalPnl = withPnl.reduce((acc, t) => acc + t.pnl_pct, 0);
+
+  // Fade stats: invert every trade
+  const fadedTrades = withPnl.map((t) => ({
+    ...t,
+    pnl_pct: -t.pnl_pct,
+    direction:
+      t.direction === "long"
+        ? "short"
+        : t.direction === "short"
+          ? "long"
+          : t.direction === "yes"
+            ? "no"
+            : "yes",
+  }));
+
+  const fadeWinRate = computeWinRate(fadedTrades);
+  const fadeAvgPnl = computeAvgPnl(fadedTrades);
+  const fadeTotalPnl = fadedTrades.reduce((acc, t) => acc + t.pnl_pct, 0);
+
+  // Best fade = their worst trade inverted (biggest fade win)
+  let bestFade: FadeStats["bestFade"] = null;
+  let worstFade: FadeStats["worstFade"] = null;
+
+  for (const t of fadedTrades) {
+    if (!bestFade || t.pnl_pct > bestFade.pnl) {
+      bestFade = {
+        ticker: t.ticker,
+        direction: t.direction,
+        pnl: t.pnl_pct,
+        date: t.entry_date ?? t.posted_at ?? "",
+      };
+    }
+    if (!worstFade || t.pnl_pct < worstFade.pnl) {
+      worstFade = {
+        ticker: t.ticker,
+        direction: t.direction,
+        pnl: t.pnl_pct,
+        date: t.entry_date ?? t.posted_at ?? "",
+      };
+    }
+  }
+
+  const fadeRating = computeFadeRating(fadeWinRate, fadeAvgPnl);
+
+  return {
+    originalWinRate,
+    originalAvgPnl,
+    originalTotalPnl,
+    fadeWinRate,
+    fadeAvgPnl,
+    fadeTotalPnl,
+    bestFade,
+    worstFade,
+    totalTrades: withPnl.length,
+    fadeRating,
+    isProfitableFade: fadeWinRate > 60,
+  };
+}
+
 export function computeFadeMetrics(handle: string, trades: TradeSummary[]): AuthorMetrics {
   const faded = trades.map((t) => ({
     ...t,

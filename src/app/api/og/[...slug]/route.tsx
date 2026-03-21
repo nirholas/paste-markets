@@ -692,14 +692,50 @@ function vsImage(data: VsData) {
 
 interface WrappedData {
   handle: string;
-  personality: { label: string; description: string };
+  personality: { label: string; description: string; color?: string };
   grades: { overall: string };
-  highlights: { winRate: number; totalTrades: number };
+  highlights: {
+    winRate: number;
+    totalTrades: number;
+    avgPnl?: number;
+    biggestWin?: { ticker: string; pnl: number };
+    favoriteTicker?: string;
+  };
 }
 
-function wrappedImage(data: WrappedData) {
+function wrappedImage(data: WrappedData, slide?: number) {
   const { handle, personality, grades, highlights } = data;
+  const pColor = personality.color ?? ACCENT;
 
+  // Slide 1: Volume stats
+  if (slide === 1) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", width: `${WIDTH}px`, height: `${HEIGHT}px`, background: `radial-gradient(ellipse at 50% 40%, ${pColor}15 0%, ${BG} 70%)`, fontFamily: "JetBrains Mono", padding: "48px 60px", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", fontSize: "13px", color: MUTED, letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "16px" }}>@{handle} · CT WRAPPED</div>
+        <div style={{ display: "flex", fontSize: "18px", color: MUTED, marginBottom: "12px" }}>Made</div>
+        <div style={{ display: "flex", fontSize: "80px", fontWeight: 700, color: TEXT }}>{highlights.totalTrades}</div>
+        <div style={{ display: "flex", fontSize: "18px", color: MUTED, marginTop: "12px" }}>trades this year</div>
+        {highlights.favoriteTicker && (
+          <div style={{ display: "flex", fontSize: "16px", color: ACCENT, marginTop: "32px" }}>Favorite: ${highlights.favoriteTicker}</div>
+        )}
+        <div style={{ display: "flex", marginTop: "auto", fontSize: "12px", color: MUTED }}>paste.markets</div>
+      </div>
+    );
+  }
+
+  // Slide 2: Best trade
+  if (slide === 2 && highlights.biggestWin && highlights.biggestWin.pnl > 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", width: `${WIDTH}px`, height: `${HEIGHT}px`, background: `radial-gradient(ellipse at 50% 40%, ${GREEN}15 0%, ${BG} 70%)`, fontFamily: "JetBrains Mono", padding: "48px 60px", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", fontSize: "13px", color: MUTED, letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "16px" }}>@{handle} · Best Call</div>
+        <div style={{ display: "flex", fontSize: "22px", color: MUTED, marginBottom: "16px" }}>LONG ${highlights.biggestWin.ticker}</div>
+        <div style={{ display: "flex", fontSize: "80px", fontWeight: 700, color: GREEN }}>+{highlights.biggestWin.pnl.toFixed(1)}%</div>
+        <div style={{ display: "flex", marginTop: "auto", fontSize: "12px", color: MUTED }}>paste.markets</div>
+      </div>
+    );
+  }
+
+  // Slide 3 or default: Personality card (the main shareable one)
   return (
     <div
       style={{
@@ -707,170 +743,44 @@ function wrappedImage(data: WrappedData) {
         flexDirection: "column",
         width: `${WIDTH}px`,
         height: `${HEIGHT}px`,
-        backgroundColor: BG,
+        background: `radial-gradient(ellipse at 50% 40%, ${pColor}20 0%, ${BG} 70%)`,
         fontFamily: "JetBrains Mono",
         padding: "48px 60px",
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          marginBottom: "32px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            fontSize: "14px",
-            color: MUTED,
-            letterSpacing: "2px",
-            textTransform: "uppercase" as const,
-            marginBottom: "8px",
-          }}
-        >
-          CT WRAPPED
-        </div>
-        <div
-          style={{
-            display: "flex",
-            fontSize: "40px",
-            fontWeight: 700,
-            color: TEXT,
-          }}
-        >
-          @{handle}
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", marginBottom: "32px" }}>
+        <div style={{ display: "flex", fontSize: "14px", color: MUTED, letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "8px" }}>CT WRAPPED</div>
+        <div style={{ display: "flex", fontSize: "40px", fontWeight: 700, color: TEXT }}>@{handle}</div>
       </div>
 
       {/* Personality + Grade */}
-      <div
-        style={{
-          display: "flex",
-          gap: "24px",
-          marginBottom: "32px",
-        }}
-      >
-        {/* Personality */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            backgroundColor: SURFACE,
-            border: `1px solid ${BORDER}`,
-            borderRadius: "12px",
-            padding: "24px",
-          }}
-        >
-          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>
-            PERSONALITY
-          </div>
-          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: ACCENT, marginBottom: "8px" }}>
-            {personality.label}
-          </div>
-          <div style={{ display: "flex", fontSize: "14px", color: MUTED }}>
-            {personality.description}
-          </div>
+      <div style={{ display: "flex", gap: "24px", marginBottom: "32px" }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: "12px", padding: "24px" }}>
+          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>PERSONALITY</div>
+          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: pColor, marginBottom: "8px" }}>{personality.label}</div>
+          <div style={{ display: "flex", fontSize: "14px", color: MUTED }}>{personality.description}</div>
         </div>
-
-        {/* Overall Grade */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "160px",
-            backgroundColor: SURFACE,
-            border: `1px solid ${BORDER}`,
-            borderRadius: "12px",
-            padding: "24px",
-          }}
-        >
-          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>
-            GRADE
-          </div>
-          <div
-            style={{
-              display: "flex",
-              fontSize: "64px",
-              fontWeight: 700,
-              color:
-                grades.overall === "S"
-                  ? AMBER
-                  : grades.overall === "A"
-                    ? GREEN
-                    : grades.overall === "F"
-                      ? RED
-                      : TEXT,
-            }}
-          >
-            {grades.overall}
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "160px", backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: "12px", padding: "24px" }}>
+          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>GRADE</div>
+          <div style={{ display: "flex", fontSize: "64px", fontWeight: 700, color: grades.overall === "S" ? AMBER : grades.overall === "A" ? GREEN : grades.overall === "F" ? RED : TEXT }}>{grades.overall}</div>
         </div>
       </div>
 
       {/* Stats row */}
-      <div
-        style={{
-          display: "flex",
-          gap: "24px",
-        }}
-      >
-        {/* Win Rate */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            backgroundColor: SURFACE,
-            border: `1px solid ${BORDER}`,
-            borderRadius: "12px",
-            padding: "20px",
-          }}
-        >
-          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>
-            WIN RATE
-          </div>
-          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: TEXT, marginBottom: "10px" }}>
-            {highlights.winRate.toFixed(0)}%
-          </div>
+      <div style={{ display: "flex", gap: "24px" }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: "12px", padding: "20px" }}>
+          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>WIN RATE</div>
+          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: TEXT, marginBottom: "10px" }}>{highlights.winRate.toFixed(0)}%</div>
           <WinRateBar winRate={highlights.winRate} />
         </div>
-
-        {/* Trade Count */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            backgroundColor: SURFACE,
-            border: `1px solid ${BORDER}`,
-            borderRadius: "12px",
-            padding: "20px",
-          }}
-        >
-          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>
-            TRADE COUNT
-          </div>
-          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: TEXT }}>
-            {highlights.totalTrades}
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, backgroundColor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: "12px", padding: "20px" }}>
+          <div style={{ display: "flex", fontSize: "12px", color: MUTED, marginBottom: "8px", letterSpacing: "1px" }}>TRADE COUNT</div>
+          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: TEXT }}>{highlights.totalTrades}</div>
         </div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          marginTop: "auto",
-          fontSize: "12px",
-          color: MUTED,
-        }}
-      >
-        paste.markets — Powered by paste.trade
-      </div>
+      <div style={{ display: "flex", marginTop: "auto", fontSize: "12px", color: MUTED }}>paste.markets — Get yours at paste.markets/wrapped</div>
     </div>
   );
 }
@@ -1536,17 +1446,19 @@ export async function GET(
 
       case "circle": {
         try {
-          const res = await fetch(`${baseUrl()}/api/circle?timeframe=30d`);
+          const res = await fetch(`${baseUrl()}/api/circle?timeframe=30d&limit=50`);
           if (!res.ok) throw new Error(`Circle fetch failed: ${res.status}`);
           const data = await res.json();
 
-          // Tier 1 callers (top 5) for the OG preview
-          const tier1: Array<{ handle: string; winRate: number; avgPnl: number }> =
-            (data.callers ?? []).filter((c: { tier: number }) => c.tier === 1).slice(0, 5);
+          const innerCallers: Array<{ rank: number; handle: string; winRate: number; avgPnl: number; tier: string }> =
+            (data.callers ?? []).filter((c: { ring: string }) => c.ring === "inner").slice(0, 5);
+          const middleCallers: Array<{ rank: number; handle: string; winRate: number }> =
+            (data.callers ?? []).filter((c: { ring: string }) => c.ring === "middle").slice(0, 10);
+          const totalCallers = data.total ?? 0;
 
-          const pnlColor = (v: number) => (v >= 0 ? GREEN : RED);
-          const fmtPnl = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
-          const wrColor = (wr: number) => (wr >= 65 ? GREEN : wr >= 50 ? AMBER : RED);
+          const ogPnlColor = (v: number) => (v >= 0 ? GREEN : RED);
+          const ogFmtPnl = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+          const ogWrColor = (wr: number) => (wr >= 65 ? GREEN : wr >= 50 ? AMBER : RED);
 
           return new ImageResponse(
             (
@@ -1558,45 +1470,59 @@ export async function GET(
                   height: `${HEIGHT}px`,
                   backgroundColor: BG,
                   fontFamily: "JetBrains Mono",
-                  padding: "48px 60px",
+                  padding: "44px 56px",
                 }}
               >
                 {/* Header */}
-                <div style={{ display: "flex", flexDirection: "column", marginBottom: "32px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      fontSize: "13px",
-                      color: MUTED,
-                      letterSpacing: "2px",
-                      textTransform: "uppercase" as const,
-                      marginBottom: "8px",
-                    }}
-                  >
-                    CT CALLER CIRCLE
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "28px" }}>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        fontSize: "13px",
+                        color: MUTED,
+                        letterSpacing: "2px",
+                        textTransform: "uppercase" as const,
+                        marginBottom: "8px",
+                      }}
+                    >
+                      CALLER CIRCLE
+                    </div>
+                    <div style={{ display: "flex", fontSize: "36px", fontWeight: 700, color: TEXT }}>
+                      paste.markets
+                    </div>
                   </div>
-                  <div style={{ display: "flex", fontSize: "40px", fontWeight: 700, color: TEXT }}>
-                    paste.markets
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                  }}>
+                    <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: AMBER }}>
+                      Top {totalCallers}
+                    </div>
+                    <div style={{ display: "flex", fontSize: "12px", color: MUTED, letterSpacing: "1px" }}>
+                      TRADERS BY WIN RATE
+                    </div>
                   </div>
                 </div>
 
-                {/* Circle diagram (simplified rings) */}
+                {/* Main content: circle + list */}
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "48px",
+                    gap: "40px",
                     flex: 1,
                   }}
                 >
-                  {/* SVG circle preview */}
+                  {/* Circle diagram */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      width: "300px",
-                      height: "300px",
+                      width: "320px",
+                      height: "320px",
                       borderRadius: "50%",
                       border: `2px solid ${BORDER}`,
                       position: "relative",
@@ -1604,103 +1530,185 @@ export async function GET(
                       backgroundColor: SURFACE,
                     }}
                   >
-                    {/* Ring 1 */}
+                    {/* Outer ring */}
                     <div
                       style={{
                         display: "flex",
                         position: "absolute",
-                        width: "220px",
-                        height: "220px",
+                        width: "260px",
+                        height: "260px",
                         borderRadius: "50%",
                         border: `1px dashed ${BORDER}`,
                       }}
                     />
-                    {/* Ring 2 */}
+                    {/* Middle ring */}
                     <div
                       style={{
                         display: "flex",
                         position: "absolute",
-                        width: "140px",
-                        height: "140px",
+                        width: "180px",
+                        height: "180px",
                         borderRadius: "50%",
-                        border: `1px dashed ${BORDER}`,
+                        border: `1.5px solid ${ACCENT}`,
+                        opacity: 0.4,
                       }}
                     />
-                    {/* Center */}
+                    {/* Inner ring */}
+                    <div
+                      style={{
+                        display: "flex",
+                        position: "absolute",
+                        width: "100px",
+                        height: "100px",
+                        borderRadius: "50%",
+                        border: `1.5px solid ${AMBER}`,
+                        opacity: 0.5,
+                      }}
+                    />
+
+                    {/* Middle ring caller dots */}
+                    {middleCallers.map((c: { handle: string; winRate: number }, i: number) => {
+                      const angle = (2 * Math.PI * i) / middleCallers.length - Math.PI / 2;
+                      const rx = 90;
+                      const dotX = 160 + rx * Math.cos(angle) - 8;
+                      const dotY = 160 + rx * Math.sin(angle) - 8;
+                      return (
+                        <div
+                          key={c.handle}
+                          style={{
+                            display: "flex",
+                            position: "absolute",
+                            left: `${dotX}px`,
+                            top: `${dotY}px`,
+                            width: "16px",
+                            height: "16px",
+                            borderRadius: "50%",
+                            backgroundColor: ACCENT,
+                            border: `1px solid ${ACCENT}`,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "6px",
+                            color: TEXT,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {Math.round(c.winRate)}
+                        </div>
+                      );
+                    })}
+
+                    {/* Inner ring caller dots */}
+                    {innerCallers.map((c: { handle: string; winRate: number }, i: number) => {
+                      const angle = (2 * Math.PI * i) / innerCallers.length - Math.PI / 2;
+                      const rx = 50;
+                      const dotX = 160 + rx * Math.cos(angle) - 12;
+                      const dotY = 160 + rx * Math.sin(angle) - 12;
+                      return (
+                        <div
+                          key={c.handle}
+                          style={{
+                            display: "flex",
+                            position: "absolute",
+                            left: `${dotX}px`,
+                            top: `${dotY}px`,
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "50%",
+                            backgroundColor: AMBER,
+                            border: `2px solid ${AMBER}`,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "8px",
+                            color: BG,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {i + 1}
+                        </div>
+                      );
+                    })}
+
+                    {/* Center label */}
                     <div
                       style={{
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: "72px",
-                        height: "72px",
+                        width: "40px",
+                        height: "40px",
                         borderRadius: "50%",
-                        border: `1px solid ${ACCENT}`,
                         backgroundColor: BG,
+                        border: `1px solid ${AMBER}`,
                       }}
                     >
-                      <div style={{ display: "flex", fontSize: "9px", color: ACCENT, letterSpacing: "1px" }}>
-                        CT
+                      <div style={{ display: "flex", fontSize: "7px", color: AMBER, letterSpacing: "1px", fontWeight: 700 }}>
+                        TOP
                       </div>
-                      <div style={{ display: "flex", fontSize: "9px", color: ACCENT, letterSpacing: "1px" }}>
-                        CIRCLE
+                      <div style={{ display: "flex", fontSize: "10px", color: AMBER, fontWeight: 800 }}>
+                        {totalCallers}
                       </div>
                     </div>
                   </div>
 
                   {/* Top callers list */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", flex: 1 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
                     <div
                       style={{
                         display: "flex",
-                        fontSize: "12px",
-                        color: MUTED,
+                        fontSize: "11px",
+                        color: AMBER,
                         letterSpacing: "1.5px",
-                        marginBottom: "4px",
+                        marginBottom: "2px",
+                        fontWeight: 600,
                       }}
                     >
-                      TOP CALLERS (30D)
+                      INNER CIRCLE (30D)
                     </div>
-                    {tier1.map((caller: { handle: string; winRate: number; avgPnl: number }, i: number) => (
+                    {innerCallers.map((caller: { rank: number; handle: string; winRate: number; avgPnl: number; tier: string }, i: number) => (
                       <div
                         key={caller.handle}
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "12px",
+                          gap: "10px",
                           padding: "10px 14px",
-                          backgroundColor: SURFACE,
-                          border: `1px solid ${BORDER}`,
+                          backgroundColor: i === 0 ? "rgba(243,156,18,0.08)" : SURFACE,
+                          border: `1px solid ${i === 0 ? AMBER : BORDER}`,
                           borderRadius: "8px",
                         }}
                       >
                         <div
                           style={{
                             display: "flex",
-                            width: "20px",
-                            fontSize: "14px",
-                            color: i === 0 ? AMBER : MUTED,
-                            fontWeight: 700,
+                            width: "22px",
+                            height: "22px",
+                            borderRadius: "50%",
+                            backgroundColor: i === 0 ? AMBER : BORDER,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "11px",
+                            color: i === 0 ? BG : TEXT,
+                            fontWeight: 800,
                           }}
                         >
-                          {i + 1}
+                          {caller.rank}
                         </div>
-                        <div style={{ display: "flex", flex: 1, fontSize: "16px", fontWeight: 700, color: TEXT }}>
+                        <div style={{ display: "flex", flex: 1, fontSize: "15px", fontWeight: 700, color: TEXT }}>
                           @{caller.handle}
                         </div>
-                        <div style={{ display: "flex", fontSize: "15px", fontWeight: 700, color: wrColor(caller.winRate) }}>
-                          {Math.round(caller.winRate)}% WR
+                        <div style={{ display: "flex", fontSize: "14px", fontWeight: 700, color: ogWrColor(caller.winRate) }}>
+                          {Math.round(caller.winRate)}%
                         </div>
-                        <div style={{ display: "flex", fontSize: "14px", color: pnlColor(caller.avgPnl) }}>
-                          {fmtPnl(caller.avgPnl)}
+                        <div style={{ display: "flex", fontSize: "13px", color: ogPnlColor(caller.avgPnl) }}>
+                          {ogFmtPnl(caller.avgPnl)}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", marginTop: "auto", fontSize: "12px", color: MUTED }}>
+                <div style={{ display: "flex", marginTop: "12px", fontSize: "11px", color: MUTED }}>
                   paste.markets/circle · Powered by paste.trade
                 </div>
               </div>
@@ -2056,6 +2064,9 @@ export async function GET(
         if (!handle) {
           return new ImageResponse(homeImage(), imageOptions);
         }
+        // Support ?slide=N for per-slide OG images
+        const slideParam = request.nextUrl.searchParams.get("slide");
+        const slideNum = slideParam ? parseInt(slideParam, 10) : undefined;
         try {
           const res = await fetch(`${baseUrl()}/api/wrapped/${encodeURIComponent(handle)}`);
           if (!res.ok) throw new Error(`Wrapped fetch failed: ${res.status}`);
@@ -2067,9 +2078,162 @@ export async function GET(
             highlights: {
               winRate: data.highlights?.winRate ?? 0,
               totalTrades: data.highlights?.totalTrades ?? 0,
+              avgPnl: data.highlights?.avgPnl ?? 0,
+              biggestWin: data.highlights?.biggestWin ?? { ticker: "N/A", pnl: 0 },
+              favoriteTicker: data.highlights?.favoriteTicker,
             },
           };
-          return new ImageResponse(wrappedImage(wrappedData), imageOptions);
+          return new ImageResponse(wrappedImage(wrappedData, slideNum), imageOptions);
+        } catch {
+          return new ImageResponse(homeImage(), imageOptions);
+        }
+      }
+
+      case "fade": {
+        const handle = rest[0];
+        if (!handle) {
+          return new ImageResponse(homeImage(), imageOptions);
+        }
+        try {
+          const res = await fetch(
+            `${baseUrl()}/api/fade/${encodeURIComponent(handle)}`
+          );
+          if (!res.ok) throw new Error(`Fade fetch failed: ${res.status}`);
+          const data = await res.json();
+          const fs = data.fadeStats;
+
+          const ratingColor =
+            fs.fadeRating === "S" ? AMBER
+            : fs.fadeRating === "A" ? GREEN
+            : fs.fadeRating === "B" ? ACCENT
+            : MUTED;
+
+          return new ImageResponse(
+            (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  width: `${WIDTH}px`,
+                  height: `${HEIGHT}px`,
+                  backgroundColor: BG,
+                  fontFamily: "JetBrains Mono",
+                  padding: "48px 60px",
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px" }}>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <div style={{ display: "flex", fontSize: "13px", color: RED, letterSpacing: "2px", marginBottom: "8px" }}>
+                      FADE ANALYSIS
+                    </div>
+                    <div style={{ display: "flex", fontSize: "42px", fontWeight: 700, color: TEXT }}>
+                      Fade @{handle}
+                    </div>
+                    <div style={{ display: "flex", fontSize: "16px", color: MUTED, marginTop: "8px" }}>
+                      {fs.isProfitableFade ? "PROFITABLE FADE — trade the opposite for alpha" : "Fade analysis for this caller"}
+                    </div>
+                  </div>
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    padding: "12px 20px",
+                    border: `2px solid ${ratingColor}`,
+                    borderRadius: "12px",
+                  }}>
+                    <div style={{ display: "flex", fontSize: "11px", color: MUTED, letterSpacing: "1px", marginBottom: "4px" }}>
+                      FADE RATING
+                    </div>
+                    <div style={{ display: "flex", fontSize: "40px", fontWeight: 700, color: ratingColor }}>
+                      {fs.fadeRating}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Side-by-side comparison */}
+                <div style={{ display: "flex", gap: "24px", flex: 1 }}>
+                  {/* FOLLOW column */}
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: 1,
+                    padding: "24px",
+                    backgroundColor: SURFACE,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: "12px",
+                  }}>
+                    <div style={{ display: "flex", fontSize: "12px", color: MUTED, letterSpacing: "2px", marginBottom: "20px" }}>
+                      FOLLOW @{handle.toUpperCase()}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", fontSize: "15px", color: MUTED }}>Win Rate</div>
+                        <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: fs.originalWinRate >= 50 ? GREEN : RED }}>
+                          {Math.round(fs.originalWinRate)}%
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", fontSize: "15px", color: MUTED }}>Avg P&amp;L</div>
+                        <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: fs.originalAvgPnl >= 0 ? GREEN : RED }}>
+                          {formatPnl(fs.originalAvgPnl)}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", fontSize: "15px", color: MUTED }}>Total P&amp;L</div>
+                        <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: fs.originalTotalPnl >= 0 ? GREEN : RED }}>
+                          {formatPnl(fs.originalTotalPnl)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FADE column */}
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: 1,
+                    padding: "24px",
+                    backgroundColor: SURFACE,
+                    border: `2px solid ${RED}44`,
+                    borderRadius: "12px",
+                  }}>
+                    <div style={{ display: "flex", fontSize: "12px", color: RED, letterSpacing: "2px", marginBottom: "20px" }}>
+                      FADE @{handle.toUpperCase()}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", fontSize: "15px", color: MUTED }}>Win Rate</div>
+                        <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: fs.fadeWinRate >= 50 ? GREEN : RED }}>
+                          {Math.round(fs.fadeWinRate)}%
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", fontSize: "15px", color: MUTED }}>Avg P&amp;L</div>
+                        <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: fs.fadeAvgPnl >= 0 ? GREEN : RED }}>
+                          {formatPnl(fs.fadeAvgPnl)}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", fontSize: "15px", color: MUTED }}>Total P&amp;L</div>
+                        <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: fs.fadeTotalPnl >= 0 ? GREEN : RED }}>
+                          {formatPnl(fs.fadeTotalPnl)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px", fontSize: "12px", color: MUTED }}>
+                  <div style={{ display: "flex" }}>paste.markets/fade/{handle}</div>
+                  <div style={{ display: "flex" }}>
+                    {fs.totalTrades} trades · Powered by paste.trade
+                  </div>
+                </div>
+              </div>
+            ),
+            imageOptions,
+          );
         } catch {
           return new ImageResponse(homeImage(), imageOptions);
         }

@@ -4,22 +4,31 @@ import { searchPasteTrade } from "@/lib/paste-trade";
 
 export const dynamic = "force-dynamic";
 
+export interface HeatmapCaller {
+  handle: string;
+  calls: number;
+  avgPnl: number | null;
+}
+
 export interface HeatmapTicker {
   ticker: string;
-  calls: number;
+  call_count: number;
+  avg_pnl: number | null;
+  total_volume: number;
+  direction_split: number; // % long (0-100)
   longs: number;
   shorts: number;
-  avgPnl: number | null;
-  sentiment: "strong-bullish" | "lean-bullish" | "neutral" | "lean-bearish" | "strong-bearish";
+  platform: string | null;
   topCaller: string;
+  callers: HeatmapCaller[];
 }
 
 export interface HeatmapResponse {
   tickers: HeatmapTicker[];
-  timeframe: "7d" | "30d" | "90d";
+  timeframe: "24h" | "7d" | "30d";
 }
 
-// Per-timeframe cache: 5 minutes
+// Per-timeframe+platform cache: 5 minutes
 const cache = new Map<string, { data: HeatmapResponse; expiresAt: number }>();
 
 async function runWithConcurrency<T>(
@@ -39,31 +48,32 @@ async function runWithConcurrency<T>(
   return results;
 }
 
-function getSentiment(
-  longs: number,
-  shorts: number,
-): HeatmapTicker["sentiment"] {
-  const total = longs + shorts;
-  if (total === 0) return "neutral";
-  const longPct = longs / total;
-  if (longPct > 0.7) return "strong-bullish";
-  if (longPct >= 0.5) return "lean-bullish";
-  if (longPct >= 0.3) return "lean-bearish";
-  return "strong-bearish";
-}
+const PLATFORM_MAP: Record<string, string[]> = {
+  stocks: ["robinhood"],
+  perps: ["hyperliquid"],
+  "prediction-markets": ["polymarket"],
+};
 
 async function buildHeatmap(
-  timeframe: "7d" | "30d" | "90d",
+  timeframe: "24h" | "7d" | "30d",
+  platformFilter: string,
 ): Promise<HeatmapResponse> {
-  const cached = cache.get(timeframe);
+  const cacheKey = `${timeframe}:${platformFilter}`;
+  const cached = cache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.data;
 
-  const leaderboard = await getLeaderboard("30d", 50, 0);
+  // Use 7d for API when timeframe is 24h (paste.trade doesn't support 24h)
+  const apiTimeframe = timeframe === "24h" ? "7d" : timeframe;
+  const leaderboard = await getLeaderboard(apiTimeframe, 50, 0);
   if (leaderboard.length === 0) {
     const empty: HeatmapResponse = { tickers: [], timeframe };
-    cache.set(timeframe, { data: empty, expiresAt: Date.now() + 5 * 60 * 1000 });
+    cache.set(cacheKey, { data: empty, expiresAt: Date.now() + 5 * 60 * 1000 });
     return empty;
   }
+
+  // Cutoff for 24h filtering
+  const now = Date.now();
+  const cutoff24h = timeframe === "24h" ? now - 24 * 60 * 60 * 1000 : 0;
 
   // Fetch trades for all callers
   const tasks = leaderboard.map(
@@ -71,7 +81,7 @@ async function buildHeatmap(
       try {
         const trades = await searchPasteTrade({
           author: entry.handle,
-          top: timeframe,
+          top: apiTimeframe,
           limit: 100,
         });
         return { handle: entry.handle, trades };
@@ -83,6 +93,9 @@ async function buildHeatmap(
 
   const results = await runWithConcurrency(tasks, 10);
 
+  // Platforms to include based on filter
+  const allowedPlatforms = platformFilter !== "all" ? PLATFORM_MAP[platformFilter] ?? [] : null;
+
   // Aggregate by ticker
   const tickerMap = new Map<
     string,
@@ -92,12 +105,25 @@ async function buildHeatmap(
       shorts: number;
       pnlSum: number;
       pnlCount: number;
-      callerCounts: Map<string, number>;
+      detectedPlatform: string | null;
+      callerData: Map<string, { calls: number; pnlSum: number; pnlCount: number }>;
     }
   >();
 
   for (const { handle, trades } of results) {
     for (const trade of trades) {
+      // Filter by 24h if needed
+      if (timeframe === "24h") {
+        const tradeTime = new Date(trade.posted_at || trade.author_date || "").getTime();
+        if (isNaN(tradeTime) || tradeTime < cutoff24h) continue;
+      }
+
+      // Filter by platform if needed
+      const tradePlatform = trade.platform?.toLowerCase() ?? null;
+      if (allowedPlatforms !== null) {
+        if (!tradePlatform || !allowedPlatforms.includes(tradePlatform)) continue;
+      }
+
       const ticker = trade.ticker.toUpperCase();
       if (!ticker) continue;
 
@@ -109,7 +135,8 @@ async function buildHeatmap(
           shorts: 0,
           pnlSum: 0,
           pnlCount: 0,
-          callerCounts: new Map(),
+          detectedPlatform: tradePlatform,
+          callerData: new Map(),
         };
         tickerMap.set(ticker, entry);
       }
@@ -126,7 +153,16 @@ async function buildHeatmap(
         entry.pnlCount += 1;
       }
 
-      entry.callerCounts.set(handle, (entry.callerCounts.get(handle) ?? 0) + 1);
+      let callerEntry = entry.callerData.get(handle);
+      if (!callerEntry) {
+        callerEntry = { calls: 0, pnlSum: 0, pnlCount: 0 };
+        entry.callerData.set(handle, callerEntry);
+      }
+      callerEntry.calls += 1;
+      if (trade.pnlPct != null) {
+        callerEntry.pnlSum += trade.pnlPct;
+        callerEntry.pnlCount += 1;
+      }
     }
   }
 
@@ -135,42 +171,54 @@ async function buildHeatmap(
   for (const [ticker, data] of tickerMap.entries()) {
     if (data.calls < 2) continue;
 
-    // Find top caller
+    // Build caller list sorted by calls
+    const callers: HeatmapCaller[] = [];
     let topCaller = "";
     let topCount = 0;
-    for (const [handle, count] of data.callerCounts.entries()) {
-      if (count > topCount) {
-        topCount = count;
+    for (const [handle, cd] of data.callerData.entries()) {
+      callers.push({
+        handle,
+        calls: cd.calls,
+        avgPnl: cd.pnlCount > 0 ? cd.pnlSum / cd.pnlCount : null,
+      });
+      if (cd.calls > topCount) {
+        topCount = cd.calls;
         topCaller = handle;
       }
     }
+    callers.sort((a, b) => b.calls - a.calls);
 
+    const total = data.longs + data.shorts;
     tickers.push({
       ticker,
-      calls: data.calls,
+      call_count: data.calls,
+      avg_pnl: data.pnlCount > 0 ? data.pnlSum / data.pnlCount : null,
+      total_volume: data.calls, // volume = number of calls
+      direction_split: total > 0 ? Math.round((data.longs / total) * 100) : 50,
       longs: data.longs,
       shorts: data.shorts,
-      avgPnl: data.pnlCount > 0 ? data.pnlSum / data.pnlCount : null,
-      sentiment: getSentiment(data.longs, data.shorts),
+      platform: data.detectedPlatform,
       topCaller,
+      callers: callers.slice(0, 10),
     });
   }
 
-  // Sort by call count descending
-  tickers.sort((a, b) => b.calls - a.calls);
+  // Sort by call_count descending
+  tickers.sort((a, b) => b.call_count - a.call_count);
 
   const result: HeatmapResponse = { tickers, timeframe };
-  cache.set(timeframe, { data: result, expiresAt: Date.now() + 5 * 60 * 1000 });
+  cache.set(cacheKey, { data: result, expiresAt: Date.now() + 5 * 60 * 1000 });
   return result;
 }
 
 export async function GET(req: NextRequest) {
   const tf = req.nextUrl.searchParams.get("timeframe") ?? "7d";
-  const timeframe: "7d" | "30d" | "90d" =
-    tf === "30d" ? "30d" : tf === "90d" ? "90d" : "7d";
+  const timeframe: "24h" | "7d" | "30d" =
+    tf === "24h" ? "24h" : tf === "30d" ? "30d" : "7d";
+  const platform = req.nextUrl.searchParams.get("platform") ?? "all";
 
   try {
-    const data = await buildHeatmap(timeframe);
+    const data = await buildHeatmap(timeframe, platform);
     return NextResponse.json(data);
   } catch (err) {
     console.error("[api/heatmap] error:", err);

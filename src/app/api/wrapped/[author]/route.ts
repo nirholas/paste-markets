@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAuthor, isStale, getOrCreateAuthor, getAuthorMetrics, recordView } from "@/lib/data";
-import type { AuthorMetrics, TradeSummary } from "@/lib/metrics";
+import type { TradeSummary } from "@/lib/metrics";
+import { determinePersonality } from "@/lib/personalities";
 
 export const dynamic = "force-dynamic";
 
@@ -126,56 +127,7 @@ function computeOverallGrade(grades: Record<string, Grade>): Grade {
   return "F";
 }
 
-function determinePersonality(metrics: AuthorMetrics): {
-  label: string;
-  description: string;
-} {
-  const { winRate, avgPnl, totalTrades, recentTrades } = metrics;
-
-  // Check direction distribution
-  const longCount = recentTrades.filter(
-    (t) => t.direction === "long" || t.direction === "yes",
-  ).length;
-  const shortCount = recentTrades.filter(
-    (t) => t.direction === "short" || t.direction === "no",
-  ).length;
-  const predictionCount = recentTrades.filter(
-    (t) => t.direction === "yes" || t.direction === "no",
-  ).length;
-
-  // Check for big trades
-  const hasMassiveWin = recentTrades.some((t) => t.pnl_pct > 100);
-
-  // P&L consistency check
-  const pnls = recentTrades.filter((t) => t.pnl_pct != null).map((t) => t.pnl_pct);
-  const mean = pnls.length > 0 ? pnls.reduce((s, v) => s + v, 0) / pnls.length : 0;
-  const variance =
-    pnls.length > 2
-      ? pnls.reduce((s, v) => s + (v - mean) ** 2, 0) / pnls.length
-      : 999;
-  const stdDev = Math.sqrt(variance);
-
-  if (winRate > 70 && avgPnl > 15)
-    return { label: "The Sniper", description: "High accuracy, high damage. Surgical precision." };
-  if (winRate > 60 && totalTrades > 50)
-    return { label: "The Grinder", description: "Volume trader who stacks consistent wins." };
-  if (winRate < 40 && hasMassiveWin)
-    return { label: "The Degen", description: "Mostly wrong, but when they're right, they're REALLY right." };
-  if (shortCount > longCount && shortCount > recentTrades.length * 0.5)
-    return { label: "The Bear", description: "Fades everything. Sees tops before they happen." };
-  if (predictionCount > recentTrades.length * 0.5)
-    return { label: "The Oracle", description: "Prediction market specialist. Bets on outcomes, not prices." };
-  if (winRate < 30)
-    return { label: "The Bag Holder", description: "Diamond hands, but not in a good way." };
-  if (stdDev < 12 && pnls.length > 5)
-    return { label: "The Machine", description: "Unnervingly consistent. Probably a quant." };
-  if (winRate > 60 && avgPnl < 10 && avgPnl > 0)
-    return { label: "Mr. Consistent", description: "High win rate, modest gains. The tortoise wins." };
-  if (totalTrades < 15 && avgPnl > 15)
-    return { label: "Quality Over Quantity", description: "Picks their spots carefully and makes them count." };
-
-  return { label: "The Trader", description: "A well-rounded market participant." };
-}
+// Personality determination now uses src/lib/personalities.ts
 
 function generateFunFacts(metrics: AuthorMetrics): string[] {
   const facts: string[] = [];
@@ -355,7 +307,12 @@ export async function GET(
         consistency: consistencyGrade,
         riskManagement: riskManagementGrade,
       },
-      personality,
+      personality: {
+        id: personality.id,
+        label: personality.label,
+        description: personality.description,
+        color: personality.color,
+      },
       highlights: {
         totalTrades: metrics.totalTrades,
         winRate: metrics.winRate,
