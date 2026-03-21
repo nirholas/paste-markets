@@ -2,17 +2,7 @@
 
 import Link from "next/link";
 import type { NewTradeEvent } from "@/lib/tweet-poller";
-
-function timeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const secs = Math.floor(diff / 1000);
-  if (secs < 10) return "just now";
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  return `${hrs}h ago`;
-}
+import { TimeAgo } from "@/components/time-ago";
 
 function formatPrice(price: number): string {
   if (price >= 1000) return `$${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -78,9 +68,7 @@ export function LiveSignalCard({ event, animate = true }: LiveSignalCardProps) {
             @{handle}
           </Link>
         </div>
-        <span className="text-[11px] text-[#555568] shrink-0 font-mono">
-          {timeAgo(event.tweetDate)}
-        </span>
+        <TimeAgo date={event.tweetDate} className="text-[11px] text-[#555568] shrink-0 font-mono" />
       </div>
 
       {/* Tweet text */}

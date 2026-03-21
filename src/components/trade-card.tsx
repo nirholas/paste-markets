@@ -2,6 +2,7 @@ import Link from "next/link";
 import { WinRateBar } from "@/components/ui/win-rate-bar";
 import { IntegrityBadge } from "@/components/integrity-badge";
 import { ExecuteButton } from "@/components/execution/execute-button";
+import { TimeAgo } from "@/components/time-ago";
 import type { IntegrityClass } from "@/lib/integrity";
 import {
   probabilityToAmericanOdds,
@@ -40,16 +41,6 @@ export interface TradeCardProps {
   leverage?: number | null;         // For perps (e.g. 10x)
 }
 
-function timeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
 
 function DirectionBadge({ direction, platform }: { direction: TradeCardProps["direction"]; platform?: string | null }) {
   const styles: Record<string, string> = {
@@ -276,7 +267,7 @@ export function TradeCard({
             </span>
           )}
         </div>
-        <span className="text-xs text-text-muted">{timeAgo(postedAt)}</span>
+        <TimeAgo date={postedAt} className="text-xs text-text-muted" />
       </div>
 
       {/* Polymarket contract title (market question) */}

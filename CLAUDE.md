@@ -39,14 +39,19 @@ Forked from [rohunvora/paste-trade](https://github.com/rohunvora/paste-trade) �
 
 ## Tech Stack
 - **Framework:** Next.js 15 (App Router)
-- **Language:** TypeScript (strict)
+- **Language:** TypeScript 5.7 (strict)
 - **React:** 19
 - **Styling:** Tailwind CSS v3
 - **Font:** JetBrains Mono (Bloomberg terminal aesthetic)
 - **Database:** Neon Postgres via `@neondatabase/serverless` (serverless HTTP driver)
 - **AI:** Claude Haiku via `@anthropic-ai/sdk` (trade extraction)
 - **OG Images:** `@vercel/og` (Satori) for dynamic image generation
-- **Deploy:** Vercel
+- **Browser Automation:** Playwright (tweet scraping)
+- **Twitter:** `agent-twitter-client` + `xactions` (exchange data, tweet ingestion)
+- **Blockchain:** `@solana/web3.js` + `@solana/spl-token` (wager settlement)
+- **WebSocket:** `ws` (real-time updates from paste.trade)
+- **Testing:** Vitest
+- **Deploy:** Vercel (primary), Fly.io (alternate, with Dockerfile)
 
 ## Design System
 Dark theme inspired by Bloomberg terminals. Consistent across all pages.
@@ -146,73 +151,169 @@ paste-markets/
 ├── .env.example                 ← env var template (no secrets)
 ├── package.json
 ├── tsconfig.json
-├── next.config.ts
+├── next.config.mjs
 ├── tailwind.config.ts
+├── Dockerfile                   ← Fly.io container build
+├── fly.toml                     ← Fly.io deployment config
+├── vitest.config.ts             ← test config
 ├── src/
-│   ├── app/                     ← 55 page routes
+│   ├── app/                     ← 59 page routes
 │   │   ├── layout.tsx           ← root layout, fonts, metadata
 │   │   ├── page.tsx             ← landing / home feed
 │   │   ├── globals.css
-│   │   ├── leaderboard/         ← main leaderboard
+│   │   ├── leaderboard/         ← main leaderboard + [ticker] + platform/[platform]
 │   │   ├── [author]/            ← author profile/scorecard
 │   │   ├── caller/[handle]/     ← alternate caller profile
 │   │   ├── callers/             ← caller directory
 │   │   ├── vs/[a]/[b]/          ← head-to-head
+│   │   ├── compare/             ← comparison tool
 │   │   ├── wrapped/[author]/    ← CT wrapped report card
-│   │   ├── trade/               ← "What's The Trade?" tool
+│   │   ├── trade/               ← "What's The Trade?" tool + [id] detail
+│   │   ├── submit/              ← trade submission + admin
 │   │   ├── asset/[ticker]/      ← per-asset pages
+│   │   ├── assets/              ← asset directory
+│   │   ├── ticker/              ← ticker pages + [ticker]
+│   │   ├── t/[ticker]/          ← short ticker URL
 │   │   ├── alerts/              ← notification rules
-│   │   ├── backtest/            ← historical simulation
-│   │   ├── wagers/              ← wagering system
+│   │   ├── backtest/            ← historical simulation + [handle]
+│   │   ├── wagers/              ← wagering system + leaderboard
 │   │   ├── positions/           ← live positions
-│   │   ├── wall/                ← public trade feed
-│   │   ├── fade/                ← contrarian signals
+│   │   ├── portfolio/           ← portfolio view
+│   │   ├── wall/                ← public trade feed + [id]
+│   │   ├── fade/                ← contrarian signals + [handle]
 │   │   ├── circle/              ← caller circle generator
-│   │   ├── signals/             ← live signals
+│   │   ├── signals/             ← live signals + live/
+│   │   ├── signal/              ← signal page
 │   │   ├── simulate/            ← paper trading
-│   │   ├── predictions/         ← prediction markets
+│   │   ├── sim/[handle]/        ← per-handle simulation
+│   │   ├── predictions/         ← prediction markets + sports + leaderboard
+│   │   ├── markets/[source_id]/ ← market source pages
 │   │   ├── consensus/           ← aggregated signals
-│   │   ├── events/              ← market events
+│   │   ├── events/              ← market events + calendar + [id]
 │   │   ├── audit/[handle]/      ← integrity verification
 │   │   ├── scan/                ← AI trade scanner
+│   │   ├── alpha/               ← alpha detection
 │   │   ├── heatmap/             ← ticker heatmap
 │   │   ├── feed/                ← trade feed
 │   │   ├── discover/            ← discovery page
+│   │   ├── today/               ← daily view
+│   │   ├── source/[id]/         ← source pages
+│   │   ├── join/                ← waitlist / join
+│   │   ├── embed/               ← embeddable views + [handle]
+│   │   ├── widget/              ← embeddable widget
+│   │   ├── telegram/            ← Telegram bot info
+│   │   ├── docs/                ← documentation
 │   │   ├── developer/           ← API docs
 │   │   ├── v1/                  ← public API v1
 │   │   ├── v2/                  ← public API v2
-│   │   └── api/                 ← 56 internal API routes
+│   │   └── api/                 ← 94 internal API routes
 │   │       ├── author/[handle]/ ← author data
+│   │       ├── caller/          ← caller data + [handle]/score + earnings
+│   │       ├── callers/         ← caller directory
 │   │       ├── leaderboard/     ← rankings
 │   │       ├── vs/              ← head-to-head data
 │   │       ├── wrapped/[author]/← wrapped data
-│   │       ├── extract/         ← AI trade extraction
-│   │       ├── trade/           ← trade submission
+│   │       ├── extract/         ← AI trade extraction + recent
+│   │       ├── trade/           ← trade submission + [id]
+│   │       ├── trades/          ← trade listing
+│   │       ├── feed/            ← trade feed
 │   │       ├── asset/[ticker]/  ← asset data
+│   │       ├── assets/          ← asset directory + [ticker]
+│   │       ├── ticker/          ← ticker data + [ticker]
 │   │       ├── og/              ← 11+ OG image routes
 │   │       ├── execute/         ← trade execution
-│   │       ├── alerts/          ← alert management
-│   │       ├── wager/           ← wager endpoints
-│   │       └── ...              ← many more
-│   ├── lib/                     ← 45 modules
+│   │       ├── execution/       ← execution preflight
+│   │       ├── alerts/          ← alert management (rules, feed, notifications)
+│   │       ├── wager/           ← wager endpoints + settle
+│   │       ├── wagers/          ← wager listing + leaderboard + quick
+│   │       ├── positions/       ← positions + close + history
+│   │       ├── predictions/     ← prediction data + sports
+│   │       ├── fade/            ← fade data + [handle]
+│   │       ├── backtest/        ← backtest jobs + reports
+│   │       ├── scan/            ← scan jobs
+│   │       ├── signals/         ← signal data + live
+│   │       ├── events/          ← events + calendar + trending + track
+│   │       ├── simulate/        ← simulation
+│   │       ├── sim/[handle]/    ← per-handle sim
+│   │       ├── circle/          ← caller circle
+│   │       ├── consensus/       ← consensus data
+│   │       ├── alpha/           ← alpha detection
+│   │       ├── watchlist/       ← watchlist + stats
+│   │       ├── wallet/          ← wallet connect + balances
+│   │       ├── source/[id]/     ← source pages
+│   │       ├── markets/         ← market source data
+│   │       ├── search/          ← search proxy
+│   │       ├── prices/          ← live prices
+│   │       ├── trending/        ← trending data
+│   │       ├── discover/        ← discovery
+│   │       ├── nominate/        ← caller nominations + vote + admin
+│   │       ├── join/            ← waitlist
+│   │       ├── widget/[handle]/ ← embeddable widget data
+│   │       ├── submit-trade/    ← trade submission
+│   │       ├── sync/            ← data sync
+│   │       ├── recap/           ← daily recap
+│   │       ├── stats/           ← platform stats
+│   │       ├── health/          ← health check
+│   │       ├── live/            ← live updates
+│   │       ├── stream/          ← event streaming
+│   │       ├── badges/[handle]/ ← badge data
+│   │       ├── heatmap/         ← heatmap data
+│   │       ├── telegram/        ← Telegram webhook
+│   │       ├── tweet-monitor/   ← tweet monitoring
+│   │       └── cron/            ← cron jobs (audit, settle-wagers, telegram-alerts)
+│   ├── lib/                     ← 54 modules
 │   │   ├── paste-trade.ts       ← paste.trade API client
 │   │   ├── db.ts                ← Neon Postgres connection + queries
 │   │   ├── schema.sql           ← database schema
 │   │   ├── metrics.ts           ← P&L / win-rate calculations
 │   │   ├── badges.ts            ← achievement system
+│   │   ├── compute-badges.ts    ← badge computation
 │   │   ├── reputation.ts        ← reputation scoring
 │   │   ├── integrity.ts         ← call timing verification
 │   │   ├── personalities.ts     ← wrapped personality types
 │   │   ├── consensus.ts         ← aggregated signals
 │   │   ├── alpha.ts             ← alpha detection
 │   │   ├── api-auth.ts          ← API authentication
-│   │   ├── execution/           ← execution engine
-│   │   ├── backtest-processor.ts
-│   │   ├── scan-processor.ts
-│   │   ├── alert-matcher.ts
-│   │   └── ...
-│   └── components/              ← 53 components
-│       ├── ui/                  ← shared primitives (card, nav, pnl-display, etc.)
+│   │   ├── types.ts             ← shared type definitions
+│   │   ├── data.ts              ← data utilities
+│   │   ├── category.ts          ← ticker categorization
+│   │   ├── venues.ts            ← venue definitions
+│   │   ├── completeness.ts      ← data completeness scoring
+│   │   ├── watchlist.ts         ← watchlist management
+│   │   ├── execution/           ← execution engine (robinhood, hyperliquid, polymarket, positions, risk)
+│   │   ├── execution-db.ts      ← execution data storage
+│   │   ├── execution-db-init.ts ← execution DB init
+│   │   ├── backtest-processor.ts← historical simulation
+│   │   ├── backtest-db.ts       ← backtest data storage
+│   │   ├── scan-processor.ts    ← AI scanner logic
+│   │   ├── scan-db.ts           ← scan results storage
+│   │   ├── alert-matcher.ts     ← alert rule matching
+│   │   ├── alert-rules.ts       ← alert rule definitions
+│   │   ├── trade-extractor.ts   ← Claude AI trade extraction
+│   │   ├── recap-summary.ts     ← daily recap generation
+│   │   ├── wager-db.ts          ← wager data storage
+│   │   ├── upstream.ts          ← upstream API utilities
+│   │   ├── sync.ts              ← data synchronization
+│   │   ├── v1-response.ts       ← V1 API response format
+│   │   ├── v2-response.ts       ← V2 API response format
+│   │   ├── webhook-dispatch.ts  ← webhook routing
+│   │   ├── ws-client.ts         ← WebSocket client
+│   │   ├── ws-bridge.ts         ← WebSocket bridge
+│   │   ├── use-paste-ws.ts      ← React hook for WebSocket
+│   │   ├── use-event-stream.ts  ← event streaming hook
+│   │   ├── twitter-http-client.ts← Twitter API client
+│   │   ├── twitter-fetch.ts     ← Twitter data fetching
+│   │   ├── twitter-auth.ts      ← Twitter authentication
+│   │   ├── tweet-poller.ts      ← polling mechanism
+│   │   ├── telegram-db.ts       ← Telegram integration DB
+│   │   ├── telegram-format.ts   ← Telegram message formatting
+│   │   ├── solana.ts            ← Solana integration
+│   │   ├── wallet.ts            ← wallet utilities
+│   │   ├── seed.ts              ← database seeding
+│   │   ├── seed-from-api.ts     ← seed from API data
+│   │   └── seed-wall.ts         ← seed wall data
+│   └── components/              ← 58 components
+│       ├── ui/                  ← shared primitives (card, nav, pnl-display, search-input, win-rate-bar)
 │       ├── leaderboard-table.tsx
 │       ├── scorecard.tsx
 │       ├── trade-history.tsx
@@ -220,20 +321,65 @@ paste-markets/
 │       ├── wrapped-card.tsx
 │       ├── wrapped-story.tsx
 │       ├── trade-finder.tsx
+│       ├── trade-card.tsx
+│       ├── trade-feed.tsx
+│       ├── feed-card.tsx
+│       ├── feed-client.tsx
+│       ├── home-feed.tsx
 │       ├── pnl-chart.tsx
+│       ├── portfolio-chart.tsx
+│       ├── radar-chart.tsx
+│       ├── probability-bar.tsx
+│       ├── conviction-meter.tsx
 │       ├── reputation-badge.tsx
 │       ├── integrity-badge.tsx
+│       ├── audit-badge.tsx
+│       ├── badge-card.tsx
 │       ├── prediction-stats.tsx
+│       ├── sports-pnl.tsx
 │       ├── venue-filter.tsx
+│       ├── venue-breakdown.tsx
 │       ├── consensus-plays.tsx
 │       ├── live-signal-card.tsx
+│       ├── signals-client.tsx
+│       ├── trade-ticker.tsx
+│       ├── alpha-stream.tsx
 │       ├── ticker-heatmap.tsx
+│       ├── ticker-search.tsx
+│       ├── asset-live-price.tsx
 │       ├── wall-grid.tsx
 │       ├── wager-widget.tsx
-│       └── ...
+│       ├── wagers-client.tsx
+│       ├── backer-strip.tsx
+│       ├── double-down-popover.tsx
+│       ├── daily-top-callers.tsx
+│       ├── caller-circle-generator.tsx
+│       ├── caller-selector.tsx
+│       ├── backtest-client.tsx
+│       ├── scanner-client.tsx
+│       ├── whats-the-bet.tsx
+│       ├── url-submitter.tsx
+│       ├── search-bar.tsx
+│       ├── smart-input.tsx
+│       ├── sim-timeframe-selector.tsx
+│       ├── notification-bell.tsx
+│       ├── wallet-button.tsx
+│       ├── follow-caller-button.tsx
+│       └── execution/           ← execute-button, trade-confirm-modal
 ├── public/
+│   ├── logo.svg
+│   ├── apple-icon.svg
+│   ├── demo.svg
+│   ├── diagram-architecture.svg
+│   ├── diagram-pipeline.svg
+│   ├── diagram-flow.svg
 │   └── fonts/
-└── tasks/                       ← agent task prompts
+├── docs/
+│   ├── DEPLOY.md                ← deployment runbook
+│   └── specs/                   ← 13 feature specifications
+├── references/                  ← API & integration reference docs
+├── paste-markets-prompts/       ← feature prompt archive
+└── tasks/                       ← agent task prompts (50+)
 ```
 
 ## Key Conventions
@@ -248,19 +394,46 @@ paste-markets/
 
 ## Environment Variables
 ```
-PASTE_TRADE_KEY=       # paste.trade API bearer token
-ANTHROPIC_API_KEY=     # for "What's The Trade?" AI feature (Claude Haiku)
-DATABASE_URL=          # Neon Postgres connection string (required)
-NEXT_PUBLIC_BASE_URL=  # for OG image URLs, defaults to localhost:3000
+# Core (required)
+PASTE_TRADE_KEY=              # paste.trade API bearer token
+DATABASE_URL=                 # Neon Postgres connection string
+NEXT_PUBLIC_BASE_URL=         # base URL for OG images, defaults to localhost:3000
+
+# AI
+ANTHROPIC_API_KEY=            # Claude API key for "What's The Trade?" feature
+
+# Twitter / X
+TWITTER_AUTH_TOKEN=           # auth_token cookie from x.com
+TWITTER_CT0=                  # ct0 CSRF cookie from x.com
+PROXY_URL=                    # optional rotating proxy
+XACTIONS_SESSION_COOKIE=      # auth_token for xactions Puppeteer fallback
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=           # Bot token from @BotFather
+TELEGRAM_WEBHOOK_SECRET=      # webhook secret token
+TELEGRAM_CHANNEL_ID=          # channel for auto-posting trades
+
+# Solana (wager system)
+SOLANA_RPC_URL=               # Solana RPC endpoint
+SOLANA_PROGRAM_ID=            # paste_wager program ID
+WAGER_VAULT_ADDRESS=          # treasury address (server-side)
+TREASURY_PRIVATE_KEY=         # settlement keypair (server-side)
+NEXT_PUBLIC_WAGER_VAULT_ADDRESS= # treasury address (client-side)
+NEXT_PUBLIC_SOLANA_RPC_URL=   # client-side RPC endpoint
+
+# Infrastructure
+CRON_SECRET=                  # bearer token for /api/cron/* endpoints
+PT_API_KEYS=                  # pre-seeded public API keys
 ```
 
 ## Running
 ```bash
-cd paste-dashboard
 npm install
 npm run dev          # http://localhost:3000
 npm run build        # production build
 npm run db:seed      # seed database with initial tracked authors
+npm run db:sync      # sync data from paste.trade API
+npm run lint         # ESLint
 ```
 
 ## Important Notes for Agents

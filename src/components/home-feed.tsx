@@ -247,7 +247,7 @@ function FilterPanel({
   onChange: (f: Filters) => void;
 }) {
   const pillCls = (active: boolean) =>
-    `text-[13px] px-3 py-1.5 rounded-full transition-colors font-medium ${
+    `text-[13px] px-3 py-1.5 rounded-lg transition-colors font-medium ${
       active
         ? "bg-[#0066FF] text-white"
         : "bg-[#ffffff08] text-[#a1a1aa] hover:bg-[#ffffff14] hover:text-[#f5f5f7]"
@@ -268,7 +268,7 @@ function FilterPanel({
       <select
         value={filters.platform}
         onChange={(e) => onChange({ ...filters, platform: e.target.value })}
-        className="text-[13px] px-3 py-1.5 rounded-full bg-[#ffffff08] text-[#a1a1aa] border-none outline-none cursor-pointer hover:bg-[#ffffff14] transition-colors font-medium appearance-none"
+        className="text-[13px] px-3 py-1.5 rounded-lg bg-[#ffffff08] text-[#a1a1aa] border-none outline-none cursor-pointer hover:bg-[#ffffff14] transition-colors font-medium appearance-none"
         aria-label="Platform"
       >
         {PLATFORM_OPTIONS.map((o) => (
@@ -276,7 +276,7 @@ function FilterPanel({
         ))}
       </select>
 
-      <label className="flex items-center gap-1.5 cursor-pointer select-none text-[13px] px-3 py-1.5 rounded-full bg-[#ffffff08] text-[#a1a1aa] hover:bg-[#ffffff14] transition-colors font-medium">
+      <label className="flex items-center gap-1.5 cursor-pointer select-none text-[13px] px-3 py-1.5 rounded-lg bg-[#ffffff08] text-[#a1a1aa] hover:bg-[#ffffff14] transition-colors font-medium">
         <input
           type="checkbox"
           checked={filters.liveOnly}
@@ -536,7 +536,7 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
   const tabBtn = (t: "hot" | "new" | "top", label: string) => (
     <button
       onClick={() => handleTabChange(t)}
-      className={`px-4 py-2 text-sm font-semibold transition-colors rounded-full ${
+      className={`px-4 py-2 text-sm font-semibold transition-colors rounded-lg ${
         tab === t
           ? "text-[#f5f5f7] bg-[#ffffff14]"
           : "text-[#52525b] hover:text-[#a1a1aa] hover:bg-[#ffffff08]"
@@ -569,7 +569,7 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
                     <button
                       key={tf.value}
                       onClick={() => setTopTimeframe(tf.value)}
-                      className={`text-xs px-2.5 py-1 rounded-full transition-colors font-medium ${
+                      className={`text-xs px-2.5 py-1 rounded-lg transition-colors font-medium ${
                         topTimeframe === tf.value
                           ? "bg-[#ffffff14] text-[#f5f5f7]"
                           : "text-[#52525b] hover:text-[#a1a1aa]"

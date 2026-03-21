@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { AutoRefresh } from "./auto-refresh";
 
 interface PageProps {
   params: Promise<{ source_id: string }>;
@@ -387,8 +388,9 @@ export default async function MarketPage({ params }: PageProps) {
                 </p>
               </div>
               <p className="text-xs" style={{ color: "#555568" }}>
-                This usually takes a few seconds. Refresh to check for updates.
+                This usually takes a few seconds. The page will update automatically.
               </p>
+              <AutoRefresh intervalMs={3000} />
             </div>
           </>
         ) : (

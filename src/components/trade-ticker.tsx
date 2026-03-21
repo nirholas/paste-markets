@@ -11,9 +11,9 @@ interface TickerTrade {
 }
 
 function formatTimeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
+  // This runs only on the client (inside useEffect-fetched data),
+  // so hydration is not an issue here.
+  const diffMs = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diffMs / 60_000);
   if (mins < 1) return "now";
   if (mins < 60) return `${mins}m ago`;
