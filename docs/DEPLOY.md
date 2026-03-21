@@ -1,10 +1,10 @@
-# Deployment Runbook — paste-markets on Fly.io
+# Deployment Runbook -- paste-markets on Fly.io
 
 ## Prerequisites
 
 - [Fly.io CLI](https://fly.io/docs/hands-on/install-flyctl/) installed and authenticated (`fly auth login`)
 - Docker installed locally (for testing builds)
-- Access to `PASTE_TRADE_KEY` and `ANTHROPIC_API_KEY`
+- Access to required env vars (see [.env.example](../.env.example) for full list)
 
 ---
 

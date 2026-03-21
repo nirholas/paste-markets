@@ -273,6 +273,47 @@ export default function SubmitPage() {
     return clearTimers;
   }, []); // eslint-disable-line
 
+  async function pollForTrades(sourceId: string, handle: string | undefined): Promise<SubmitResult | null> {
+    const maxAttempts = 10;
+    const delay = 2000;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, delay));
+      try {
+        const params = new URLSearchParams();
+        if (handle) params.set("handle", handle);
+        const res = await fetch(`/api/source/${sourceId}?${params}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        if (data.trades?.length > 0) {
+          const trade = data.trades[0];
+          return {
+            ok: true,
+            source_id: sourceId,
+            source_url: data.source_url,
+            ticker: trade.ticker,
+            direction: trade.direction,
+            thesis: trade.thesis,
+            author_handle: trade.author_handle ?? handle,
+            author_price: trade.author_price ?? trade.posted_price ?? null,
+            headline_quote: trade.headline_quote,
+            platform: trade.platform,
+            status: "completed",
+          };
+        }
+
+        if (data.status && data.status !== "processing" && data.status !== "pending") {
+          break;
+        }
+      } catch {
+        // continue polling
+      }
+    }
+
+    return null;
+  }
+
   async function handleTradeSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim() || loading) return;
@@ -290,12 +331,22 @@ export default function SubmitPage() {
       });
       const data: SubmitResponse = await res.json();
 
-      clearTimers();
-      setLoading(false);
-
       if (data.ok) {
-        setResult(data);
+        // Source created — poll paste.trade for extracted trades
+        const polled = await pollForTrades(data.source_id, data.author_handle);
+
+        clearTimers();
+        setLoading(false);
+
+        if (polled) {
+          setResult(polled);
+        } else {
+          // Still show the result card even if no trades found yet
+          setResult(data);
+        }
       } else {
+        clearTimers();
+        setLoading(false);
         setError(data.error);
       }
     } catch {
