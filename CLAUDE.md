@@ -1,24 +1,50 @@
-# paste-dashboard
+# paste-markets
 
 ## What This Is
 A Next.js web dashboard built on the **paste.trade API** by @frankdegods. paste.trade tracks real P&L for crypto/stock/prediction-market calls made on Twitter (CT = Crypto Twitter). This dashboard makes that data useful, visual, and viral.
 
-**Working product name:** paste.markets (can be changed later)
+Forked from [rohunvora/paste-trade](https://github.com/rohunvora/paste-trade) — the open-source repo by Rohun Vora. We build the public-facing dashboard, leaderboards, scorecards, and viral sharing features on top of the paste.trade API.
 
-## Core Features
-1. **Leaderboard** — Public rankings of CT traders by real P&L performance
-2. **Author Profile / Scorecard** — Individual pages with full trade history + visual scorecard
-3. **Head-to-Head** — 1v1 comparison of two traders
-4. **CT Wrapped / Report Card** — Spotify-Wrapped-style shareable trading personality cards
-5. **"What's The Trade?"** — Paste any news URL/headline → AI finds the optimal trade
-6. **OG Images** — Dynamic twitter card images for every page (sharing is the growth engine)
+**Product name:** paste.markets
+
+## Core Features (all shipped)
+1. **Leaderboard** — Rankings by win rate, avg P&L, total trades. Timeframe filters (24h/7d/30d/all), fade mode, streaks, venue filtering, ticker-specific boards
+2. **Author Profile / Scorecard** — Trade history, P&L chart, badges, reputation score, integrity scoring, venue breakdown, prediction stats, fade score
+3. **Head-to-Head** — 1v1 comparison across 6 dimensions, shared ticker analysis
+4. **CT Wrapped / Report Card** — Personality archetypes, S-F grading (timing/conviction/consistency/risk), fun facts
+5. **"What's The Trade?"** — Paste URL/headline → Claude Haiku extracts trades → routes to Robinhood/Hyperliquid/Polymarket
+6. **OG Images** — Dynamic Twitter cards for every page type (11+ routes)
+7. **Asset Pages** — Per-ticker view: sentiment, top callers, all calls, bull/bear ratio
+8. **Public API** — V1 + V2 REST API with auth, rate limiting, pagination
+
+## Extended Features (all shipped)
+- **Alerts** — Rule-based notifications
+- **Backtest** — Historical performance simulation
+- **Wagers** — Tip-based wagering on calls
+- **Execution** — Robinhood, Hyperliquid, Polymarket integration
+- **Positions** — Live position tracking
+- **Wall of Trades** — Public trade feed
+- **Fade Trading** — Contrarian signal tracking
+- **Circle Generator** — Top callers visualization
+- **Live Signals** — Real-time trade alerts
+- **Portfolio Simulation** — Paper trading
+- **Caller Directory** — Browseable caller list
+- **Predictions** — Dedicated prediction market tracking
+- **Consensus Plays** — Aggregated trader signals
+- **Events** — Market event calendar
+- **Audit Trail** — Call integrity verification
+- **Scanner** — AI-powered trade discovery
+- **Telegram Bot** — Alert delivery
+- **Widget System** — Embeddable caller widgets
 
 ## Tech Stack
-- **Framework:** Next.js 14+ (App Router)
+- **Framework:** Next.js 15 (App Router)
 - **Language:** TypeScript (strict)
+- **React:** 19
 - **Styling:** Tailwind CSS v3
 - **Font:** JetBrains Mono (Bloomberg terminal aesthetic)
 - **Database:** Neon Postgres via `@neondatabase/serverless` (serverless HTTP driver)
+- **AI:** Claude Haiku via `@anthropic-ai/sdk` (trade extraction)
 - **OG Images:** `@vercel/og` (Satori) for dynamic image generation
 - **Deploy:** Vercel
 

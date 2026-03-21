@@ -72,12 +72,13 @@ export function FeedCard({ item, showWagerCta = false, onWagerClick }: FeedCardP
   const quote = (item.headline_quote ?? item.thesis ?? "").slice(0, 120);
   const handle = item.author_handle.replace(/^@/, "");
   const isLong = item.direction === "long" || item.direction === "yes";
-  const borderAccent = isLong ? "hover:border-[#2ecc71]/30" : "hover:border-[#e74c3c]/30";
+  const accentColor = isLong ? "#2ecc71" : "#e74c3c";
   const tradeHref = item.source_url ?? `/${handle}`;
 
   return (
     <div
-      className={`bg-[#0f0f22] border border-[#1a1a2e] ${borderAccent} rounded-lg p-4 space-y-3 transition-colors`}
+      className="card-glow bg-[#0f0f22] border border-[#1a1a2e] rounded-lg p-4 space-y-3 relative overflow-hidden"
+      style={{ borderLeft: `2px solid ${accentColor}` }}
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-2">

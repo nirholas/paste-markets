@@ -130,8 +130,11 @@ function TrendingAssets({
   onSelect: (ticker: string) => void;
 }) {
   return (
-    <div className="bg-[#0f0f22] border border-[#1a1a2e] rounded-lg p-4">
-      <p className="text-[10px] uppercase tracking-widest text-[#555568] mb-3">Trending Now</p>
+    <div className="card-glow bg-[#0f0f22] border border-[#1a1a2e] rounded-lg p-4">
+      <p className="text-[10px] uppercase tracking-[0.15em] text-[#555568] mb-3 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#f39c12] stat-pulse" />
+        Trending Now
+      </p>
       <div className="space-y-2">
         {assets.slice(0, 5).map((asset) => {
           const sentiment = asset.bullCount + asset.bearCount > 0
@@ -177,8 +180,11 @@ function TrendingAssets({
 
 function TopCallers({ callers }: { callers: TopCaller[] }) {
   return (
-    <div className="bg-[#0f0f22] border border-[#1a1a2e] rounded-lg p-4">
-      <p className="text-[10px] uppercase tracking-widest text-[#555568] mb-3">Top Callers</p>
+    <div className="card-glow bg-[#0f0f22] border border-[#1a1a2e] rounded-lg p-4">
+      <p className="text-[10px] uppercase tracking-[0.15em] text-[#555568] mb-3 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#2ecc71] stat-pulse" />
+        Top Callers
+      </p>
       <div className="space-y-3">
         {callers.slice(0, 5).map((caller) => {
           const color = tierColor(caller.tier);
@@ -519,10 +525,10 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
   const tabBtn = (t: "hot" | "new" | "top", label: string) => (
     <button
       onClick={() => handleTabChange(t)}
-      className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest transition-colors font-mono ${
+      className={`px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] transition-all font-mono rounded-t ${
         tab === t
-          ? "text-[#f0f0f0] border-b-2 border-[#3b82f6]"
-          : "text-[#555568] hover:text-[#c8c8d0]"
+          ? "text-[#f0f0f0] border-b-2 border-[#3b82f6] bg-[#0f0f22]/50"
+          : "text-[#555568] hover:text-[#c8c8d0] border-b-2 border-transparent"
       }`}
     >
       {label}
