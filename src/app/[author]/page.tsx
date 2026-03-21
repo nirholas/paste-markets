@@ -20,6 +20,7 @@ import { PredictionStats } from "@/components/prediction-stats";
 import { computeFadeScore } from "@/lib/metrics";
 import { VenueBreakdown, computeVenueStats } from "@/components/venue-breakdown";
 import { FollowCallerButton } from "@/components/follow-caller-button";
+import { fetchAuthorProfile } from "@/lib/upstream";
 
 const PASTE_TRADE_BASE = "https://paste.trade";
 
@@ -136,20 +137,40 @@ export default async function AuthorPage({ params }: PageProps) {
 
   if (!isValidHandle(handle)) notFound();
 
-  // Ensure author exists
-  const author = await getOrCreateAuthor(handle);
+  try {
+  // Primary: try upstream paste.trade API (no DB dependency)
+  let metrics: import("@/lib/metrics").AuthorMetrics | null = null;
+  let upstreamRank: number | null = null;
+  let upstreamAvatar: string | null = null;
+  let lastUpdated = "just now";
 
-  // Sync if stale
-  if (isStale(author.last_fetched)) {
-    try {
-      await syncAuthor(handle);
-    } catch (err) {
-      console.error(`[author-page] Failed to sync ${handle}:`, err);
+  try {
+    const upstream = await fetchAuthorProfile(handle);
+    if (upstream && upstream.metrics.totalTrades > 0) {
+      metrics = upstream.metrics;
+      upstreamRank = upstream.rank;
+      upstreamAvatar = upstream.avatarUrl;
     }
+  } catch (err) {
+    console.error(`[author-page] Upstream fetch failed for ${handle}:`, err);
   }
 
-  // Get metrics
-  const metrics = await getAuthorMetrics(handle);
+  // Fallback: local DB (sync if stale)
+  let refreshed: Awaited<ReturnType<typeof getOrCreateAuthor>> | null = null;
+  if (!metrics) {
+    try {
+      const author = await getOrCreateAuthor(handle);
+      if (isStale(author.last_fetched)) {
+        try { await syncAuthor(handle); } catch { /* continue with cached */ }
+      }
+      metrics = await getAuthorMetrics(handle);
+      refreshed = await getOrCreateAuthor(handle);
+      upstreamRank = upstreamRank ?? refreshed.rank;
+      lastUpdated = refreshed.last_fetched ? timeAgo(refreshed.last_fetched) : "never";
+    } catch {
+      // DB unavailable
+    }
+  }
 
   if (!metrics || metrics.totalTrades === 0) {
     return <NotFound handle={handle} />;
@@ -158,58 +179,68 @@ export default async function AuthorPage({ params }: PageProps) {
   // Record the view (fire-and-forget, don't block page render)
   recordView(handle, "profile").catch(() => {});
 
-  // Re-read author for rank + last_fetched after potential sync
-  const refreshed = await getOrCreateAuthor(handle);
-  const lastUpdated = refreshed.last_fetched
-    ? timeAgo(refreshed.last_fetched)
-    : "never";
-
-  // Fetch X profile data (cached in DB, refreshed every 24h)
+  // Fetch X profile data (try DB cache first, then Twitter)
   let xProfile = {
-    avatarUrl: refreshed.avatar_url as string | null,
-    bannerUrl: refreshed.banner_url as string | null,
-    displayName: refreshed.display_name as string | null,
-    bio: refreshed.bio as string | null,
-    location: refreshed.location as string | null,
-    website: refreshed.website as string | null,
-    verified: refreshed.verified ?? false,
-    followers: refreshed.followers as number | null,
-    following: refreshed.following as number | null,
-    tweetCount: refreshed.tweet_count as number | null,
-    joinedAt: refreshed.x_joined_at as string | null,
+    avatarUrl: null as string | null,
+    bannerUrl: null as string | null,
+    displayName: null as string | null,
+    bio: null as string | null,
+    location: null as string | null,
+    website: null as string | null,
+    verified: false,
+    followers: null as number | null,
+    following: null as number | null,
+    tweetCount: null as number | null,
+    joinedAt: null as string | null,
   };
 
-  if (isXProfileStale(refreshed.x_profile_fetched_at)) {
-    try {
-      const profile = await fetchProfile(handle);
-      if (profile) {
-        xProfile = {
-          avatarUrl: profile.avatarUrl,
-          bannerUrl: profile.bannerUrl,
-          displayName: profile.displayName,
-          bio: profile.bio,
-          location: profile.location,
-          website: profile.website,
-          verified: profile.verified,
-          followers: profile.followers,
-          following: profile.following,
-          tweetCount: profile.tweetCount,
-          joinedAt: profile.joined,
-        };
-        await updateXProfile(handle, {
-          ...xProfile,
-          followers: xProfile.followers ?? 0,
-          following: xProfile.following ?? 0,
-          tweetCount: xProfile.tweetCount ?? 0,
-        });
+  if (refreshed) {
+    xProfile = {
+      avatarUrl: refreshed.avatar_url as string | null,
+      bannerUrl: refreshed.banner_url as string | null,
+      displayName: refreshed.display_name as string | null,
+      bio: refreshed.bio as string | null,
+      location: refreshed.location as string | null,
+      website: refreshed.website as string | null,
+      verified: refreshed.verified ?? false,
+      followers: refreshed.followers as number | null,
+      following: refreshed.following as number | null,
+      tweetCount: refreshed.tweet_count as number | null,
+      joinedAt: refreshed.x_joined_at as string | null,
+    };
+
+    if (isXProfileStale(refreshed.x_profile_fetched_at)) {
+      try {
+        const profile = await fetchProfile(handle);
+        if (profile) {
+          xProfile = {
+            avatarUrl: profile.avatarUrl,
+            bannerUrl: profile.bannerUrl,
+            displayName: profile.displayName,
+            bio: profile.bio,
+            location: profile.location,
+            website: profile.website,
+            verified: profile.verified,
+            followers: profile.followers,
+            following: profile.following,
+            tweetCount: profile.tweetCount,
+            joinedAt: profile.joined,
+          };
+          await updateXProfile(handle, {
+            ...xProfile,
+            followers: xProfile.followers ?? 0,
+            following: xProfile.following ?? 0,
+            tweetCount: xProfile.tweetCount ?? 0,
+          });
+        }
+      } catch {
+        // X profile fetch is optional
       }
-    } catch {
-      // X profile fetch is optional
     }
   }
 
-  // Fallback avatar from paste.trade if X didn't provide one
-  let avatarUrl = xProfile.avatarUrl;
+  // Avatar: upstream > X profile > paste.trade search
+  let avatarUrl = upstreamAvatar ?? xProfile.avatarUrl;
   if (!avatarUrl) {
     try {
       const fullTrades = await searchFullTrades({ author: handle, top: "30d", limit: 3 });
@@ -238,13 +269,24 @@ export default async function AuthorPage({ params }: PageProps) {
   const venueStats = computeVenueStats(metrics.recentTrades);
 
   // Integrity stats (SQLite only — null in serverless mode)
-  const integrityStats = await getIntegrityStats(handle);
+  let integrityStats = null;
+  try {
+    integrityStats = await getIntegrityStats(handle);
+  } catch {
+    // Integrity stats are optional
+  }
 
   // Wager tips earned
-  const tipsEarned = await getCallerTipsEarned(handle);
-  const wagerHistory = (await getCallerWagerHistory(handle)).filter(
-    (w) => w.wager_count > 0,
-  );
+  let tipsEarned = 0;
+  let wagerHistory: Awaited<ReturnType<typeof getCallerWagerHistory>> = [];
+  try {
+    tipsEarned = await getCallerTipsEarned(handle);
+    wagerHistory = (await getCallerWagerHistory(handle)).filter(
+      (w) => w.wager_count > 0,
+    );
+  } catch {
+    // Wager data is non-critical
+  }
 
   // Reputation score — use cache or compute fresh
   let repScore = getCachedScore(handle);
@@ -259,14 +301,24 @@ export default async function AuthorPage({ params }: PageProps) {
   }
 
   // Compute fade stats
-  const fadeStats = computeFadeScore(metrics.recentTrades);
+  let fadeStats = null;
+  try {
+    fadeStats = computeFadeScore(metrics.recentTrades);
+  } catch {
+    // Fade stats are optional
+  }
 
   // Compute achievement badges
-  const earnedBadges = computeBadges(metrics, metrics.recentTrades);
-  const badgeData = earnedBadges.map((e) => ({
-    id: e.badge.id,
-    earnedAt: e.earnedAt,
-  }));
+  let badgeData: { id: string; earnedAt: string }[] = [];
+  try {
+    const earnedBadges = computeBadges(metrics, metrics.recentTrades);
+    badgeData = earnedBadges.map((e) => ({
+      id: e.badge.id,
+      earnedAt: e.earnedAt,
+    }));
+  } catch {
+    // Badges are optional
+  }
 
   // Best 5 trades sorted by PnL descending
   const best5 = [...metrics.recentTrades]
@@ -359,9 +411,9 @@ export default async function AuthorPage({ params }: PageProps) {
         </div>
 
         <div className="text-right flex-shrink-0">
-          {refreshed.rank != null && (
+          {upstreamRank != null && (
             <div className="text-xs uppercase tracking-widest text-text-muted">
-              Rank #{refreshed.rank}
+              Rank #{upstreamRank}
             </div>
           )}
           <div className="text-xs text-text-muted mt-1">
@@ -479,12 +531,14 @@ export default async function AuthorPage({ params }: PageProps) {
       </div>
 
       {/* Achievement badges */}
-      <div className="mb-8">
-        <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">
-          Achievements
-        </h2>
-        <BadgeShelf earnedBadges={badgeData} />
-      </div>
+      {badgeData.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">
+            Achievements
+          </h2>
+          <BadgeShelf earnedBadges={badgeData} />
+        </div>
+      )}
 
       {/* Reputation score breakdown */}
       {repScore && repScore.qualifyingCalls >= 5 && (
@@ -492,19 +546,21 @@ export default async function AuthorPage({ params }: PageProps) {
       )}
 
       {/* Scorecard with fade toggle */}
-      <FadeScorecardWrapper
-        handle={handle}
-        metrics={{
-          winRate: metrics.winRate,
-          avgPnl: metrics.avgPnl,
-          totalTrades: metrics.totalTrades,
-          streak: metrics.streak,
-          bestTrade: metrics.bestTrade,
-          worstTrade: metrics.worstTrade,
-        }}
-        rank={refreshed.rank}
-        fadeStats={fadeStats}
-      />
+      {fadeStats && (
+        <FadeScorecardWrapper
+          handle={handle}
+          metrics={{
+            winRate: metrics.winRate,
+            avgPnl: metrics.avgPnl,
+            totalTrades: metrics.totalTrades,
+            streak: metrics.streak,
+            bestTrade: metrics.bestTrade,
+            worstTrade: metrics.worstTrade,
+          }}
+          rank={upstreamRank}
+          fadeStats={fadeStats}
+        />
+      )}
 
       {/* Action buttons */}
       <ActionButtons
@@ -831,4 +887,8 @@ export default async function AuthorPage({ params }: PageProps) {
       </div>
     </main>
   );
+  } catch (err) {
+    console.error(`[author-page] Unhandled error for ${handle}:`, err);
+    return <NotFound handle={handle} />;
+  }
 }

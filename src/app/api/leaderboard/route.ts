@@ -217,6 +217,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     console.error("[api/leaderboard] Error:", err);
-    return NextResponse.json({ error: "Failed to fetch leaderboard" }, { status: 500 });
+    return NextResponse.json({ entries: [], total: 0, error: "Unavailable" }, { status: 200 });
   }
 }

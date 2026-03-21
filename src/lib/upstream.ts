@@ -18,11 +18,14 @@ import {
   fetchPasteTradeLeaderboard,
   fetchPasteTradeStats,
   fetchPasteTradePrices,
+  searchFullTrades,
   type FeedResult,
   type LeaderboardAuthor,
   type PlatformStats,
   type PriceData,
+  type PasteTradeFullTrade,
 } from "@/lib/paste-trade";
+import { computeMetrics, type AuthorMetrics, type TradeSummary } from "@/lib/metrics";
 
 const BASE = "https://paste.trade";
 
@@ -452,4 +455,73 @@ export async function fetchPrices(
   tradeIds: string[],
 ): Promise<Record<string, PriceData>> {
   return fetchPasteTradePrices(tradeIds);
+}
+
+// ---------------------------------------------------------------------------
+// Author profile — fetch directly from paste.trade, no local DB needed
+// ---------------------------------------------------------------------------
+
+function apiTradeToSummary(t: PasteTradeFullTrade): TradeSummary {
+  return {
+    ticker: t.ticker,
+    direction: t.direction,
+    pnl_pct: t.pnlPct ?? 0,
+    platform: t.platform,
+    entry_date: t.author_date,
+    posted_at: t.posted_at,
+    source_url: t.source_url,
+  };
+}
+
+export interface UpstreamAuthorProfile {
+  handle: string;
+  metrics: AuthorMetrics;
+  rank: number | null;
+  avatarUrl: string | null;
+  trades: PasteTradeFullTrade[];
+}
+
+/**
+ * Fetch an author's profile directly from paste.trade public endpoints.
+ * Returns null if the author has no trades on paste.trade.
+ */
+export async function fetchAuthorProfile(
+  handle: string,
+): Promise<UpstreamAuthorProfile | null> {
+  // Fetch trades where this person is the actual caller (author_handle matches)
+  const allTrades = await searchFullTrades({ author: handle, top: "all", limit: 100 });
+
+  // Filter to only trades where this handle is the actual author
+  const authorTrades = allTrades.filter(
+    (t) => t.author_handle?.toLowerCase() === handle.toLowerCase(),
+  );
+
+  if (authorTrades.length === 0) return null;
+
+  const summaries = authorTrades.map(apiTradeToSummary);
+  const metrics = computeMetrics(handle, summaries);
+
+  // Try to find rank from leaderboard
+  let rank: number | null = null;
+  try {
+    const lb = await fetchPasteTradeLeaderboard("30d", "avg_pnl", 200);
+    const entry = lb.authors.find(
+      (a) => a.author.handle.toLowerCase() === handle.toLowerCase(),
+    );
+    if (entry) rank = entry.rank;
+  } catch {
+    // rank is optional
+  }
+
+  // Extract avatar
+  let avatarUrl: string | null = null;
+  for (const t of authorTrades) {
+    if (t.author_avatar_url) {
+      const raw = t.author_avatar_url;
+      avatarUrl = raw.startsWith("/") ? `${BASE}${raw}` : raw;
+      break;
+    }
+  }
+
+  return { handle, metrics, rank, avatarUrl, trades: authorTrades };
 }

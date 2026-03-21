@@ -143,7 +143,23 @@ export default async function TickerPage({ params }: PageProps) {
   const { ticker } = await params;
   const upper = ticker.toUpperCase();
 
-  const trades = await searchFullTrades({ ticker: upper, top: "all", limit: 100 });
+  let trades: PasteTradeFullTrade[];
+  try {
+    trades = await searchFullTrades({ ticker: upper, top: "all", limit: 100 });
+  } catch (err) {
+    console.error(`[ticker-page] Failed to load ${upper}:`, err);
+    return (
+      <main className="min-h-screen px-4 py-12 max-w-3xl mx-auto">
+        <h1 className="text-2xl font-bold mb-2" style={{ color: "#f0f0f0" }}>
+          ${upper}
+        </h1>
+        <p className="text-sm" style={{ color: "#c8c8d0" }}>
+          Ticker data is temporarily unavailable.
+        </p>
+      </main>
+    );
+  }
+
   const intel = aggregateTicker(upper, trades);
 
   // Sort recent trades by date desc
@@ -349,7 +365,7 @@ export default async function TickerPage({ params }: PageProps) {
                   {trade.pnlPct != null ? (
                     <PnlDisplay value={trade.pnlPct} />
                   ) : (
-                    <span style={{ color: "#555568" }}>–</span>
+                    <span style={{ color: "#555568" }}>--</span>
                   )}
                   {trade.source_url && (
                     <div className="mt-1">

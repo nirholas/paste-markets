@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { LeaderboardClient } from "./client";
+import { fetchLeaderboard } from "@/lib/upstream";
+import { computeAlphaScore, callerTier } from "@/lib/alpha";
 
 export const metadata: Metadata = {
   title: "CT Leaderboard -- paste.markets",
@@ -21,45 +23,26 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function LeaderboardPage() {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-
   let initialEntries: import("@/components/leaderboard-table").LeaderboardRow[] = [];
 
   try {
-    const res = await fetch(
-      `${baseUrl}/api/leaderboard?window=30d&limit=25`,
-      { cache: "no-store" },
-    );
-    if (res.ok) {
-      const data = await res.json();
-      initialEntries = (data.entries ?? []).map(
-        (entry: {
-          rank: number;
-          handle: string;
-          winRate: number;
-          avgPnl: number;
-          totalTrades: number;
-          totalPnl: number;
-          bestTicker: string;
-          platform: string;
-          avatarUrl: string | null;
-        }) => ({
-          rank: entry.rank,
-          handle: entry.handle,
-          winRate: entry.winRate,
-          avgPnl: entry.avgPnl,
-          totalTrades: entry.totalTrades,
-          totalPnl: entry.totalPnl,
-          bestTicker: entry.bestTicker,
-          platform: entry.platform,
-          avatarUrl: entry.avatarUrl,
-        }),
-      );
-    } else {
-      console.error(
-        `[leaderboard/page] API responded ${res.status}`,
-      );
-    }
+    const lbData = await fetchLeaderboard("30d", "win_rate", 25);
+    initialEntries = lbData.authors.map((a, i) => {
+      const alpha = computeAlphaScore(a.stats.win_rate, a.stats.avg_pnl, a.stats.trade_count);
+      return {
+        rank: i + 1,
+        handle: a.author.handle,
+        winRate: a.stats.win_rate,
+        avgPnl: a.stats.avg_pnl,
+        totalTrades: a.stats.trade_count,
+        totalPnl: a.stats.total_pnl ?? 0,
+        bestTicker: a.stats.best_ticker ?? "",
+        platform: a.author.platform ?? "",
+        avatarUrl: a.author.avatar_url ?? null,
+        alphaScore: alpha,
+        tier: callerTier(alpha),
+      };
+    });
   } catch (err) {
     console.error("[leaderboard/page] Failed to fetch initial entries:", err);
   }

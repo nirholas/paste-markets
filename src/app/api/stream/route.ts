@@ -51,9 +51,9 @@ export async function GET(): Promise<Response> {
       controller.enqueue(
         encoder.encode(
           `event: connected\ndata: ${JSON.stringify({
-            activeCallers: stats.activeCallers,
-            totalCallers: stats.totalCallers,
-            lastSignalAt: stats.lastSignalAt,
+            activeCallers: stats?.activeCallers ?? 0,
+            totalCallers: stats?.totalCallers ?? 0,
+            lastSignalAt: stats?.lastSignalAt ?? null,
           })}\n\n`,
         ),
       );
@@ -88,8 +88,21 @@ export async function GET(): Promise<Response> {
             ),
           );
         } catch {
-          clearInterval(heartbeat);
-          removeSSEListener(listener);
+          // Send a minimal heartbeat to keep connection alive
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `event: heartbeat\ndata: ${JSON.stringify({
+                  timestamp: new Date().toISOString(),
+                  wsConnected: isWSBridgeConnected(),
+                })}\n\n`,
+              ),
+            );
+          } catch {
+            // Stream is closed — clean up
+            clearInterval(heartbeat);
+            removeSSEListener(listener);
+          }
         }
       }, 30_000);
 

@@ -4,7 +4,9 @@ import { SmartInput } from "@/components/smart-input";
 import { HomeFeed } from "@/components/home-feed";
 import HeroGlobe from "@/components/hero-globe";
 import type { AssetSummary } from "@/lib/data";
-import type { SiteStats } from "@/app/api/stats/route";
+import { fetchPasteTradeStats } from "@/lib/paste-trade";
+import { fetchLeaderboard } from "@/lib/upstream";
+import { computeAlphaScore, callerTier } from "@/lib/alpha";
 
 export const metadata: Metadata = {
   title: "paste.markets — Turn any tweet into a trade",
@@ -21,6 +23,12 @@ export const metadata: Metadata = {
     images: ["/api/og/home"],
   },
 };
+
+interface SiteStats {
+  total_trades: number;
+  total_callers: number;
+  avg_win_rate: number;
+}
 
 interface TopCallerRow {
   handle: string;
@@ -46,17 +54,26 @@ const jsonLd = {
   },
 };
 
+const PASTE_TRADE_BASE = "https://paste.trade";
+
 async function getSiteStats(): Promise<SiteStats | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/stats`, { next: { revalidate: 300 } });
-    if (!res.ok) return null;
-    return res.json() as Promise<SiteStats>;
+    const upstream = await fetchPasteTradeStats();
+    if (!upstream) return null;
+    return {
+      total_trades: upstream.total_trades,
+      total_callers: upstream.users,
+      avg_win_rate: upstream.total_trades > 0
+        ? Math.round((upstream.profitable_trades / upstream.total_trades) * 1000) / 10
+        : 0,
+    };
   } catch {
     return null;
   }
 }
 
 async function getInitialAssets(): Promise<AssetSummary[]> {
+  // Assets are local-DB only; return empty if unavailable
   try {
     const res = await fetch(`${BASE_URL}/api/assets`, { next: { revalidate: 300 } });
     if (!res.ok) return [];
@@ -69,12 +86,22 @@ async function getInitialAssets(): Promise<AssetSummary[]> {
 
 async function getTopCallers(): Promise<TopCallerRow[]> {
   try {
-    const res = await fetch(`${BASE_URL}/api/callers?sort=win_rate&limit=5`, {
-      next: { revalidate: 300 },
+    const lbData = await fetchLeaderboard("30d", "win_rate", 5);
+    return lbData.authors.map((a) => {
+      const rawAvatar = a.author.avatar_url ?? "";
+      const avatarUrl = rawAvatar?.startsWith("/")
+        ? `${PASTE_TRADE_BASE}${rawAvatar}`
+        : rawAvatar || null;
+      const alpha = computeAlphaScore(a.stats.win_rate, a.stats.avg_pnl, a.stats.trade_count);
+      return {
+        handle: a.author.handle,
+        displayName: a.author.name ?? a.author.handle,
+        avatarUrl,
+        winRate: a.stats.win_rate,
+        alphaScore: alpha,
+        tier: callerTier(alpha) as "S" | "A" | "B" | "C",
+      };
     });
-    if (!res.ok) return [];
-    const data = await res.json() as { callers?: TopCallerRow[] };
-    return data.callers ?? [];
   } catch {
     return [];
   }

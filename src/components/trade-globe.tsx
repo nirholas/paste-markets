@@ -28,6 +28,18 @@ export default function TradeGlobe({ points, arcs, stats }: TradeGlobeProps) {
   const [initialized, setInitialized] = useState(false);
   const [selectedArc, setSelectedArc] = useState<TradeArc | null>(null);
 
+  // Suppress THREE.Clock deprecation warning (from three-globe internals, no upgrade available)
+  useEffect(() => {
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      if (typeof args[0] === "string" && args[0].includes("THREE.Clock")) return;
+      originalWarn.apply(console, args);
+    };
+    return () => {
+      console.warn = originalWarn;
+    };
+  }, []);
+
   // Initialize globe
   useEffect(() => {
     if (!containerRef.current || initialized) return;
