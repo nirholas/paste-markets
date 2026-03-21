@@ -11,6 +11,7 @@
     "db:sync": "tsx src/lib/seed-from-api.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
     "@vercel/og": "^0.11.1",
     "better-sqlite3": "^12.8.0",
     "next": "^15.5.14",
