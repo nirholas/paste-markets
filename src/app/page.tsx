@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SmartInput } from "@/components/smart-input";
 import { HomeFeed } from "@/components/home-feed";
+import HeroGlobe from "@/components/hero-globe";
 import type { AssetSummary } from "@/lib/data";
 import type { SiteStats } from "@/app/api/stats/route";
 
@@ -93,28 +94,28 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="relative flex flex-col items-center justify-center px-4 pt-16 sm:pt-24 pb-12 overflow-hidden">
+      {/* ── Hero w/ Globe ────────────────────────────────────────────── */}
+      <section className="relative flex flex-col items-center px-4 pt-4 pb-8 overflow-hidden">
         {/* Background gradient */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.12), transparent 60%)",
+            background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(99, 102, 241, 0.08), transparent 60%)",
           }}
         />
 
-        <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[#f5f5f7] mb-4 text-center leading-[1.1] tracking-tight">
-            Turn any tweet
-            <br />
-            <span className="bg-gradient-to-r from-[#0066FF] to-[#3385FF] bg-clip-text text-transparent">
-              into a trade.
-            </span>
-          </h1>
-          <p className="text-[#a1a1aa] text-base sm:text-lg mb-8 text-center max-w-md">
-            Track calls from CT forever. Real P&amp;L. No cap.
-          </p>
+        {/* Globe */}
+        <div className="relative w-full max-w-3xl" style={{ height: "420px" }}>
+          <HeroGlobe />
+          {/* Fade bottom edge into bg */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+            style={{ background: "linear-gradient(to top, #0a0a1a, transparent)" }}
+          />
+        </div>
 
+        {/* Input + links overlaid below globe */}
+        <div className="relative z-10 flex flex-col items-center w-full max-w-2xl -mt-8">
           <div className="w-full max-w-lg">
             <SmartInput />
           </div>
@@ -131,7 +132,7 @@ export default async function HomePage() {
 
           {/* Stats pills */}
           {stats && (
-            <div className="mt-8 flex flex-wrap justify-center items-center gap-3">
+            <div className="mt-6 flex flex-wrap justify-center items-center gap-3">
               <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-lg px-4 py-2 text-sm">
                 <span className="text-[#f5f5f7] font-semibold font-mono">
                   {stats.total_trades.toLocaleString()}
