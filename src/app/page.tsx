@@ -96,16 +96,15 @@ export default async function HomePage() {
 
       {/* ── Hero w/ Globe ────────────────────────────────────────────── */}
       <section className="relative flex flex-col items-center px-4 pt-4 pb-8 overflow-hidden">
-        {/* Background gradient */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(99, 102, 241, 0.08), transparent 60%)",
-          }}
-        />
+        {/* Large logo behind globe */}
+        <div className="absolute inset-0 flex items-start justify-center pointer-events-none" style={{ paddingTop: "120px" }}>
+          <span className="text-[#f5f5f7] font-bold tracking-tight select-none opacity-[0.07]" style={{ fontSize: "clamp(80px, 12vw, 160px)" }}>
+            paste<span className="text-[#0066FF]">.</span>markets
+          </span>
+        </div>
 
         {/* Globe */}
-        <div className="relative w-full max-w-3xl" style={{ height: "420px" }}>
+        <div className="relative z-[1] w-full max-w-3xl" style={{ height: "420px" }}>
           <HeroGlobe />
           {/* Fade bottom edge into bg */}
           <div

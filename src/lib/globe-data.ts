@@ -1,6 +1,6 @@
 import type { TradePoint, TradeArc, GlobeData } from "./globe-types";
 
-// Major financial cities — callers get deterministically assigned
+// Major financial cities — fallback for callers with no real location
 const CALLER_CITIES = [
   { name: "New York", lat: 40.71, lng: -74.01 },
   { name: "London", lat: 51.51, lng: -0.13 },
@@ -39,10 +39,9 @@ function hashString(s: string): number {
   return Math.abs(hash);
 }
 
-function getCallerLocation(handle: string): { lat: number; lng: number; cityName: string } {
+function getFallbackCallerLocation(handle: string): { lat: number; lng: number; cityName: string } {
   const hash = hashString(handle);
   const city = CALLER_CITIES[hash % CALLER_CITIES.length]!;
-  // Add jitter so callers in the same city don't overlap
   const jitterLat = ((hash % 100) / 100) * 2 - 1;
   const jitterLng = (((hash >> 8) % 100) / 100) * 2 - 1;
   return { lat: city.lat + jitterLat, lng: city.lng + jitterLng, cityName: city.name };
@@ -63,14 +62,54 @@ export interface TradeInput {
   direction?: string;
 }
 
-export function buildGlobeData(trades: TradeInput[]): GlobeData {
-  const callerMap = new Map<string, { loc: ReturnType<typeof getCallerLocation>; tradeCount: number }>();
+/** Real location from DB (lat/lng from geocoded X profile location) */
+export interface CallerLocation {
+  handle: string;
+  lat: number;
+  lng: number;
+  label?: string;
+}
+
+/**
+ * Build globe visualization data from trades.
+ *
+ * @param trades - Trade data from paste.trade
+ * @param realLocations - Optional map of handle → real lat/lng from DB.
+ *   When provided, callers are plotted at their actual X profile location.
+ *   Callers without a real location fall back to hash-based assignment.
+ */
+export function buildGlobeData(
+  trades: TradeInput[],
+  realLocations?: Map<string, CallerLocation>,
+): GlobeData {
+  const callerMap = new Map<string, {
+    loc: { lat: number; lng: number; cityName: string };
+    tradeCount: number;
+    isReal: boolean;
+  }>();
   const tickerMap = new Map<string, { loc: ReturnType<typeof getTickerLocation>; tradeCount: number }>();
 
   // Collect caller and ticker locations
   for (const trade of trades) {
     if (!callerMap.has(trade.author)) {
-      callerMap.set(trade.author, { loc: getCallerLocation(trade.author), tradeCount: 0 });
+      const real = realLocations?.get(trade.author);
+      if (real) {
+        // Use real geocoded location with small jitter to prevent overlap
+        const hash = hashString(trade.author);
+        const jitterLat = ((hash % 50) / 50) * 0.4 - 0.2;
+        const jitterLng = (((hash >> 8) % 50) / 50) * 0.4 - 0.2;
+        callerMap.set(trade.author, {
+          loc: { lat: real.lat + jitterLat, lng: real.lng + jitterLng, cityName: real.label ?? "Unknown" },
+          tradeCount: 0,
+          isReal: true,
+        });
+      } else {
+        callerMap.set(trade.author, {
+          loc: getFallbackCallerLocation(trade.author),
+          tradeCount: 0,
+          isReal: false,
+        });
+      }
     }
     callerMap.get(trade.author)!.tradeCount++;
 
@@ -85,11 +124,11 @@ export function buildGlobeData(trades: TradeInput[]): GlobeData {
   for (const [handle, data] of callerMap) {
     points.push({
       id: handle,
-      label: `@${handle}`,
+      label: `@${handle}${data.isReal ? ` (${data.loc.cityName})` : ""}`,
       lat: data.loc.lat,
       lng: data.loc.lng,
       size: Math.min(0.3 + data.tradeCount * 0.05, 1.2),
-      color: "#3b82f6", // accent blue
+      color: data.isReal ? "#3b82f6" : "#555568", // blue if real, grey if fallback
     });
   }
 
