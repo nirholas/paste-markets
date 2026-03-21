@@ -191,7 +191,7 @@ export default function Nav() {
         <div className="flex items-center gap-2 ml-auto">
           <Link
             href="/submit"
-            className="hidden sm:flex items-center gap-1.5 text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#0066FF] text-white hover:bg-[#0052CC] transition-colors"
+            className="hidden sm:flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-accent text-accent hover:bg-accent/10 transition-colors"
           >
             Submit Call
           </Link>

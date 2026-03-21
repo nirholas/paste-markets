@@ -185,7 +185,7 @@ Required env vars: `PASTE_TRADE_KEY`, `DATABASE_URL`. See [.env.example](.env.ex
 
 | File | Description |
 |------|-------------|
-| [SKILLS.md](SKILLS.md) | Skill commands and how `/trade` works |
+| [SKILL.md](SKILL.md) | Skill commands and how `/trade` works |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Internal pipeline architecture |
 | [CLAUDE.md](CLAUDE.md) | Agent context, design system, and codebase reference |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Fly.io deployment runbook |

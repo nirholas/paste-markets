@@ -11,7 +11,7 @@
 ## First Deploy
 
 ```bash
-cd paste-dashboard
+cd paste-markets
 
 # 1. Create the Fly app (links fly.toml to a real app)
 fly launch --no-deploy
@@ -21,8 +21,10 @@ fly volumes create data   --size 1 --region ord
 fly volumes create config --size 1 --region ord
 
 # 3. Set secrets (never stored in fly.toml or git)
+# See .env.example for full list of available env vars
 fly secrets set \
   PASTE_TRADE_KEY=your_paste_trade_key_here \
+  DATABASE_URL=your_neon_postgres_connection_string \
   ANTHROPIC_API_KEY=your_anthropic_key_here \
   NEXT_PUBLIC_BASE_URL=https://paste-markets.fly.dev
 
@@ -85,7 +87,7 @@ X sessions expire. When scraping starts returning auth errors, repeat Step 1 and
 ## Redeploy After Code Changes
 
 ```bash
-cd paste-dashboard
+cd paste-markets
 fly deploy
 ```
 
@@ -121,17 +123,15 @@ fly scale vm shared-cpu-2x
 
 ---
 
-## SQLite Data
+## Database
 
-SQLite lives at `/app/data/paste-markets.sqlite` on the persistent volume. To inspect it:
+The primary database is **Neon Postgres** (serverless), configured via the `DATABASE_URL` env var. Data persists in Neon's cloud -- no local SQLite files on the Fly.io VM.
 
-```bash
-fly ssh console
-sqlite3 /app/data/paste-markets.sqlite
-```
-
-To back it up locally:
+To connect directly:
 
 ```bash
-fly sftp get /app/data/paste-markets.sqlite ./backup.sqlite
+# Use the DATABASE_URL from your secrets
+psql "$DATABASE_URL"
 ```
+
+Local data (config files, session cookies) lives on the persistent `/app/data` and `/app/config` volumes.
