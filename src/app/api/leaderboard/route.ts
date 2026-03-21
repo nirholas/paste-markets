@@ -120,29 +120,43 @@ export async function GET(request: NextRequest) {
       // For 24h window, use 7d data and let the API consumer know
       // (rankings table stores 7d/30d/all — 24h maps to 7d with a note)
       const dbWindow = window === "24h" ? "7d" : window;
-      let entries = await data.getLeaderboard(dbWindow, limit, 0, platform);
+      // Fetch extra rows so we can filter by min_trades before paginating
+      let entries = await data.getLeaderboard(dbWindow, limit + offset + 200, 0, platform);
 
       // Auto-seed on first visit if leaderboard is empty
       if (entries.length === 0) {
         console.log("[api/leaderboard] Leaderboard empty — triggering seed sync...");
         const { seedFromApi } = await import("@/lib/seed-from-api");
         await seedFromApi();
-        entries = await data.getLeaderboard(dbWindow, limit, 0, platform);
+        entries = await data.getLeaderboard(dbWindow, limit + offset + 200, 0, platform);
+      }
+
+      // Filter by minimum trades
+      if (minTrades > 0) {
+        entries = entries.filter((e) => e.total_trades >= minTrades);
       }
 
       // Sort entries per requested sort param
       if (sort === "avg_pnl") {
-        entries = [...entries].sort((a, b) => b.avg_pnl - a.avg_pnl);
+        entries = [...entries].sort((a, b) => order === "asc" ? a.avg_pnl - b.avg_pnl : b.avg_pnl - a.avg_pnl);
       } else if (sort === "total_trades") {
-        entries = [...entries].sort((a, b) => b.total_trades - a.total_trades);
+        entries = [...entries].sort((a, b) => order === "asc" ? a.total_trades - b.total_trades : b.total_trades - a.total_trades);
+      } else {
+        // win_rate
+        if (order === "asc") {
+          entries = [...entries].sort((a, b) => a.win_rate - b.win_rate);
+        }
       }
-      // win_rate is already the default sort from getLeaderboard
 
-      const mapped = entries.map((e, i) => mapEntry(e, i, platform));
+      const total = entries.length;
+      // Apply offset/limit pagination
+      entries = entries.slice(offset, offset + limit);
+
+      const mapped = entries.map((e, i) => mapEntry(e, i + offset, platform));
 
       const response = NextResponse.json({
         entries: mapped,
-        total: mapped.length,
+        total,
         window,
         sort,
         platform,
