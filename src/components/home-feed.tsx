@@ -433,11 +433,10 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
       if (filters.liveOnly) params.set("liveOnly", "true");
       if (filters.asset) params.set("asset", filters.asset);
       if (tab === "top") params.set("timeframe", topTimeframe);
-      const cur = overrideCursor !== undefined ? overrideCursor : cursor;
-      if (cur) params.set("cursor", cur);
+      if (overrideCursor) params.set("cursor", overrideCursor);
       return `/api/feed?${params}`;
     },
-    [tab, filters, topTimeframe, cursor],
+    [tab, filters, topTimeframe],
   );
 
   // ── Initial load / tab/filter change ─────────────────────────────
