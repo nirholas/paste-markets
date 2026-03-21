@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { SearchTrigger } from "@/components/search-bar";
 import NotificationBell from "@/components/notification-bell";
-import { WalletButton } from "@/components/wallet-button";
 
 const NAV_LINKS = [
   { href: "/feed", label: "Feed" },
@@ -197,7 +196,6 @@ export default function Nav() {
           </Link>
           <SearchTrigger />
           <NotificationBell />
-          <WalletButton />
           <MobileMenu pathname={pathname} />
         </div>
       </div>
