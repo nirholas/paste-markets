@@ -34,7 +34,7 @@ body {
 }
 
 .ticker-track {
-  animation: ticker-scroll 40s linear infinite;
+  animation: ticker-scroll 300s linear infinite;
   width: max-content;
 }
 
