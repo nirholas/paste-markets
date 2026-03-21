@@ -155,8 +155,8 @@ export default async function AuthorPage({ params }: PageProps) {
     return <NotFound handle={handle} />;
   }
 
-  // Record the view
-  await recordView(handle, "profile");
+  // Record the view (fire-and-forget, don't block page render)
+  recordView(handle, "profile").catch(() => {});
 
   // Re-read author for rank + last_fetched after potential sync
   const refreshed = await getOrCreateAuthor(handle);

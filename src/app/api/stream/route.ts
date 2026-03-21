@@ -18,9 +18,13 @@ export const runtime = "nodejs";
 
 export async function GET(): Promise<Response> {
   // Auto-populate watchlist on first connection if empty
-  const callers = await getEnabledWatched();
-  if (callers.length === 0) {
-    await autoPopulateFromLeaderboard();
+  try {
+    const callers = await getEnabledWatched();
+    if (callers.length === 0) {
+      await autoPopulateFromLeaderboard();
+    }
+  } catch (err) {
+    console.error("[api/stream] Failed to check watchlist:", err);
   }
 
   // Start polling loop if not already running
@@ -38,7 +42,12 @@ export async function GET(): Promise<Response> {
   const stream = new ReadableStream({
     async start(controller) {
       // Send initial connection event
-      const stats = await getWatchlistStats();
+      let stats: Awaited<ReturnType<typeof getWatchlistStats>> | null = null;
+      try {
+        stats = await getWatchlistStats();
+      } catch (err) {
+        console.error("[api/stream] Failed to get watchlist stats:", err);
+      }
       controller.enqueue(
         encoder.encode(
           `event: connected\ndata: ${JSON.stringify({
