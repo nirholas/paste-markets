@@ -21,3 +21,6 @@ dist/
 *.keypair
 *-keypair.json
 test-ledger/
+
+# Cloned repos (do not commit)
+agent-payments-sdk/
