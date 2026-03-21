@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import type { AlphaTrade, Tier } from "@/app/api/alpha/route";
+import { TimeAgo } from "@/components/time-ago";
 
 // ─── EV Bar ────────────────────────────────────────────────────────────────
 
@@ -68,16 +69,6 @@ function PnlBadge({ pnl }: { pnl: number | null }) {
 
 // ─── Time ──────────────────────────────────────────────────────────────────
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60_000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
 // ─── Trade Row ─────────────────────────────────────────────────────────────
 
 function TradeRow({ trade, rank }: { trade: AlphaTrade; rank: number }) {
@@ -134,7 +125,7 @@ function TradeRow({ trade, rank }: { trade: AlphaTrade; rank: number }) {
             {trade.instrument && trade.instrument !== trade.ticker && (
               <span className="text-[10px] text-[#555568] font-mono">{trade.instrument}</span>
             )}
-            <span className="text-[10px] text-[#555568] font-mono">{timeAgo(trade.postedAt)}</span>
+            <TimeAgo date={trade.postedAt} className="text-[10px] text-[#555568] font-mono" />
           </div>
 
           {/* Thesis/quote */}
@@ -221,7 +212,7 @@ function FilterBar({
       <div className="flex items-center gap-3 text-[10px] text-[#555568] font-mono">
         {loading && <span className="text-[#3b82f6]">refreshing...</span>}
         <span>{count} signals</span>
-        {updatedAt && <span>updated {timeAgo(updatedAt)}</span>}
+        {updatedAt && <span>updated <TimeAgo date={updatedAt} /></span>}
       </div>
     </div>
   );

@@ -18,27 +18,27 @@ paste.trade is built to fix that: extract the thesis, lock the price, publish it
 
 ```
  source                         trade card
-┌─────────────────────┐       ┌──────────────────────────────────┐
-│ @kansasangus         │       │ @kansasangus · Mar 18, 2026      │
-│                      │       │                                  │
-│ "Cow/calf markets    │       │ "Cow/calf is just beginning      │
-│  beginning to get    │  ──>  │  to get wild"                    │
-│  wild"               │       │                                  │
-│                      │       │  1  Severe drought across        │
-│                      │       │     Southern Plains              │
-│                      │       │  2  Herd liquidation + strike    │
-│                      │       │     shrink supply                │
-│                      │       │  3  DBA holds cattle & grain     │
-│                      │       │     exposed to same drought      │
-│                      │       │                                  │
-│                      │       │  DBA  LONG           +0.3%       │
-│                      │       │  $26.88 → $26.97     1 day ago   │
-└─────────────────────┘       └──────────────────────────────────┘
++-----------------------+       +--------------------------------------+
+| @kansasangus           |       | @kansasangus . Mar 18, 2026          |
+|                        |       |                                      |
+| "Cow/calf markets      |       | "Cow/calf is just beginning          |
+|  beginning to get      |  -->  |  to get wild"                        |
+|  wild"                 |       |                                      |
+|                        |       |  1  Severe drought across             |
+|                        |       |     Southern Plains                   |
+|                        |       |  2  Herd liquidation + strike         |
+|                        |       |     shrink supply                     |
+|                        |       |  3  DBA holds cattle & grain          |
+|                        |       |     exposed to same drought           |
+|                        |       |                                      |
+|                        |       |  DBA  LONG           +0.3%           |
+|                        |       |  $26.88 -> $26.97     1 day ago       |
++-----------------------+       +--------------------------------------+
 ```
 
 Two timestamps on every trade:
-- **author price** — the moment the source was originally published (extracted from source metadata, not when you ran `/trade`)
-- **paste price** — the moment it entered paste.trade
+- **author price** -- the moment the source was originally published (extracted from source metadata, not when you ran `/trade`)
+- **paste price** -- the moment it entered paste.trade
 
 This distinction matters. It's the difference between "I called this" and "I called this before it moved."
 
@@ -48,26 +48,26 @@ This distinction matters. It's the difference between "I called this" and "I cal
 
 ```
 paste a URL or type a thesis
-    │
-    ▼
-read the source ── tweet, video, article, PDF, screenshot
-    │
-    ▼
-find tradeable ideas ── 1 to 5 per source
-    │
-    ▼
-research each one ── web search, instrument discovery
-    │
- ┌──┼──┐
- ▼  ▼  ▼
-compare candidates ── stocks, perps, prediction markets
- └──┼──┘
-    │
-    ▼
+    |
+    v
+read the source -- tweet, video, article, PDF, screenshot
+    |
+    v
+find tradeable ideas -- 1 to 5 per source
+    |
+    v
+research each one -- web search, instrument discovery
+    |
+ +--+--+
+ v  v  v
+compare candidates -- stocks, perps, prediction markets
+ +--+--+
+    |
+    v
 pick best fit, explain why, lock price
-    │
-    ▼
-post to paste.trade ── P&L tracks from here
+    |
+    v
+post to paste.trade -- P&L tracks from here
 ```
 
 ---
@@ -104,8 +104,8 @@ GET https://paste.trade/api/search?ticker=NVDA
 
 | Param    | Values                  | Default |
 |----------|-------------------------|---------|
-| `author` | Twitter handle          | —       |
-| `ticker` | ticker symbol           | —       |
+| `author` | Twitter handle          | --      |
+| `ticker` | ticker symbol           | --      |
 | `top`    | `7d`, `30d`, `90d`, `all` | `all`   |
 | `limit`  | integer                 | 50      |
 
@@ -132,42 +132,50 @@ Response shape:
 
 The API is designed to be built on. Here's what's already been built:
 
-### [paste.rank](https://github.com/nirholas/paste-markets)
+### [paste.markets](https://github.com/nirholas/paste-markets)
 
-A full leaderboard dashboard on top of the paste.trade API:
+A full dashboard with 59 pages, 94 API routes, and 58 components on top of the paste.trade API:
 
-- **Leaderboard** — CT traders ranked by real win rate and avg P&L
-- **Author Scorecards** — full trade history, best call, win rate bar
-- **Head-to-Head** — 1v1 any two traders
-- **CT Wrapped** — Spotify-style trading report cards
-- **Caller Circle** — Twitter Circle-style visualization of top callers, shareable PNG
-- **What's the Trade?** — paste any URL, AI finds the trade
+- **Leaderboard** -- CT traders ranked by real win rate and avg P&L, with timeframe/venue/ticker filters
+- **Author Scorecards** -- full trade history, P&L chart, badges, reputation score, integrity scoring
+- **Head-to-Head** -- 1v1 any two traders across 6 dimensions
+- **CT Wrapped** -- Spotify-style trading personality cards with S-F grading
+- **Caller Circle** -- Twitter Circle-style visualization of top callers
+- **What's the Trade?** -- paste any URL, AI finds and routes the trade
+- **Asset Pages** -- per-ticker sentiment, top callers, bull/bear ratio
+- **Wagers** -- tip-based wagering with Solana settlement
+- **Fade Trading** -- contrarian signal tracking
+- **Live Signals** -- real-time trade alerts via WebSocket
+- **Public API** -- V1 + V2 REST API with auth and rate limiting
+- **Telegram Bot** -- automated alert delivery
 
 ```
 GET /api/author/{handle}
 GET /api/leaderboard?timeframe=30d&sort=win_rate
 GET /api/circle?timeframe=30d
+GET /api/feed?sort=new&limit=20
+GET /api/trades/{id}
 ```
 
-Built with Next.js. Dark Bloomberg terminal aesthetic. Everything server-rendered and cacheable.
+Built with Next.js 15, React 19, Neon Postgres. Dark Bloomberg terminal aesthetic. Everything server-rendered and cacheable.
 
 ---
 
 ## Why it's built this way
 
-Claude Code and OpenClaw are the tools we use every day. Making it `/trade [anything]` means zero friction — you're one command away from a tracked trade from any source.
+Claude Code and OpenClaw are the tools we use every day. Making it `/trade [anything]` means zero friction -- you're one command away from a tracked trade from any source.
 
 ```
-┌─────────────────────────┐      ┌─────────────────────────────┐
-│  the skill               │      │  paste.trade                 │
-│                          │      │                              │
-│  reads sources           │ ───> │  tracks P&L                  │
-│  extracts theses         │ ───> │  streams progress live       │
-│  researches instruments  │ ───> │  explains reasoning          │
-│  explains reasoning      │ ───> │  publishes trade cards       │
-│                          │      │  saves to your profile       │
-│  runs in your agent      │      │                              │
-└─────────────────────────┘      └─────────────────────────────┘
++---------------------------+      +-------------------------------+
+|  the skill                 |      |  paste.trade                   |
+|                            |      |                                |
+|  reads sources             | ---> |  tracks P&L                    |
+|  extracts theses           | ---> |  streams progress live         |
+|  researches instruments    | ---> |  explains reasoning            |
+|  explains reasoning        | ---> |  publishes trade cards         |
+|                            |      |  saves to your profile         |
+|  runs in your agent        |      |                                |
++---------------------------+      +-------------------------------+
 ```
 
 ---
@@ -175,18 +183,17 @@ Claude Code and OpenClaw are the tools we use every day. Making it `/trade [anyt
 ## Works with
 
 ```
-sources:   tweets · youtube · podcasts · articles · PDFs · screenshots · typed theses
-venues:    Robinhood (stocks) · Hyperliquid (perps) · Polymarket (prediction markets)
-agents:    Claude Code · Codex · OpenClaw
+sources:   tweets . youtube . podcasts . articles . PDFs . screenshots . typed theses
+venues:    Robinhood (stocks) . Hyperliquid (perps) . Polymarket (prediction markets)
+agents:    Claude Code . Codex . OpenClaw
 ```
 
 ---
 
 ## Prerequisites
 
-- [Bun](https://bun.sh)
-- `yt-dlp` for YouTube (skill will offer to install on first run)
-- Copy [env.example](env.example) to `.env` and fill in your keys
+- Copy [.env.example](.env.example) to `.env` and fill in your keys
+- `yt-dlp` for YouTube sources (skill will offer to install on first run)
 
 ---
 
@@ -198,4 +205,4 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how the skill pipeline works, how aut
 
 ## Links
 
-[paste.trade](https://paste.trade) · [ARCHITECTURE.md](ARCHITECTURE.md) · [Changelog](https://paste.trade/#changelog) · [@frankdegods](https://x.com/frankdegods)
+[paste.trade](https://paste.trade) . [ARCHITECTURE.md](ARCHITECTURE.md) . [@frankdegods](https://x.com/frankdegods)

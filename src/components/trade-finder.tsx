@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ExecuteButton } from "@/components/execution/execute-button";
+import { TimeAgo } from "@/components/time-ago";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors TradeExtraction from trade-extractor.ts)
@@ -95,15 +96,6 @@ function venueToPayload(platform: string): { platform: string; instrument: strin
   return { platform: "hyperliquid", instrument: "perps" };
 }
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 // ---------------------------------------------------------------------------
 // ConfidenceBar
@@ -401,9 +393,7 @@ function RecentExtractions({ extractions }: { extractions: RecentExtraction[] })
               <span className="text-xs text-text-secondary">
                 {ext.thesis_count} trade{ext.thesis_count !== 1 ? "s" : ""}
               </span>
-              <span className="text-xs text-text-muted">
-                {timeAgo(ext.created_at)}
-              </span>
+              <TimeAgo date={ext.created_at} className="text-xs text-text-muted" />
             </div>
           </a>
         ))}
