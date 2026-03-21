@@ -140,7 +140,7 @@ function TradeCard({ data }: { data: SubmitResult }) {
 
       <Link
         href={`/markets/${data.source_id}`}
-        className="block w-full text-center bg-accent text-white px-6 py-3 rounded hover:bg-blue-500 transition text-sm font-bold"
+        className="block w-full text-center bg-accent text-white px-6 py-3 rounded-lg hover:bg-blue-500 transition text-sm font-bold"
       >
         View Live P&L &rarr;
       </Link>
@@ -419,7 +419,7 @@ export default function SubmitPage() {
             <button
               type="submit"
               disabled={loading || !url.trim()}
-              className="bg-accent text-white px-6 py-3 rounded hover:bg-blue-500 transition font-mono text-sm font-bold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-accent text-white px-6 py-3 rounded-lg hover:bg-blue-500 transition font-mono text-sm font-bold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Track This Trade
             </button>
@@ -531,7 +531,7 @@ export default function SubmitPage() {
           <button
             type="submit"
             disabled={nomLoading || !handle.trim()}
-            className="w-full bg-accent text-white px-6 py-3 rounded hover:bg-blue-500 transition font-mono text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-accent text-white px-6 py-3 rounded-lg hover:bg-blue-500 transition font-mono text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {nomLoading ? "Submitting..." : "Nominate Caller"}
           </button>
@@ -553,7 +553,7 @@ export default function SubmitPage() {
                 href={shareUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block border border-accent text-accent px-4 py-2 rounded text-xs font-bold hover:bg-accent hover:text-white transition"
+                className="inline-block border border-accent text-accent px-4 py-2 rounded-lg text-xs font-bold hover:bg-accent hover:text-white transition"
               >
                 Share to boost
               </a>
@@ -612,7 +612,7 @@ export default function SubmitPage() {
                   <button
                     onClick={() => handleUpvote(s.id)}
                     disabled={hasVoted}
-                    className={`flex flex-col items-center min-w-[48px] rounded px-2 py-1 text-xs transition ${
+                    className={`flex flex-col items-center min-w-[48px] rounded-lg px-2 py-1 text-xs transition ${
                       hasVoted
                         ? "border border-win/40 text-win cursor-default"
                         : "border border-border text-text-muted hover:border-win hover:text-win cursor-pointer"
