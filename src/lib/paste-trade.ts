@@ -439,21 +439,37 @@ export async function getTradeById(
   tradeId: string,
   authorHint?: string,
 ): Promise<PasteTradeFullTrade | null> {
-  const apiKey = process.env["PASTE_TRADE_KEY"];
+  const apiKey = getApiKey();
   if (!apiKey) return null;
 
-  // Fast path: if we have an author hint, search that author's trades
+  // Fast path: direct trade lookup via /api/trades/{id}
+  try {
+    const res = await fetch(`${BASE_URL}/api/trades/${encodeURIComponent(tradeId)}`, {
+      headers: authHeaders(apiKey),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const raw = await res.json() as Record<string, unknown>;
+      if (raw["trade_id"] || raw["ticker"]) {
+        return normalizeFullTrade(raw);
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  // Fallback: search by author hint
   if (authorHint) {
     try {
       const trades = await searchFullTrades({ author: authorHint, top: "all", limit: 100 });
       const found = trades.find((t) => t.trade_id === tradeId);
       if (found) return found;
     } catch {
-      // fall through to direct lookup
+      // fall through
     }
   }
 
-  // Try direct lookup via trade_id query param (may or may not be supported by the API)
+  // Last resort: search by trade_id param
   try {
     const url = new URL("/api/search", BASE_URL);
     url.searchParams.set("trade_id", tradeId);
@@ -465,4 +481,403 @@ export async function getTradeById(
   }
 
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Feed — public endpoint with hot/new/top sorting
+// ---------------------------------------------------------------------------
+
+export async function fetchPasteTradeFeed(params: FeedParams): Promise<FeedResult> {
+  const url = new URL("/api/feed", BASE_URL);
+  url.searchParams.set("sort", params.sort);
+  if (params.limit) url.searchParams.set("limit", String(params.limit));
+  if (params.window) url.searchParams.set("window", params.window);
+  if (params.lens) url.searchParams.set("lens", params.lens);
+  if (params.author) url.searchParams.set("author", params.author);
+  if (params.platform) url.searchParams.set("platform", params.platform);
+  if (params.direction) url.searchParams.set("direction", params.direction);
+  if (params.cursor) url.searchParams.set("cursor", params.cursor);
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { items: [], next_cursor: null, total: 0 };
+    return await res.json() as FeedResult;
+  } catch {
+    return { items: [], next_cursor: null, total: 0 };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Leaderboard — public endpoint with rankings
+// ---------------------------------------------------------------------------
+
+export async function fetchPasteTradeLeaderboard(
+  window = "7d",
+  sort = "avg_pnl",
+  limit = 20,
+): Promise<LeaderboardResult> {
+  const url = new URL("/api/leaderboard", BASE_URL);
+  url.searchParams.set("window", window);
+  url.searchParams.set("sort", sort);
+  url.searchParams.set("limit", String(limit));
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      return { authors: [], window, sort, computed_at: new Date().toISOString() };
+    }
+    return await res.json() as LeaderboardResult;
+  } catch {
+    return { authors: [], window, sort, computed_at: new Date().toISOString() };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Stats — platform-wide stats (public, no auth)
+// ---------------------------------------------------------------------------
+
+export async function fetchPasteTradeStats(): Promise<PlatformStats | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/stats`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as PlatformStats;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Prices — live prices for trade IDs (public, no auth)
+// ---------------------------------------------------------------------------
+
+export async function fetchPasteTradePrices(
+  tradeIds: string[],
+): Promise<Record<string, PriceData>> {
+  if (tradeIds.length === 0) return {};
+
+  const url = new URL("/api/prices", BASE_URL);
+  url.searchParams.set("ids", tradeIds.join(","));
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+      cache: "no-store",
+    });
+    if (!res.ok) return {};
+    return await res.json() as Record<string, PriceData>;
+  } catch {
+    return {};
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sources — get source detail or create a source (auth required)
+// ---------------------------------------------------------------------------
+
+export async function fetchSource(sourceId: string): Promise<SourceResult | null> {
+  try {
+    const res = await fetch(
+      `${BASE_URL}/api/sources/${encodeURIComponent(sourceId)}`,
+      {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (!res.ok) return null;
+    return await res.json() as SourceResult;
+  } catch {
+    return null;
+  }
+}
+
+export async function createSource(params: CreateSourceParams): Promise<CreateSourceResult | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/sources`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(apiKey),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as CreateSourceResult;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trade submission (auth required)
+// ---------------------------------------------------------------------------
+
+export async function submitTrade(params: SubmitTradeParams): Promise<SubmitTradeResult | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/trades`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(apiKey),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as SubmitTradeResult;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trades list (public, no auth)
+// ---------------------------------------------------------------------------
+
+export interface TradesListParams {
+  limit?: number;
+  platform?: string;
+  cursor?: string;
+}
+
+export interface TradesListResult {
+  items: Record<string, unknown>[];
+  next_cursor: string | null;
+  total: number;
+}
+
+export async function fetchTradesList(params: TradesListParams = {}): Promise<TradesListResult> {
+  const url = new URL("/api/trades", BASE_URL);
+  if (params.limit) url.searchParams.set("limit", String(params.limit));
+  if (params.platform) url.searchParams.set("platform", params.platform);
+  if (params.cursor) url.searchParams.set("cursor", params.cursor);
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { items: [], next_cursor: null, total: 0 };
+    return await res.json() as TradesListResult;
+  } catch {
+    return { items: [], next_cursor: null, total: 0 };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Skill: Route — validate instrument and get pricing across venues
+// ---------------------------------------------------------------------------
+
+export async function skillRoute(params: SkillRouteParams): Promise<SkillRouteResult | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/skill/route`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(apiKey),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as SkillRouteResult;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Skill: Discover — instrument discovery across venues
+// ---------------------------------------------------------------------------
+
+export async function skillDiscover(params: SkillDiscoverParams): Promise<SkillDiscoverResult | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/skill/discover`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(apiKey),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as SkillDiscoverResult;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Health check
+// ---------------------------------------------------------------------------
+
+export async function fetchHealth(): Promise<{ ok: boolean; service: string; ts: number } | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as { ok: boolean; service: string; ts: number };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Source events — push live processing events (auth required)
+// ---------------------------------------------------------------------------
+
+export interface SourceEventParams {
+  type: string;
+  data?: Record<string, unknown>;
+}
+
+export async function pushSourceEvent(
+  sourceId: string,
+  params: SourceEventParams,
+): Promise<boolean> {
+  const apiKey = getApiKey();
+  if (!apiKey) return false;
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/api/sources/${encodeURIComponent(sourceId)}/events`,
+      {
+        method: "POST",
+        headers: { ...authHeaders(apiKey), "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// API key provisioning (no auth required)
+// ---------------------------------------------------------------------------
+
+export interface ProvisionKeyResult {
+  api_key: string;
+  [key: string]: unknown;
+}
+
+export async function provisionApiKey(): Promise<ProvisionKeyResult | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/keys`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as ProvisionKeyResult;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auth session link — browser sign-in URL (auth required)
+// ---------------------------------------------------------------------------
+
+export interface SessionLinkResult {
+  url: string;
+  [key: string]: unknown;
+}
+
+export async function createSessionLink(): Promise<SessionLinkResult | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/auth/session-link`, {
+      method: "POST",
+      headers: { ...authHeaders(apiKey), "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as SessionLinkResult;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// OG share image URL helper (no fetch — just builds the URL)
+// ---------------------------------------------------------------------------
+
+export function getShareImageUrl(
+  tradeId: string,
+  format: "landscape" | "square" = "landscape",
+): string {
+  return `${BASE_URL}/api/og/share/${encodeURIComponent(tradeId)}?format=${format}`;
+}
+
+// ---------------------------------------------------------------------------
+// Enhanced search with full params and pagination
+// ---------------------------------------------------------------------------
+
+export async function searchPasteTradeAdvanced(params: SearchParams): Promise<SearchResult> {
+  const apiKey = getApiKey();
+  if (!apiKey) return { trades: [], total: 0, next_cursor: null };
+
+  const url = new URL("/api/search", BASE_URL);
+  if (params.author) url.searchParams.set("author", params.author);
+  if (params.ticker) url.searchParams.set("ticker", params.ticker);
+  if (params.q) url.searchParams.set("q", params.q);
+  if (params.top) url.searchParams.set("top", params.top);
+  if (params.direction) url.searchParams.set("direction", params.direction);
+  if (params.platform) url.searchParams.set("platform", params.platform);
+  if (params.limit) url.searchParams.set("limit", String(params.limit));
+  if (params.cursor) url.searchParams.set("cursor", params.cursor);
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: authHeaders(apiKey),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { trades: [], total: 0, next_cursor: null };
+
+    const body = await res.json() as Record<string, unknown>;
+    const rawItems = Array.isArray(body["trades"])
+      ? (body["trades"] as Record<string, unknown>[])
+      : Array.isArray(body["data"])
+        ? (body["data"] as Record<string, unknown>[])
+        : Array.isArray(body)
+          ? (body as unknown as Record<string, unknown>[])
+          : [];
+
+    return {
+      trades: rawItems.map(normalizeFullTrade),
+      total: typeof body["total"] === "number" ? body["total"] : rawItems.length,
+      next_cursor: typeof body["next_cursor"] === "string" ? body["next_cursor"] : null,
+    };
+  } catch {
+    return { trades: [], total: 0, next_cursor: null };
+  }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { computeAlphaScore, callerTier } from "@/lib/alpha";
+import { fetchLeaderboard } from "@/lib/upstream";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ function mapEntry(e: {
   avg_pnl: number;
   total_trades: number;
   total_pnl?: number | null;
+  best_ticker?: string | null;
+  avatar_url?: string | null;
   streak?: number;
 }, idx: number, platform: string) {
   const alpha = computeAlphaScore(e.win_rate, e.avg_pnl, e.total_trades);
@@ -31,9 +34,9 @@ function mapEntry(e: {
     avgPnl: e.avg_pnl,
     totalTrades: e.total_trades,
     totalPnl: e.total_pnl ?? null,
-    bestTicker: null as string | null,
+    bestTicker: e.best_ticker ?? null,
     platform: platform !== "all" ? platform : null,
-    avatarUrl: null as string | null,
+    avatarUrl: e.avatar_url ?? null,
     alphaScore: alpha,
     tier: callerTier(alpha),
     streak: e.streak ?? 0,
@@ -78,7 +81,7 @@ export async function GET(request: NextRequest) {
   try {
     const data = await import("@/lib/data");
 
-    // Ticker-specific leaderboard
+    // Ticker-specific leaderboard (local DB only — upstream doesn't support ticker filter)
     if (ticker) {
       const entries = await data.getTickerLeaderboard(ticker, limit);
       const mapped = entries.map((e, i) => mapEntry(e, i, platform));
@@ -95,7 +98,7 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    // Streak leaderboard
+    // Streak leaderboard (local DB only)
     if (mode === "streaks") {
       const entries = await data.getStreakLeaderboard(limit, 0);
       const mapped = entries.map((e, i) => mapEntry(e, i, platform));
@@ -112,10 +115,61 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    // For 24h window, use 7d data and let the API consumer know
-    // (rankings table stores 7d/30d/all — 24h maps to 7d with a note)
+    // Primary: upstream paste.trade /api/leaderboard (official rankings)
+    const upstreamSort = sort === "total_trades" ? "avg_pnl" : sort;
+    const lbData = await fetchLeaderboard(window === "24h" ? "7d" : window, upstreamSort, limit + offset + 200);
+
+    if (lbData.authors.length > 0) {
+      let entries = lbData.authors.map((a) => ({
+        handle: a.author.handle,
+        rank: a.rank,
+        prev_rank: null as number | null,
+        win_rate: a.stats.win_rate,
+        avg_pnl: a.stats.avg_pnl,
+        total_trades: a.stats.trade_count,
+        total_pnl: a.stats.total_pnl ?? null,
+        best_ticker: a.stats.best_ticker ?? null,
+        avatar_url: a.author.avatar_url ?? null,
+        streak: 0,
+      }));
+
+      // Platform filter
+      // (upstream doesn't filter by platform, so we keep all for now)
+
+      // Filter by minimum trades
+      if (minTrades > 0) {
+        entries = entries.filter((e) => e.total_trades >= minTrades);
+      }
+
+      // Sort entries per requested sort param
+      if (sort === "avg_pnl") {
+        entries = [...entries].sort((a, b) => order === "asc" ? a.avg_pnl - b.avg_pnl : b.avg_pnl - a.avg_pnl);
+      } else if (sort === "total_trades") {
+        entries = [...entries].sort((a, b) => order === "asc" ? a.total_trades - b.total_trades : b.total_trades - a.total_trades);
+      } else {
+        entries = [...entries].sort((a, b) => order === "asc" ? a.win_rate - b.win_rate : b.win_rate - a.win_rate);
+      }
+
+      const total = entries.length;
+      entries = entries.slice(offset, offset + limit);
+
+      const mapped = entries.map((e, i) => mapEntry(e, i + offset, platform));
+
+      const response = NextResponse.json({
+        entries: mapped,
+        total,
+        window,
+        sort,
+        platform,
+        source: "upstream",
+        updatedAt: lbData.computed_at,
+      });
+      response.headers.set("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
+      return response;
+    }
+
+    // Fallback: local database
     const dbWindow = window === "24h" ? "7d" : window;
-    // Fetch extra rows so we can filter by min_trades before paginating
     let entries = await data.getLeaderboard(dbWindow, limit + offset + 200, 0, platform);
 
     // Auto-seed on first visit if leaderboard is empty
@@ -155,6 +209,7 @@ export async function GET(request: NextRequest) {
       window,
       sort,
       platform,
+      source: "local",
       updatedAt: new Date().toISOString(),
     });
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchSource } from "@/lib/paste-trade";
 
 export const dynamic = "force-dynamic";
 
@@ -7,9 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ source_id: string }> }
 ) {
   const { source_id } = await params;
-  const res = await fetch(`https://paste.trade/api/sources/${source_id}`, {
-    headers: { Authorization: `Bearer ${process.env.PASTE_TRADE_KEY}` },
-  });
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+  const data = await fetchSource(source_id);
+  if (!data) {
+    return NextResponse.json({ error: "Source not found" }, { status: 404 });
+  }
+  return NextResponse.json(data);
 }

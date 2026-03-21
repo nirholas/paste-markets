@@ -1,14 +1,28 @@
 /**
  * Resilient paste.trade API client with automatic fallbacks.
  *
- * paste.trade exposes two relevant endpoint families:
- *   /api/leaderboard  — pre-computed rankings (may not exist)
- *   /api/trades       — live trade feed (may not exist)
- *   /api/search       — always exists (confirmed)
+ * paste.trade exposes multiple endpoint families:
+ *   /api/leaderboard  — pre-computed rankings
+ *   /api/trades       — live trade list
+ *   /api/feed         — curated feed with sort=new|top
+ *   /api/prices       — live prices by trade ID
+ *   /api/stats        — platform-wide stats
+ *   /api/search       — always exists (confirmed, auth required)
  *
  * When the primary endpoints are unavailable we fall back to /api/search
  * and compute the same data in-memory.
  */
+
+import {
+  fetchPasteTradeFeed,
+  fetchPasteTradeLeaderboard,
+  fetchPasteTradeStats,
+  fetchPasteTradePrices,
+  type FeedResult,
+  type LeaderboardAuthor,
+  type PlatformStats,
+  type PriceData,
+} from "@/lib/paste-trade";
 
 const BASE = "https://paste.trade";
 
@@ -41,6 +55,7 @@ export interface LeaderboardData {
 
 export interface RawTrade {
   id?: string | null;
+  trade_id?: string | null;
   ticker?: string | null;
   direction?: string | null;
   platform?: string | null;
@@ -49,6 +64,7 @@ export interface RawTrade {
   author_avatar_url?: string | null;
   headline_quote?: string | null;
   thesis?: string | null;
+  source_id?: string | null;
   source_url?: string | null;
   created_at?: string | null;
   posted_at?: string | null;
@@ -58,6 +74,7 @@ export interface RawTrade {
   pnlPct?: number | null;
   win_rate?: number | null;
   market_question?: string | null;
+  logo_url?: string | null;
   wager_count?: number | null;
   wager_total?: number | null;
   integrity?: string | null;
@@ -68,6 +85,9 @@ export interface TradesData {
   next_cursor: string | null;
   total: number;
 }
+
+// Re-export types from paste-trade for convenience
+export type { FeedResult, LeaderboardAuthor, PlatformStats, PriceData };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -151,7 +171,7 @@ async function leaderboardFromSearch(
     const win_rate = (wins / pnls.length) * 100;
     const avg_pnl = pnls.reduce((s, p) => s + p, 0) / pnls.length;
     const total_pnl = pnls.reduce((s, p) => s + p, 0);
-    const best = data.trades.reduce((best, t) => (t.pnl > best.pnl ? t : best), data.trades[0]);
+    const best = data.trades.reduce((best, t) => (t.pnl > best.pnl ? t : best), data.trades[0]!);
 
     authors.push({
       rank: 0,
@@ -160,8 +180,8 @@ async function leaderboardFromSearch(
         trade_count: data.trades.length,
         avg_pnl: parseFloat(avg_pnl.toFixed(2)),
         win_rate: parseFloat(win_rate.toFixed(1)),
-        best_pnl: best.pnl,
-        best_ticker: best.ticker,
+        best_pnl: best!.pnl,
+        best_ticker: best!.ticker,
         total_pnl: parseFloat(total_pnl.toFixed(2)),
       },
     });
@@ -187,7 +207,8 @@ async function leaderboardFromSearch(
 }
 
 /**
- * Fetch leaderboard. Tries /api/leaderboard first, falls back to /api/search.
+ * Fetch leaderboard. Tries paste.trade /api/leaderboard (public) first,
+ * then authenticated /api/leaderboard, then falls back to /api/search.
  */
 export async function fetchLeaderboard(
   window = "30d",
@@ -195,10 +216,28 @@ export async function fetchLeaderboard(
   limit = 100,
 ): Promise<LeaderboardData> {
   const key = process.env["PASTE_TRADE_KEY"];
+
+  // Primary: use the public paste.trade leaderboard endpoint
+  try {
+    const result = await fetchPasteTradeLeaderboard(window, sort, limit);
+    if (result.authors.length > 0) {
+      // Map to our RawLeaderboardAuthor shape (compatible)
+      return {
+        window: result.window,
+        sort: result.sort,
+        computed_at: result.computed_at,
+        authors: result.authors as unknown as RawLeaderboardAuthor[],
+      };
+    }
+  } catch {
+    // fall through
+  }
+
   if (!key) {
     return { window, sort, computed_at: new Date().toISOString(), authors: [] };
   }
 
+  // Fallback: authenticated /api/leaderboard
   try {
     const url = new URL("/api/leaderboard", BASE);
     url.searchParams.set("window", window);
@@ -230,7 +269,7 @@ export async function fetchLeaderboard(
     // fall through
   }
 
-  // Fallback: build from /api/search
+  // Last resort: build from /api/search
   console.log("[upstream] /api/leaderboard unavailable — falling back to /api/search");
   return leaderboardFromSearch(key, window, sort, limit);
 }
@@ -238,7 +277,7 @@ export async function fetchLeaderboard(
 // ── Trades feed (with /api/search fallback) ───────────────────────────────────
 
 /**
- * Fetch live trades. Tries /api/trades first, falls back to /api/search.
+ * Fetch live trades. Tries /api/feed?sort=new, then /api/trades, then /api/search.
  */
 export async function fetchTrades(
   limit = 100,
@@ -247,8 +286,58 @@ export async function fetchTrades(
   ticker?: string,
 ): Promise<TradesData> {
   const key = process.env["PASTE_TRADE_KEY"];
+
+  // Primary: use paste.trade /api/feed?sort=new (public, no auth)
+  if (!ticker) {
+    try {
+      const feedResult = await fetchPasteTradeFeed({
+        sort: "new",
+        limit,
+        platform: platform as "polymarket" | "hyperliquid" | "robinhood" | undefined,
+        cursor,
+      });
+      if (feedResult.items.length > 0) {
+        const items: RawTrade[] = feedResult.items.flatMap((feedItem) =>
+          feedItem.trades.map((t: Record<string, unknown>) => ({
+            id: String(t["id"] ?? t["trade_id"] ?? ""),
+            trade_id: t["trade_id"] != null ? String(t["trade_id"]) : null,
+            ticker: t["ticker"] != null ? String(t["ticker"]) : null,
+            direction: t["direction"] != null ? String(t["direction"]) : null,
+            platform: t["platform"] != null ? String(t["platform"]) : null,
+            instrument: t["instrument"] != null ? String(t["instrument"]) : null,
+            author_handle: feedItem.author?.["handle"] != null ? String(feedItem.author["handle"]) : null,
+            author_avatar_url: feedItem.author?.["avatar_url"] != null ? String(feedItem.author["avatar_url"]) : null,
+            headline_quote: t["headline_quote"] != null ? String(t["headline_quote"]) : null,
+            thesis: t["thesis"] != null ? String(t["thesis"]) : null,
+            source_id: feedItem.source?.["id"] != null ? String(feedItem.source["id"]) : null,
+            source_url: feedItem.source?.["url"] != null ? String(feedItem.source["url"]) : null,
+            created_at: t["created_at"] != null ? String(t["created_at"]) : null,
+            posted_at: t["posted_at"] != null ? String(t["posted_at"]) : null,
+            entry_price: t["entry_price"] != null ? Number(t["entry_price"]) : null,
+            current_price: feedResult.prices?.[String(t["trade_id"] ?? t["id"])]?.price ?? (t["current_price"] != null ? Number(t["current_price"]) : null),
+            pnl_pct: feedResult.pnls?.[String(t["trade_id"] ?? t["id"])] ?? (t["pnl_pct"] != null ? Number(t["pnl_pct"]) : null),
+            logo_url: t["logo_url"] != null ? String(t["logo_url"]) : null,
+            win_rate: null,
+            market_question: t["market_question"] != null ? String(t["market_question"]) : null,
+            wager_count: 0,
+            wager_total: 0,
+            integrity: null,
+          })),
+        );
+        return {
+          items,
+          next_cursor: feedResult.next_cursor,
+          total: feedResult.total,
+        };
+      }
+    } catch {
+      // fall through
+    }
+  }
+
   if (!key) return { items: [], next_cursor: null, total: 0 };
 
+  // Secondary: /api/trades (may need auth)
   try {
     const url = new URL("/api/trades", BASE);
     url.searchParams.set("limit", String(limit));
@@ -281,7 +370,7 @@ export async function fetchTrades(
     // fall through
   }
 
-  // Fallback: use /api/search
+  // Last resort: /api/search
   console.log("[upstream] /api/trades unavailable — falling back to /api/search");
 
   try {
@@ -300,12 +389,10 @@ export async function fetchTrades(
     const body = await res.json();
     const raw = extractItems(body) as RawTrade[];
 
-    // Apply platform filter if needed
     const filtered = platform
       ? raw.filter((t) => t.platform?.toLowerCase() === platform.toLowerCase())
       : raw;
 
-    // Normalize to RawTrade shape
     const items: RawTrade[] = filtered.map((t) => ({
       id: String(t["id"] ?? t["trade_id"] ?? Math.random()),
       ticker: t.ticker ?? null,
@@ -333,4 +420,36 @@ export async function fetchTrades(
   } catch {
     return { items: [], next_cursor: null, total: 0 };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Feed — direct access to paste.trade /api/feed (hot/top sorting)
+// ---------------------------------------------------------------------------
+
+export async function fetchFeed(
+  sort: "new" | "top" = "new",
+  limit = 20,
+  window?: "24h" | "7d" | "30d" | "all",
+  cursor?: string,
+  platform?: "polymarket" | "hyperliquid" | "robinhood",
+): Promise<FeedResult> {
+  return fetchPasteTradeFeed({ sort, limit, window, cursor, platform });
+}
+
+// ---------------------------------------------------------------------------
+// Stats — direct access to paste.trade /api/stats
+// ---------------------------------------------------------------------------
+
+export async function fetchStats(): Promise<PlatformStats | null> {
+  return fetchPasteTradeStats();
+}
+
+// ---------------------------------------------------------------------------
+// Prices — live prices by trade IDs
+// ---------------------------------------------------------------------------
+
+export async function fetchPrices(
+  tradeIds: string[],
+): Promise<Record<string, PriceData>> {
+  return fetchPasteTradePrices(tradeIds);
 }

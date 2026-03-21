@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { classifyCategory, type CallCategory } from "@/lib/category";
 import { computeAlphaScore, callerTier, type CallerTier } from "@/lib/alpha";
-import { fetchLeaderboard, fetchTrades } from "@/lib/upstream";
+import { fetchLeaderboard, fetchTrades, fetchFeed as fetchUpstreamFeed } from "@/lib/upstream";
 
 export const dynamic = "force-dynamic";
 
@@ -177,6 +177,43 @@ function mapRawItem(
   };
 }
 
+/**
+ * Flatten a paste.trade /api/feed item (nested source/author/trades shape)
+ * into the flat Record shape that mapRawItem expects.
+ */
+function flattenFeedItem(raw: Record<string, unknown>): Record<string, unknown> {
+  const author = (raw["author"] ?? {}) as Record<string, unknown>;
+  const source = (raw["source"] ?? {}) as Record<string, unknown>;
+  const trades = Array.isArray(raw["trades"]) ? (raw["trades"] as Record<string, unknown>[]) : [];
+  const firstTrade = trades[0] ?? {};
+
+  return {
+    id: firstTrade["id"] ?? firstTrade["trade_id"] ?? source["id"] ?? raw["id"],
+    trade_id: firstTrade["trade_id"] ?? firstTrade["id"],
+    ticker: firstTrade["ticker"] ?? raw["ticker"],
+    direction: firstTrade["direction"] ?? raw["direction"],
+    platform: firstTrade["platform"] ?? raw["platform"],
+    instrument: firstTrade["instrument"] ?? raw["instrument"],
+    author_handle: author["handle"] ?? raw["author_handle"],
+    author_avatar_url: author["avatar_url"] ?? raw["author_avatar_url"],
+    headline_quote: source["headline_quote"] ?? firstTrade["headline_quote"] ?? raw["headline_quote"],
+    thesis: firstTrade["thesis"] ?? raw["thesis"],
+    source_id: source["id"] ?? raw["source_id"],
+    source_url: source["url"] ?? raw["source_url"],
+    created_at: source["created_at"] ?? firstTrade["created_at"] ?? raw["created_at"],
+    posted_at: firstTrade["posted_at"] ?? source["posted_at"] ?? raw["posted_at"],
+    entry_price: firstTrade["entry_price"] ?? firstTrade["entryPrice"] ?? raw["entry_price"],
+    current_price: firstTrade["current_price"] ?? firstTrade["currentPrice"] ?? raw["current_price"],
+    pnl_pct: firstTrade["pnl_pct"] ?? firstTrade["pnlPct"] ?? raw["pnl_pct"],
+    win_rate: author["win_rate"] ?? raw["win_rate"],
+    market_question: firstTrade["market_question"] ?? raw["market_question"],
+    logo_url: firstTrade["logo_url"] ?? raw["logo_url"],
+    integrity: firstTrade["integrity"] ?? raw["integrity"],
+    wager_count: raw["wager_count"] ?? 0,
+    wager_total: raw["wager_total"] ?? 0,
+  };
+}
+
 async function fetchUpstream(
   _apiKey: string,
   limit: number,
@@ -184,6 +221,35 @@ async function fetchUpstream(
   ticker?: string,
   platform?: string,
 ): Promise<{ items: Record<string, unknown>[]; next_cursor: string | null; total: number }> {
+  // Primary: use paste.trade's public /api/feed (no auth required, richer data)
+  try {
+    const feedResult = await fetchUpstreamFeed(
+      "new",
+      limit,
+      undefined,    // window
+      cursor,
+      platform as "polymarket" | "hyperliquid" | "robinhood" | undefined,
+    );
+    if (feedResult.items.length > 0) {
+      // Feed items have nested structure — flatten to our expected shape
+      const items = feedResult.items.map((item) =>
+        flattenFeedItem(item as unknown as Record<string, unknown>),
+      );
+      // Apply ticker filter client-side (feed endpoint doesn't support ticker param)
+      const filtered = ticker
+        ? items.filter((t) => String(t["ticker"] ?? "").toUpperCase() === ticker.toUpperCase())
+        : items;
+      return {
+        items: filtered,
+        next_cursor: feedResult.next_cursor,
+        total: feedResult.total,
+      };
+    }
+  } catch {
+    // fall through to /api/trades
+  }
+
+  // Fallback: auth-required /api/trades → /api/search
   const data = await fetchTrades(limit, cursor, platform, ticker);
   return {
     items: data.items as Record<string, unknown>[],
@@ -215,10 +281,8 @@ const VALID_CATEGORIES = new Set([
 // ─── GET /api/feed ──────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env["PASTE_TRADE_KEY"];
-  if (!apiKey) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 500 });
-  }
+  // API key used for fallback paths only; public feed endpoints work without auth
+  const apiKey = process.env["PASTE_TRADE_KEY"] ?? "";
 
   const { searchParams } = request.nextUrl;
 
@@ -254,7 +318,24 @@ export async function GET(request: NextRequest) {
       if (hotCache && Date.now() < hotCache.expiresAt) {
         enriched = hotCache.data;
       } else {
-        const raw = await fetchUpstream(apiKey, 100);
+        // Try paste.trade's public /api/feed first (richer data, no auth)
+        let raw: { items: Record<string, unknown>[]; next_cursor: string | null; total: number };
+        try {
+          const feedResult = await fetchUpstreamFeed("new", 100);
+          if (feedResult.items.length > 0) {
+            raw = {
+              items: feedResult.items.map((item) =>
+                flattenFeedItem(item as unknown as Record<string, unknown>),
+              ),
+              next_cursor: feedResult.next_cursor,
+              total: feedResult.total,
+            };
+          } else {
+            raw = await fetchUpstream(apiKey, 100);
+          }
+        } catch {
+          raw = await fetchUpstream(apiKey, 100);
+        }
         enriched = raw.items.map((r) => mapRawItem(r as Record<string, unknown>, scores));
         enriched.sort((a, b) => b.hotness_score - a.hotness_score);
         hotCache = { data: enriched, expiresAt: Date.now() + HOT_CACHE_TTL };
@@ -279,7 +360,25 @@ export async function GET(request: NextRequest) {
       if (topCache && Date.now() < topCache.expiresAt) {
         enriched = topCache.data;
       } else {
-        const raw = await fetchUpstream(apiKey, 100);
+        // Try paste.trade's /api/feed?sort=top (already sorted by P&L)
+        let raw: { items: Record<string, unknown>[]; next_cursor: string | null; total: number };
+        try {
+          const window = timeframe === "today" ? "24h" : timeframe === "week" ? "7d" : "30d";
+          const feedResult = await fetchUpstreamFeed("top", 100, window);
+          if (feedResult.items.length > 0) {
+            raw = {
+              items: feedResult.items.map((item) =>
+                flattenFeedItem(item as unknown as Record<string, unknown>),
+              ),
+              next_cursor: feedResult.next_cursor,
+              total: feedResult.total,
+            };
+          } else {
+            raw = await fetchUpstream(apiKey, 100);
+          }
+        } catch {
+          raw = await fetchUpstream(apiKey, 100);
+        }
         enriched = raw.items.map((r) => mapRawItem(r as Record<string, unknown>, scores));
         topCache = { data: enriched, expiresAt: Date.now() + TOP_CACHE_TTL };
       }

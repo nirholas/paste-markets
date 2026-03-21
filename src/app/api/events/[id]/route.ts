@@ -35,38 +35,21 @@ export async function GET(
 
   try {
     // Fetch the specific trade/market from paste.trade
-    const res = await fetch(`https://paste.trade/api/trades/${id}`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    const { getTradeById, fetchTradesList } = await import("@/lib/paste-trade");
+    const raw = await getTradeById(id);
 
-    if (!res.ok) {
+    if (!raw) {
       return NextResponse.json({ error: "Market not found" }, { status: 404 });
     }
 
-    const raw = await res.json();
-
     // Also fetch all trades for this market question to build caller consensus
     const marketQuestion = raw.market_question ?? raw.ticker ?? "";
-    const allTradesRes = await fetch(
-      `https://paste.trade/api/trades?platform=polymarket&limit=50`,
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      },
-    );
+    const allTradesData = await fetchTradesList({ platform: "polymarket", limit: 50 });
 
     let callers: CallerPosition[] = [];
 
-    if (allTradesRes.ok) {
-      const allData = await allTradesRes.json();
-      const items = Array.isArray(allData.items) ? allData.items : [];
+    {
+      const items = allTradesData.items;
 
       // Find trades on the same market
       const relatedTrades = items.filter((t: Record<string, unknown>) => {

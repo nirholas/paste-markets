@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchAuthors } from "@/lib/data";
-import { searchPasteTrade } from "@/lib/paste-trade";
+import { searchPasteTrade, searchPasteTradeAdvanced } from "@/lib/paste-trade";
 import { fetchLeaderboard } from "@/lib/upstream";
 import { computeAlphaScore } from "@/lib/alpha";
 
@@ -14,7 +14,6 @@ function fuzzyMatch(query: string, target: string): boolean {
   const q = query.toLowerCase();
   const t = target.toLowerCase();
   if (t.includes(q)) return true;
-  // Simple fuzzy: check if all chars of query appear in order in target
   let qi = 0;
   for (let ti = 0; ti < t.length && qi < q.length; ti++) {
     if (t[ti] === q[qi]) qi++;
@@ -37,6 +36,11 @@ export async function GET(request: NextRequest) {
     const query = cleanQuery(rawQuery);
     const limitRaw = parseInt(searchParams.get("limit") ?? "10", 10);
     const limit = isNaN(limitRaw) ? 10 : Math.min(Math.max(1, limitRaw), 50);
+
+    // Optional filters from query params
+    const directionFilter = searchParams.get("direction") as "long" | "short" | null;
+    const platformFilter = searchParams.get("platform") as "hyperliquid" | "robinhood" | "polymarket" | null;
+    const cursor = searchParams.get("cursor") ?? undefined;
 
     // Fetch leaderboard data for rich caller results
     const leaderboard = await fetchLeaderboard("30d", "win_rate", 100);
@@ -137,31 +141,58 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.calls - a.calls)
       .slice(0, limit);
 
-    // --- Trades ---
+    // --- Trades (enhanced: full-text search with direction/platform/cursor) ---
     const trades: Array<{
+      trade_id?: string;
       handle: string;
       ticker: string;
       direction: string;
       pnl_pct: number | null;
+      thesis?: string | null;
+      platform?: string | null;
       content_preview: string;
     }> = [];
 
-    // Search for trades matching the query as a ticker or handle
     try {
-      const tradeResults = await searchPasteTrade({
-        author: callers.length > 0 ? callers[0].handle : undefined,
-        ticker: tickers.length > 0 ? tickers[0].ticker : query,
-        limit: 10,
+      // Use advanced search with full-text q param for richer results
+      const advancedResult = await searchPasteTradeAdvanced({
+        q: query,
+        direction: directionFilter ?? undefined,
+        platform: platformFilter ?? undefined,
+        limit: Math.min(limit, 20),
+        cursor,
       });
 
-      for (const t of tradeResults) {
-        trades.push({
-          handle: t.author_handle ?? "unknown",
-          ticker: t.ticker,
-          direction: t.direction,
-          pnl_pct: t.pnlPct ?? null,
-          content_preview: `${t.direction.toUpperCase()} $${t.ticker}${t.pnlPct != null ? ` → ${t.pnlPct > 0 ? "+" : ""}${t.pnlPct.toFixed(1)}%` : ""}`,
+      if (advancedResult.trades.length > 0) {
+        for (const t of advancedResult.trades) {
+          trades.push({
+            trade_id: t.trade_id,
+            handle: t.author_handle ?? "unknown",
+            ticker: t.ticker,
+            direction: t.direction,
+            pnl_pct: t.pnlPct ?? null,
+            thesis: t.thesis,
+            platform: t.platform,
+            content_preview: `${t.direction.toUpperCase()} $${t.ticker}${t.pnlPct != null ? ` → ${t.pnlPct > 0 ? "+" : ""}${t.pnlPct.toFixed(1)}%` : ""}`,
+          });
+        }
+      } else {
+        // Fallback: simple search by ticker/author
+        const tradeResults = await searchPasteTrade({
+          author: callers[0]?.handle ?? undefined,
+          ticker: tickers[0]?.ticker ?? query,
+          limit: 10,
         });
+
+        for (const t of tradeResults) {
+          trades.push({
+            handle: t.author_handle ?? "unknown",
+            ticker: t.ticker,
+            direction: t.direction,
+            pnl_pct: t.pnlPct ?? null,
+            content_preview: `${t.direction.toUpperCase()} $${t.ticker}${t.pnlPct != null ? ` → ${t.pnlPct > 0 ? "+" : ""}${t.pnlPct.toFixed(1)}%` : ""}`,
+          });
+        }
       }
     } catch {
       // silently continue

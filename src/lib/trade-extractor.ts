@@ -310,12 +310,12 @@ export async function extractTrades(
         if (res.ok) {
           const html = await res.text();
           const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-          if (titleMatch) {
+          if (titleMatch?.[1]) {
             title = titleMatch[1].replace(/\s*-\s*YouTube\s*$/i, "").replace(/\s+/g, " ").trim() || "YouTube Video";
           }
           // Try to extract channel name
           const channelMatch = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
-          if (channelMatch) author = channelMatch[1];
+          if (channelMatch?.[1]) author = channelMatch[1];
         }
       } catch {
         // Ignore fetch errors

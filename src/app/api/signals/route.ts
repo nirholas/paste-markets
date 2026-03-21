@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLeaderboard } from "@/lib/data";
-import { searchPasteTrade } from "@/lib/paste-trade";
+import { searchPasteTrade, type PasteTradeTrade } from "@/lib/paste-trade";
+import { fetchTrades } from "@/lib/upstream";
 import { computeAlphaScore, callerTier, type CallerTier } from "@/lib/alpha";
 
 export const dynamic = "force-dynamic";
@@ -121,19 +122,68 @@ async function buildFromApi(): Promise<SignalsResponse> {
     }),
   );
 
-  // Fetch 7d trades for all callers
-  const tasks = leaderboard.map(
-    (entry) => async (): Promise<{ handle: string; trades: Awaited<ReturnType<typeof searchPasteTrade>> }> => {
-      try {
-        const trades = await searchPasteTrade({ author: entry.handle, top: "7d", limit: 25 });
-        return { handle: entry.handle, trades };
-      } catch {
-        return { handle: entry.handle, trades: [] };
-      }
-    },
-  );
+  // Fetch recent trades in bulk from upstream /api/trades (single request)
+  // then group by author — avoids 60+ individual /api/search calls
+  const handleSet = new Set(leaderboard.map((e) => e.handle.toLowerCase()));
+  let results: Array<{ handle: string; trades: PasteTradeTrade[] }> = [];
 
-  const results = await runWithConcurrency(tasks, 10);
+  try {
+    const bulk = await fetchTrades(200);
+    const byAuthor = new Map<string, PasteTradeTrade[]>();
+
+    for (const raw of bulk.items) {
+      const handle = String(raw.author_handle ?? "").toLowerCase();
+      if (!handle || !handleSet.has(handle)) continue;
+
+      const trade: PasteTradeTrade = {
+        ticker: String(raw.ticker ?? ""),
+        direction: (raw.direction ?? "long") as PasteTradeTrade["direction"],
+        platform: raw.platform ?? undefined,
+        pnlPct: raw.pnl_pct != null ? Number(raw.pnl_pct) : raw.pnlPct != null ? Number(raw.pnlPct) : undefined,
+        posted_at: String(raw.posted_at ?? raw.created_at ?? new Date().toISOString()),
+        source_url: raw.source_url ?? undefined,
+        author_handle: handle,
+      };
+
+      const existing = byAuthor.get(handle) ?? [];
+      existing.push(trade);
+      byAuthor.set(handle, existing);
+    }
+
+    results = leaderboard.map((e) => ({
+      handle: e.handle,
+      trades: byAuthor.get(e.handle.toLowerCase()) ?? [],
+    }));
+
+    // For callers without trades in the bulk response, do targeted fetches
+    const missingHandles = results.filter((r) => r.trades.length === 0).slice(0, 15);
+    if (missingHandles.length > 0) {
+      const fillTasks = missingHandles.map(
+        (entry) => async () => {
+          try {
+            const trades = await searchPasteTrade({ author: entry.handle, top: "7d", limit: 25 });
+            entry.trades = trades;
+          } catch {
+            // leave empty
+          }
+        },
+      );
+      await runWithConcurrency(fillTasks, 10);
+    }
+  } catch {
+    // Full fallback: N+1 approach if bulk fails
+    const tasks = leaderboard.map(
+      (entry) => async (): Promise<{ handle: string; trades: PasteTradeTrade[] }> => {
+        try {
+          const trades = await searchPasteTrade({ author: entry.handle, top: "7d", limit: 25 });
+          return { handle: entry.handle, trades };
+        } catch {
+          return { handle: entry.handle, trades: [] };
+        }
+      },
+    );
+    results = await runWithConcurrency(tasks, 10);
+  }
 
   const smartCalls: SmartCallItem[] = [];
   const consensusMap = new Map<string, {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractTrades, type SourceType } from "@/lib/trade-extractor";
 import { saveExtraction, trackThesis } from "@/lib/db";
+import { submitTrade, skillRoute } from "@/lib/paste-trade";
 
 interface SubmitResult {
   thesisId: string;
@@ -10,6 +11,12 @@ interface SubmitResult {
   entryPrice: number | null;
   pasteTradeId: string;
 }
+
+const INSTRUMENT_MAP: Record<string, string> = {
+  hyperliquid: "perps",
+  robinhood: "stock",
+  polymarket: "prediction",
+};
 
 async function submitThesisToPasteTrade(thesis: {
   id: string;
@@ -21,61 +28,32 @@ async function submitThesisToPasteTrade(thesis: {
   sourceUrl: string | null;
   author: string | null;
 }): Promise<SubmitResult | null> {
-  const apiKey = process.env["PASTE_TRADE_KEY"];
-  if (!apiKey) return null;
+  const dir = (["long", "short"].includes(thesis.direction)
+    ? thesis.direction
+    : "long") as "long" | "short";
 
-  const instrumentMap: Record<string, string> = {
-    hyperliquid: "perps",
-    robinhood: "stock",
-    polymarket: "prediction",
+  const result = await submitTrade({
+    ticker: thesis.ticker,
+    direction: dir,
+    platform: thesis.platform,
+    instrument: INSTRUMENT_MAP[thesis.platform] ?? "perps",
+    thesis: thesis.quote || thesis.reasoning,
+    source_url: thesis.sourceUrl ?? undefined,
+    author_handle: thesis.author?.replace(/^@/, ""),
+    headline_quote: (thesis.quote || thesis.reasoning).slice(0, 120),
+    explanation: thesis.reasoning,
+  });
+
+  if (!result) return null;
+
+  return {
+    thesisId: thesis.id,
+    tradeUrl: result.url ?? (result.trade_id ? `https://paste.trade/t/${result.trade_id}` : ""),
+    ticker: thesis.ticker,
+    direction: thesis.direction,
+    entryPrice: null,
+    pasteTradeId: result.trade_id ?? result.id ?? "",
   };
-
-  try {
-    const res = await fetch("https://paste.trade/api/trades", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        ticker: thesis.ticker,
-        direction: thesis.direction,
-        platform: thesis.platform,
-        instrument: instrumentMap[thesis.platform] ?? "perps",
-        thesis: thesis.quote || thesis.reasoning,
-        ...(thesis.sourceUrl && { source_url: thesis.sourceUrl }),
-        ...(thesis.author && { author_handle: thesis.author.replace(/^@/, "") }),
-        headline_quote: (thesis.quote || thesis.reasoning).slice(0, 120),
-        explanation: thesis.reasoning,
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    if (!res.ok) return null;
-
-    const data = (await res.json()) as Record<string, unknown>;
-    const tradeId = String(data["trade_id"] ?? data["id"] ?? "");
-    const tradeUrl = String(
-      data["url"] ?? (tradeId ? `https://paste.trade/t/${tradeId}` : ""),
-    );
-    const entryPrice =
-      data["entryPrice"] != null
-        ? Number(data["entryPrice"])
-        : data["entry_price"] != null
-          ? Number(data["entry_price"])
-          : null;
-
-    return {
-      thesisId: thesis.id,
-      tradeUrl,
-      ticker: thesis.ticker,
-      direction: thesis.direction,
-      entryPrice,
-      pasteTradeId: tradeId,
-    };
-  } catch {
-    return null;
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -162,9 +140,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Run venue routing for each thesis via paste.trade /api/skill/route
+    const routing: Record<string, unknown>[] = [];
+    if (extraction.theses.length > 0) {
+      const routeResults = await Promise.allSettled(
+        extraction.theses.map(async (thesis) => {
+          const dir = (["long", "short"].includes(thesis.direction)
+            ? thesis.direction
+            : "long") as "long" | "short";
+          const result = await skillRoute({
+            ticker: thesis.ticker,
+            direction: dir,
+            platform: thesis.platform,
+          });
+          return result ? { ticker: thesis.ticker, ...result } : null;
+        }),
+      );
+
+      for (const result of routeResults) {
+        if (result.status === "fulfilled" && result.value) {
+          routing.push(result.value);
+        }
+      }
+    }
+
     return NextResponse.json({
       extraction,
       tracked,
+      routing,
       sourceUrl: `/source/${extraction.id}`,
     });
   } catch (err) {
