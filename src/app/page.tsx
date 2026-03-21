@@ -107,7 +107,7 @@ export default async function HomePage() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[#f5f5f7] mb-4 text-center leading-[1.1] tracking-tight">
             Turn any tweet
             <br />
-            <span className="bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#0066FF] to-[#3385FF] bg-clip-text text-transparent">
               into a trade.
             </span>
           </h1>
@@ -123,7 +123,7 @@ export default async function HomePage() {
             Paste a tweet, search a trader, or{" "}
             <Link
               href="/submit"
-              className="text-[#6366f1] hover:text-[#8b5cf6] transition-colors font-medium"
+              className="text-[#0066FF] hover:text-[#3385FF] transition-colors font-medium"
             >
               submit a call
             </Link>

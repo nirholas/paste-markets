@@ -84,26 +84,57 @@ Small/Caption: 11px, uppercase, letter-spacing 1px, color #555568
 
 ## paste.trade API
 Base URL: `https://paste.trade`
-Auth: Bearer token via `PASTE_TRADE_KEY` env var
+Auth: Bearer token via `PASTE_TRADE_KEY` env var (for auth-required endpoints)
 
-### Endpoints (known)
+### Currently Used
+We only call `GET /api/search` today. Everything else below is available but not yet wired up.
+
+### Public Endpoints (No Auth)
 ```
-GET /api/search?author={handle}&top=7d&limit=50
-GET /api/search?author={handle}&ticker={ticker}&top=7d
+GET /api/feed?sort=new&limit=20            — Live trade feed (items, next_cursor, total, prices)
+GET /api/feed?sort=top&window=7d           — Top trades by P&L (includes pnls)
+GET /api/trades                            — All trades, paginated
+GET /api/trades/{id}                       — Full trade detail (thesis, derivation, chain_steps, horizon, live price)
+GET /api/sources/{id}                      — Source page with all associated trades
+GET /api/prices?ids=id1,id2                — Live prices for trade IDs (polled every 10s on their frontend)
+GET /api/leaderboard?window=7d&sort=avg_pnl — Ranked authors (trade_count, avg_pnl, win_rate, best_ticker)
+GET /api/stats                             — Platform-wide stats (users, total_trades, profitable_trades)
+GET /api/og/share/{trade_id}?format=landscape — Share card images (1200x630 or 1080x1080)
+GET /api/health                            — { ok: true }
 ```
 
-### Response shape (approximate — verify against real responses)
-```typescript
-interface PasteTradeResult {
-  ticker: string;
-  direction: "long" | "short" | "yes" | "no";
-  platform?: string;
-  pnlPct?: number;
-  author_date?: string;
-  posted_at: string;
-  // ... possibly more fields
-}
+### Auth-Required Endpoints
 ```
+GET  /api/search?author={handle}&top=7d&limit=50  — Our current only call
+POST /api/trades                           — Submit a trade (thesis, chain_steps, derivation)
+POST /api/sources                          — Create source page from tweet URL
+POST /api/sources/{id}/events              — Push live processing events to source page
+POST /api/keys                             — Auto-provision API key (no auth needed!)
+POST /api/auth/session-link                — Browser sign-in URL
+POST /api/skill/route                      — Route/price a ticker across venues
+POST /api/skill/discover                   — Instrument discovery (Hyperliquid, Polymarket)
+```
+
+### Search Params We're Not Using
+```
+q         — full-text search on theses (e.g., q=iran oil)
+direction — filter long/short
+platform  — filter by venue (hyperliquid, robinhood, polymarket)
+cursor    — pagination (we're capped at limit=100)
+top=24h   — we only use 7d/30d/90d/all
+```
+
+### WebSocket
+```
+wss://paste.trade/ws — Real-time new_trade and price_update events
+```
+
+### Biggest Integration Opportunities
+1. `/api/feed` + `/api/prices` — power live, real-time trade feed with updating P&L
+2. `/api/leaderboard` — official rankings instead of our own computation
+3. `/api/trades/{id}` — rich trade detail pages with thesis, derivation, chain steps
+4. `wss://paste.trade/ws` — real-time trade alerts without polling
+5. `/api/skill/discover` + `/api/skill/route` — enhance "What's The Trade?" with real venue routing
 
 ### API Key
 Stored in `.env` as `PASTE_TRADE_KEY`. Never commit this.

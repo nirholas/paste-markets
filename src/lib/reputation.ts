@@ -110,7 +110,7 @@ export function tierColor(tier: ReputationTier): string {
     case "Oracle":     return "#f39c12"; // gold
     case "Alpha":      return "#2ecc71"; // green
     case "Reliable":   return "#3b82f6"; // blue
-    case "Developing": return "#8b5cf6"; // purple
+    case "Developing": return "#3385FF"; // polymarket blue
     case "Mixed":      return "#f39c12"; // amber
     case "New":        return "#555568"; // muted
     default:           return "#555568";

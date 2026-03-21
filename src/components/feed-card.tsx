@@ -47,7 +47,7 @@ export function FeedCard({ item }: FeedCardProps) {
       {/* Author row */}
       <div className="flex items-center gap-3 mb-3">
         <Link href={`/${handle}`} className="shrink-0">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center text-white text-sm font-bold">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0066FF] to-[#3385FF] flex items-center justify-center text-white text-sm font-bold">
             {handle[0]?.toUpperCase()}
           </div>
         </Link>
@@ -56,7 +56,7 @@ export function FeedCard({ item }: FeedCardProps) {
           <div className="flex items-center gap-2">
             <Link
               href={`/${handle}`}
-              className="text-[#f5f5f7] font-semibold text-sm hover:text-[#6366f1] transition-colors truncate"
+              className="text-[#f5f5f7] font-semibold text-sm hover:text-[#0066FF] transition-colors truncate"
             >
               @{handle}
             </Link>
@@ -97,7 +97,7 @@ export function FeedCard({ item }: FeedCardProps) {
         </span>
         <Link
           href={`/ticker/${item.ticker.toUpperCase()}`}
-          className="text-[#f5f5f7] font-bold text-lg hover:text-[#6366f1] transition-colors font-mono"
+          className="text-[#f5f5f7] font-bold text-lg hover:text-[#0066FF] transition-colors font-mono"
         >
           ${item.ticker.toUpperCase()}
         </Link>
@@ -137,7 +137,7 @@ export function FeedCard({ item }: FeedCardProps) {
       {/* Social proof */}
       {item.wager_count > 0 && (
         <div className="flex items-center gap-2 text-xs text-[#52525b] mb-3">
-          <span className="text-[#6366f1] font-semibold">{item.wager_count} backed</span>
+          <span className="text-[#0066FF] font-semibold">{item.wager_count} backed</span>
           <span>&middot;</span>
           <span>{item.wager_total.toFixed(0)} USDC</span>
         </div>
@@ -165,7 +165,7 @@ export function FeedCard({ item }: FeedCardProps) {
           href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`@${handle} called ${item.direction.toUpperCase()} $${item.ticker.toUpperCase()} on paste.markets — ${pnlLabel}`)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-[13px] text-[#a1a1aa] hover:text-[#6366f1] hover:bg-[#6366f1]/10 px-3 py-1.5 rounded-lg transition-colors font-medium"
+          className="flex items-center gap-1.5 text-[13px] text-[#a1a1aa] hover:text-[#0066FF] hover:bg-[#0066FF]/10 px-3 py-1.5 rounded-lg transition-colors font-medium"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />

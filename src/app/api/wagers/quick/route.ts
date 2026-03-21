@@ -7,7 +7,7 @@ import {
   getWagerStats,
   insertWagerEvent,
 } from "@/lib/wager-db";
-import { isValidSolanaSignature, verifySolanaTransaction } from "@/lib/solana";
+import { isValidSolanaSignature, verifySolanaTransaction, verifySolanaUsdcTransfer } from "@/lib/solana";
 
 export const dynamic = "force-dynamic";
 
@@ -88,16 +88,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid Solana transaction signature format" }, { status: 400 });
   }
 
-  // Verify transaction on-chain (graceful degradation on RPC failure)
-  const verification = await verifySolanaTransaction(txSignature);
-  if (!verification.verified) {
-    if (verification.error?.includes("RPC unavailable")) {
-      console.warn("[api/wagers/quick] RPC unavailable, skipping tx verification for:", txSignature);
-    } else {
-      return NextResponse.json(
-        { error: `Transaction verification failed: ${verification.error}` },
-        { status: 400 },
-      );
+  // Verify transaction on-chain — enhanced USDC check when vault address is configured
+  const vaultAddress = process.env["WAGER_VAULT_ADDRESS"];
+  if (vaultAddress) {
+    const verification = await verifySolanaUsdcTransfer(txSignature, vaultAddress, amount);
+    if (!verification.verified) {
+      if (verification.error?.includes("RPC unavailable")) {
+        console.warn("[api/wagers/quick] RPC unavailable, skipping USDC verification for:", txSignature);
+      } else {
+        return NextResponse.json(
+          { error: `Transaction verification failed: ${verification.error}` },
+          { status: 400 },
+        );
+      }
+    }
+  } else {
+    // Fallback: basic tx existence check when vault address not configured
+    const verification = await verifySolanaTransaction(txSignature);
+    if (!verification.verified) {
+      if (verification.error?.includes("RPC unavailable")) {
+        console.warn("[api/wagers/quick] RPC unavailable, skipping tx verification for:", txSignature);
+      } else {
+        return NextResponse.json(
+          { error: `Transaction verification failed: ${verification.error}` },
+          { status: 400 },
+        );
+      }
     }
   }
 

@@ -83,7 +83,7 @@ function NewTradeToast({
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-[#1a1a24] border border-[#ffffff14] rounded-2xl px-4 py-3 shadow-2xl animate-slide-up text-sm">
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-[#1a1a1a] border border-[#ffffff14] rounded-2xl px-4 py-3 shadow-2xl animate-slide-up text-sm">
       <span className="w-2 h-2 rounded-full animate-live" style={{ backgroundColor: isLong ? "#22c55e" : "#ef4444" }} />
       <span className="font-semibold" style={{ color: isLong ? "#22c55e" : "#ef4444" }}>
         {toast.direction.toUpperCase()}
@@ -92,7 +92,7 @@ function NewTradeToast({
       <span className="text-[#52525b]">@{toast.handle}</span>
       <button
         onClick={onView}
-        className="text-[#6366f1] hover:text-[#8b5cf6] transition-colors ml-1 font-medium"
+        className="text-[#0066FF] hover:text-[#3385FF] transition-colors ml-1 font-medium"
       >
         view
       </button>
@@ -119,7 +119,7 @@ function TrendingAssets({
   onSelect: (ticker: string) => void;
 }) {
   return (
-    <div className="bg-[#12121a] border border-[#ffffff0d] rounded-2xl p-4">
+    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-4">
       <p className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider mb-3 flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] animate-live" />
         Trending
@@ -143,7 +143,7 @@ function TrendingAssets({
                 <Link
                   href={`/ticker/${asset.ticker.toUpperCase()}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="text-sm font-bold text-[#f5f5f7] group-hover:text-[#6366f1] transition-colors font-mono"
+                  className="text-sm font-bold text-[#f5f5f7] group-hover:text-[#0066FF] transition-colors font-mono"
                 >
                   ${asset.ticker}
                 </Link>
@@ -169,7 +169,7 @@ function TrendingAssets({
 
 function TopCallers({ callers }: { callers: TopCaller[] }) {
   return (
-    <div className="bg-[#12121a] border border-[#ffffff0d] rounded-2xl p-4">
+    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-4">
       <p className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider mb-3 flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-live" />
         Top Callers
@@ -190,13 +190,13 @@ function TopCallers({ callers }: { callers: TopCaller[] }) {
                   className="w-8 h-8 rounded-full object-cover shrink-0"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] shrink-0 flex items-center justify-center text-xs text-white font-bold">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0066FF] to-[#3385FF] shrink-0 flex items-center justify-center text-xs text-white font-bold">
                   {caller.handle[0]?.toUpperCase()}
                 </div>
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-[#f5f5f7] group-hover:text-[#6366f1] transition-colors font-medium truncate">
+                  <span className="text-sm text-[#f5f5f7] group-hover:text-[#0066FF] transition-colors font-medium truncate">
                     @{caller.handle}
                   </span>
                   <span
@@ -216,7 +216,7 @@ function TopCallers({ callers }: { callers: TopCaller[] }) {
       </div>
       <Link
         href="/callers"
-        className="block mt-3 text-[13px] text-[#6366f1] hover:text-[#8b5cf6] transition-colors font-medium px-2"
+        className="block mt-3 text-[13px] text-[#0066FF] hover:text-[#3385FF] transition-colors font-medium px-2"
       >
         View all callers
       </Link>
@@ -249,7 +249,7 @@ function FilterPanel({
   const pillCls = (active: boolean) =>
     `text-[13px] px-3 py-1.5 rounded-full transition-colors font-medium ${
       active
-        ? "bg-[#6366f1] text-white"
+        ? "bg-[#0066FF] text-white"
         : "bg-[#ffffff08] text-[#a1a1aa] hover:bg-[#ffffff14] hover:text-[#f5f5f7]"
     }`;
 
@@ -281,7 +281,7 @@ function FilterPanel({
           type="checkbox"
           checked={filters.liveOnly}
           onChange={(e) => onChange({ ...filters, liveOnly: e.target.checked })}
-          className="accent-[#6366f1] w-3.5 h-3.5"
+          className="accent-[#0066FF] w-3.5 h-3.5"
         />
         Live only
       </label>
@@ -302,18 +302,18 @@ function FilterPanel({
 
 function SkeletonCard() {
   return (
-    <div className="bg-[#12121a] border border-[#ffffff0d] rounded-2xl p-5 space-y-3 animate-pulse">
+    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-5 space-y-3 animate-pulse">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#1a1a24]" />
+        <div className="w-10 h-10 rounded-full bg-[#1a1a1a]" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-28 rounded-full bg-[#1a1a24]" />
-          <div className="h-3 w-16 rounded-full bg-[#1a1a24]" />
+          <div className="h-4 w-28 rounded-full bg-[#1a1a1a]" />
+          <div className="h-3 w-16 rounded-full bg-[#1a1a1a]" />
         </div>
-        <div className="h-7 w-16 rounded-full bg-[#1a1a24]" />
+        <div className="h-7 w-16 rounded-full bg-[#1a1a1a]" />
       </div>
-      <div className="h-4 w-40 rounded-full bg-[#1a1a24]" />
-      <div className="h-3 w-full rounded-full bg-[#1a1a24]" />
-      <div className="h-3 w-3/4 rounded-full bg-[#1a1a24]" />
+      <div className="h-4 w-40 rounded-full bg-[#1a1a1a]" />
+      <div className="h-3 w-full rounded-full bg-[#1a1a1a]" />
+      <div className="h-3 w-3/4 rounded-full bg-[#1a1a1a]" />
     </div>
   );
 }
@@ -540,7 +540,7 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
                   <p className="text-[#52525b] text-sm">No trades match your filters.</p>
                   <button
                     onClick={() => setFilters(DEFAULT_FILTERS)}
-                    className="mt-3 text-sm text-[#6366f1] hover:text-[#8b5cf6] transition-colors font-medium"
+                    className="mt-3 text-sm text-[#0066FF] hover:text-[#3385FF] transition-colors font-medium"
                   >
                     Clear filters
                   </button>

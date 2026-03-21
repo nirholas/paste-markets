@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useWallet } from "@/lib/wallet";
 
 interface WagerModalProps {
   tradeId: string;
@@ -13,6 +14,7 @@ type Step = "cta" | "form" | "submitting" | "success" | "error";
 
 const MIN_WAGER = 5;
 const MAX_WAGER = 500;
+const VAULT_ADDRESS = process.env["NEXT_PUBLIC_WAGER_VAULT_ADDRESS"] ?? "";
 
 function isValidSolanaAddress(addr: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
@@ -24,6 +26,9 @@ export function WagerModal({
   settlementDate,
   callerTipBps,
 }: WagerModalProps) {
+  const wallet = useWallet();
+  const isWalletConnected = wallet.connected && wallet.chain === "solana";
+
   const [step, setStep] = useState<Step>("cta");
   const [amount, setAmount] = useState<string>("50");
   const [walletAddress, setWalletAddress] = useState<string>("");
@@ -34,7 +39,70 @@ export function WagerModal({
 
   const callerTipPct = (callerTipBps / 100).toFixed(0);
 
-  async function handleSubmit() {
+  // Auto-populate wallet address when Phantom is connected
+  useEffect(() => {
+    if (isWalletConnected && wallet.address) {
+      setWalletAddress(wallet.address);
+    }
+  }, [isWalletConnected, wallet.address]);
+
+  // Submit wager to backend (shared by both flows)
+  async function submitWagerToApi(addr: string, amountNum: number, sig: string) {
+    const res = await fetch("/api/wager", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "submit",
+        tradeCardId: tradeId,
+        walletAddress: addr,
+        amount: amountNum,
+        txSignature: sig,
+        handle: handle.replace(/^@/, "") || undefined,
+        currency: "USDC",
+      }),
+    });
+
+    const data = (await res.json()) as { ok?: boolean; wager?: { id: string }; error?: string };
+
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error ?? "Failed to place wager");
+    }
+
+    return data.wager?.id ?? "";
+  }
+
+  // Auto-transfer flow: wallet connected, one-click send + submit
+  async function handleAutoTransfer() {
+    setError("");
+
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum < MIN_WAGER || amountNum > MAX_WAGER) {
+      setError(`Amount must be between ${MIN_WAGER} and ${MAX_WAGER} USDC`);
+      return;
+    }
+
+    if (!VAULT_ADDRESS) {
+      setError("Vault address not configured");
+      return;
+    }
+
+    setStep("submitting");
+
+    try {
+      const result = await wallet.sendTransaction(VAULT_ADDRESS, amountNum);
+      if (!result.confirmed) throw new Error("Transaction not confirmed");
+
+      const wagerId = await submitWagerToApi(wallet.address!, amountNum, result.signature);
+      setSuccessWagerId(wagerId);
+      setStep("success");
+    } catch (err: any) {
+      setError(err.message || String(err));
+      setStep("form");
+    }
+  }
+
+  // Manual flow: user pastes wallet address + tx signature
+  async function handleManualSubmit() {
     setError("");
 
     const amountNum = parseFloat(amount);
@@ -57,32 +125,11 @@ export function WagerModal({
     setStep("submitting");
 
     try {
-      const res = await fetch("/api/wager", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "submit",
-          tradeCardId: tradeId,
-          walletAddress,
-          amount: amountNum,
-          txSignature: trimmedSig,
-          handle: handle.replace(/^@/, "") || undefined,
-          currency: "USDC",
-        }),
-      });
-
-      const data = (await res.json()) as { ok?: boolean; wager?: { id: string }; error?: string };
-
-      if (!res.ok || !data.ok) {
-        setError(data.error ?? "Failed to place wager");
-        setStep("form");
-        return;
-      }
-
-      setSuccessWagerId(data.wager?.id ?? "");
+      const wagerId = await submitWagerToApi(walletAddress, amountNum, trimmedSig);
+      setSuccessWagerId(wagerId);
       setStep("success");
-    } catch (err) {
-      setError(String(err));
+    } catch (err: any) {
+      setError(err.message || String(err));
       setStep("form");
     }
   }
@@ -166,21 +213,6 @@ export function WagerModal({
         </div>
       </div>
 
-      {/* Wallet address */}
-      <div className="mb-4">
-        <label className="text-[11px] uppercase tracking-widest text-text-muted block mb-1">
-          Solana Wallet Address
-        </label>
-        <input
-          type="text"
-          placeholder="Base58 address…"
-          value={walletAddress}
-          onChange={(e) => setWalletAddress(e.target.value.trim())}
-          disabled={step === "submitting"}
-          className="w-full bg-background border border-border rounded px-3 py-2 text-xs font-mono text-text-primary focus:border-accent outline-none placeholder-text-muted"
-        />
-      </div>
-
       {/* Optional Twitter handle */}
       <div className="mb-4">
         <label className="text-[11px] uppercase tracking-widest text-text-muted block mb-1">
@@ -196,23 +228,55 @@ export function WagerModal({
         />
       </div>
 
-      {/* Transaction signature */}
-      <div className="mb-4">
-        <label className="text-[11px] uppercase tracking-widest text-text-muted block mb-1">
-          Transaction Signature
-        </label>
-        <input
-          type="text"
-          placeholder="Paste Solana tx signature…"
-          value={txSignature}
-          onChange={(e) => setTxSignature(e.target.value.trim())}
-          disabled={step === "submitting"}
-          className="w-full bg-background border border-border rounded px-3 py-2 text-xs font-mono text-text-primary focus:border-accent outline-none placeholder-text-muted"
-        />
-        <div className="text-[10px] text-text-muted mt-1">
-          Transfer {amount || "0"} USDC first, then paste the tx signature here
-        </div>
-      </div>
+      {isWalletConnected ? (
+        <>
+          {/* Connected wallet info */}
+          <div className="mb-4 p-3 bg-background rounded border border-accent/30 text-[11px] text-text-muted space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-win" />
+              <span className="text-text-secondary">Phantom connected</span>
+            </div>
+            <div className="font-mono text-text-primary break-all">
+              {wallet.address?.slice(0, 8)}...{wallet.address?.slice(-4)}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Manual wallet address */}
+          <div className="mb-4">
+            <label className="text-[11px] uppercase tracking-widest text-text-muted block mb-1">
+              Solana Wallet Address
+            </label>
+            <input
+              type="text"
+              placeholder="Base58 address…"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value.trim())}
+              disabled={step === "submitting"}
+              className="w-full bg-background border border-border rounded px-3 py-2 text-xs font-mono text-text-primary focus:border-accent outline-none placeholder-text-muted"
+            />
+          </div>
+
+          {/* Manual transaction signature */}
+          <div className="mb-4">
+            <label className="text-[11px] uppercase tracking-widest text-text-muted block mb-1">
+              Transaction Signature
+            </label>
+            <input
+              type="text"
+              placeholder="Paste Solana tx signature…"
+              value={txSignature}
+              onChange={(e) => setTxSignature(e.target.value.trim())}
+              disabled={step === "submitting"}
+              className="w-full bg-background border border-border rounded px-3 py-2 text-xs font-mono text-text-primary focus:border-accent outline-none placeholder-text-muted"
+            />
+            <div className="text-[10px] text-text-muted mt-1">
+              Transfer {amount || "0"} USDC first, then paste the tx signature here
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Disclosure */}
       <div className="mb-4 p-3 bg-background rounded border border-border text-[11px] text-text-muted space-y-1">
@@ -230,11 +294,15 @@ export function WagerModal({
 
       {/* Submit */}
       <button
-        onClick={handleSubmit}
+        onClick={isWalletConnected ? handleAutoTransfer : handleManualSubmit}
         disabled={step === "submitting"}
         className="w-full py-2.5 px-4 rounded-lg bg-win/10 border border-win text-win font-mono text-sm font-bold hover:bg-win/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {step === "submitting" ? "Placing wager…" : "Sign & Back"}
+        {step === "submitting"
+          ? "Placing wager…"
+          : isWalletConnected
+            ? `Send ${amount || "0"} USDC & Back`
+            : "Sign & Back"}
       </button>
     </div>
   );

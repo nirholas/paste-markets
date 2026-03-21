@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import Nav from "@/components/ui/nav";
+
 
 /* ─── Trade submission types (existing feature) ──────────────────────────── */
 
@@ -395,7 +395,6 @@ export default function SubmitPage() {
 
   return (
     <main className="min-h-screen">
-      <Nav />
 
       {/* ── Track Any Trade ─────────────────────────────────────────────── */}
       <section className="flex flex-col items-center px-4 pt-20 pb-12">

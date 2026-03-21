@@ -82,15 +82,15 @@ export default function TradeTicker() {
   return (
     <div
       className="relative w-full overflow-hidden border-b border-[#ffffff08]"
-      style={{ height: 36, background: "#08080d" }}
+      style={{ height: 36, background: "#000000" }}
     >
       <div
         className="pointer-events-none absolute left-0 top-0 z-10 h-full w-16"
-        style={{ background: "linear-gradient(to right, #08080d, transparent)" }}
+        style={{ background: "linear-gradient(to right, #000000, transparent)" }}
       />
       <div
         className="pointer-events-none absolute right-0 top-0 z-10 h-full w-16"
-        style={{ background: "linear-gradient(to left, #08080d, transparent)" }}
+        style={{ background: "linear-gradient(to left, #000000, transparent)" }}
       />
 
       <div className="ticker-track flex items-center h-full">

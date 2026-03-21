@@ -166,7 +166,7 @@ export default function Nav() {
       <div className="max-w-6xl mx-auto flex items-center h-14 gap-2">
         {/* Logo */}
         <Link href="/" className="text-[#f5f5f7] font-bold text-lg tracking-tight hover:opacity-80 transition-opacity shrink-0 mr-4">
-          paste<span className="text-[#6366f1]">.</span>markets
+          paste<span className="text-[#0066FF]">.</span>markets
         </Link>
 
         {/* Desktop links */}
@@ -191,7 +191,7 @@ export default function Nav() {
         <div className="flex items-center gap-2 ml-auto">
           <Link
             href="/submit"
-            className="hidden sm:flex items-center gap-1.5 text-[13px] font-semibold px-4 py-1.5 rounded-full bg-[#6366f1] text-white hover:bg-[#5558e6] transition-colors"
+            className="hidden sm:flex items-center gap-1.5 text-[13px] font-semibold px-4 py-1.5 rounded-full bg-[#0066FF] text-white hover:bg-[#0052CC] transition-colors"
           >
             Submit Call
           </Link>
