@@ -83,21 +83,21 @@ export default function TradeTicker() {
 
   return (
     <div
-      className="relative w-full overflow-hidden border-b border-[#1a1a2e]"
-      style={{ height: 32, background: "#08081a" }}
+      className="relative w-full overflow-hidden border-b border-[#1a1a2e]/50"
+      style={{ height: 32, background: "#07071a" }}
     >
       {/* Left fade */}
       <div
-        className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12"
+        className="pointer-events-none absolute left-0 top-0 z-10 h-full w-20"
         style={{
-          background: "linear-gradient(to right, #08081a, transparent)",
+          background: "linear-gradient(to right, #07071a, transparent)",
         }}
       />
       {/* Right fade */}
       <div
-        className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12"
+        className="pointer-events-none absolute right-0 top-0 z-10 h-full w-20"
         style={{
-          background: "linear-gradient(to left, #08081a, transparent)",
+          background: "linear-gradient(to left, #07071a, transparent)",
         }}
       />
 
