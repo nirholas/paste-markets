@@ -2,6 +2,8 @@ import Link from "next/link";
 import { WinRateBar } from "@/components/ui/win-rate-bar";
 import { IntegrityBadge } from "@/components/integrity-badge";
 import { WagerWidget } from "@/components/wager-widget";
+import { DoubleDownButton } from "@/components/double-down-popover";
+import { BackerStrip } from "@/components/backer-strip";
 import type { IntegrityClass } from "@/lib/integrity";
 import {
   probabilityToAmericanOdds,
@@ -363,11 +365,23 @@ export function TradeCard({
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-text-muted pt-2 border-t border-border">
-        <span>
-          {handle ? `@${handle}` : ""}
-          {handle && postedAt ? " · " : ""}
-          {formatDate(postedAt)}
-        </span>
+        <div className="flex items-center gap-3">
+          {tradeId && handle && (
+            <DoubleDownButton
+              tradeId={tradeId}
+              ticker={ticker}
+              direction={direction}
+              authorHandle={handle}
+              totalWagered={0}
+              backerCount={0}
+            />
+          )}
+          <span>
+            {handle ? `@${handle}` : ""}
+            {handle && postedAt ? " · " : ""}
+            {formatDate(postedAt)}
+          </span>
+        </div>
         {sourceUrl && !polymarketUrl && (
           <a
             href={sourceUrl}

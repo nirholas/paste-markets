@@ -321,6 +321,16 @@ export default async function SignalsPage() {
             </p>
           </div>
           <div className="text-right shrink-0 ml-4">
+            <Link
+              href="/signals/live"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono border border-[#2ecc71]/50 text-[#2ecc71] rounded hover:bg-[#2ecc71]/10 transition-colors mb-2"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2ecc71] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2ecc71]" />
+              </span>
+              LIVE Signals
+            </Link>
             <div className="text-[10px] text-[#555568] font-mono uppercase tracking-wider">
               Updated {updatedAt}
             </div>

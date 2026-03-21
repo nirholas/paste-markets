@@ -3,8 +3,9 @@
  *
  * Strategy (in order):
  * 1. Twitter API v2 (if TWITTER_BEARER_TOKEN is set)
- * 2. Nitter RSS feed (public, no auth required) — tries multiple instances
- * 3. Playwright browser scraper (if config/x-session.json exists)
+ * 2. xactions Puppeteer scraper (no API key needed, stealth mode)
+ * 3. Nitter RSS feed (public, no auth required) — tries multiple instances
+ * 4. Playwright browser scraper (if config/x-session.json exists)
  */
 
 import { existsSync } from "fs";
@@ -14,6 +15,23 @@ export interface Tweet {
   text: string;
   created_at: string; // ISO 8601
   url: string;
+  author_handle?: string;
+  author_name?: string;
+  metrics?: {
+    likes: number;
+    retweets: number;
+    replies: number;
+  };
+}
+
+export interface TwitterProfile {
+  handle: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  verified: boolean;
+  followers: string | null;
+  following: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +96,126 @@ async function fetchViaTwitterApi(handle: string, maxTweets: number): Promise<Tw
   }
 
   return tweets.slice(0, maxTweets);
+}
+
+// ---------------------------------------------------------------------------
+// xactions Puppeteer scraper (no API key needed)
+// ---------------------------------------------------------------------------
+
+function parseMetricCount(value: string | null | undefined): number {
+  if (!value) return 0;
+  const cleaned = value.replace(/,/g, "").trim();
+  if (cleaned.endsWith("K")) return Math.round(parseFloat(cleaned) * 1_000);
+  if (cleaned.endsWith("M")) return Math.round(parseFloat(cleaned) * 1_000_000);
+  return parseInt(cleaned, 10) || 0;
+}
+
+async function fetchViaXactions(handle: string, maxTweets: number): Promise<Tweet[]> {
+  const { createBrowser, createPage, scrapeTweets } = await import("xactions");
+
+  const browser = await createBrowser();
+  try {
+    const page = await createPage(browser);
+    const raw = await scrapeTweets(page, handle, { limit: maxTweets });
+
+    const tweets: Tweet[] = [];
+    for (const t of raw) {
+      // Skip retweets
+      if (t.isRetweet) continue;
+      if (t.text?.startsWith("RT @")) continue;
+
+      if (!t.id || !t.text) continue;
+
+      tweets.push({
+        id: t.id,
+        text: t.text,
+        created_at: t.timestamp || new Date().toISOString(),
+        url: t.url || `https://x.com/${handle}/status/${t.id}`,
+        author_handle: handle,
+        metrics: {
+          likes: parseMetricCount(t.likes),
+          retweets: parseMetricCount(t.retweets),
+          replies: parseMetricCount(t.replies),
+        },
+      });
+    }
+
+    // Sort newest first
+    tweets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return tweets.slice(0, maxTweets);
+  } finally {
+    await browser.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// xactions profile scraper
+// ---------------------------------------------------------------------------
+
+export async function fetchProfileViaXactions(handle: string): Promise<TwitterProfile | null> {
+  const { createBrowser, createPage, scrapeProfile } = await import("xactions");
+
+  const browser = await createBrowser();
+  try {
+    const page = await createPage(browser);
+    const raw = await scrapeProfile(page, handle);
+
+    if (!raw || (!raw.username && !raw.name)) return null;
+
+    return {
+      handle: raw.username || handle,
+      displayName: raw.name || null,
+      avatarUrl: raw.avatar || null,
+      bio: raw.bio || null,
+      verified: raw.verified ?? false,
+      followers: raw.followers || null,
+      following: raw.following || null,
+    };
+  } catch {
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// xactions tweet search
+// ---------------------------------------------------------------------------
+
+export async function searchTweetsViaXactions(
+  query: string,
+  maxResults = 50,
+): Promise<Tweet[]> {
+  const { createBrowser, createPage, searchTweets } = await import("xactions");
+
+  const browser = await createBrowser();
+  try {
+    const page = await createPage(browser);
+    const raw = await searchTweets(page, query, { limit: maxResults, filter: "latest" });
+
+    const tweets: Tweet[] = [];
+    for (const t of raw) {
+      if (!t.id || !t.text) continue;
+
+      tweets.push({
+        id: t.id,
+        text: t.text,
+        created_at: t.timestamp || new Date().toISOString(),
+        url: t.url || `https://x.com/i/status/${t.id}`,
+        author_handle: t.author || undefined,
+        metrics: {
+          likes: parseMetricCount(t.likes),
+          retweets: 0,
+          replies: 0,
+        },
+      });
+    }
+
+    return tweets;
+  } finally {
+    await browser.close();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +422,7 @@ async function fetchViaBrowser(handle: string, maxTweets: number): Promise<Tweet
 export async function fetchUserTweets(handle: string, maxTweets = 200): Promise<Tweet[]> {
   const errors: string[] = [];
 
-  // Prefer official API when configured
+  // 1. Prefer official API when configured
   if (process.env["TWITTER_BEARER_TOKEN"]) {
     try {
       return await fetchViaTwitterApi(handle, maxTweets);
@@ -295,7 +433,16 @@ export async function fetchUserTweets(handle: string, maxTweets = 200): Promise<
     }
   }
 
-  // Try Nitter RSS
+  // 2. Try xactions scraper (no API key needed, stealth Puppeteer)
+  try {
+    return await fetchViaXactions(handle, maxTweets);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[twitter-fetch] xactions failed:", msg);
+    errors.push(`xactions: ${msg}`);
+  }
+
+  // 3. Try Nitter RSS
   try {
     return await fetchViaNitter(handle, maxTweets);
   } catch (err) {
@@ -304,7 +451,7 @@ export async function fetchUserTweets(handle: string, maxTweets = 200): Promise<
     errors.push(`Nitter: ${msg}`);
   }
 
-  // Try Playwright browser scraper (only if session file exists)
+  // 4. Try Playwright browser scraper (only if session file exists)
   if (existsSync(SESSION_PATH)) {
     try {
       return await fetchViaBrowser(handle, maxTweets);

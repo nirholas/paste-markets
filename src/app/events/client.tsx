@@ -110,9 +110,10 @@ function EventSummaryRow({ item }: { item: EventItem }) {
 interface EventsClientProps {
   initialItems: EventItem[];
   initialCategory: CategoryTab;
+  trendingItems?: EventItem[];
 }
 
-export function EventsClient({ initialItems, initialCategory }: EventsClientProps) {
+export function EventsClient({ initialItems, initialCategory, trendingItems = [] }: EventsClientProps) {
   const [items, setItems] = useState<EventItem[]>(initialItems);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -185,12 +186,26 @@ export function EventsClient({ initialItems, initialCategory }: EventsClientProp
                 Polymarket calls — sports, politics, macro, entertainment
               </p>
             </div>
-            <Link
-              href="/leaderboard?platform=polymarket"
-              className="text-xs text-text-muted hover:text-accent transition-colors hidden sm:block"
-            >
-              Top callers →
-            </Link>
+            <div className="flex items-center gap-3 hidden sm:flex">
+              <Link
+                href="/events/calendar"
+                className="text-xs text-text-muted hover:text-amber transition-colors"
+              >
+                Calendar
+              </Link>
+              <Link
+                href="/predictions/sports"
+                className="text-xs text-text-muted hover:text-win transition-colors"
+              >
+                Sports Board
+              </Link>
+              <Link
+                href="/leaderboard?platform=polymarket"
+                className="text-xs text-text-muted hover:text-accent transition-colors"
+              >
+                Top callers
+              </Link>
+            </div>
           </div>
         </div>
       </header>
@@ -261,6 +276,50 @@ export function EventsClient({ initialItems, initialCategory }: EventsClientProp
             </button>
           </div>
         </div>
+
+        {/* Trending section (only on "all" tab) */}
+        {!loading && category === "all" && trendingItems.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">
+              Trending Now
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {trendingItems.slice(0, 4).map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-surface border border-amber/20 rounded-lg p-4 hover:border-amber/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] uppercase tracking-widest text-amber font-mono">
+                      {(item as EventItem & { caller_count?: number }).caller_count ?? 1} caller{((item as EventItem & { caller_count?: number }).caller_count ?? 1) !== 1 ? "s" : ""}
+                    </span>
+                    {item.expires_at && (
+                      <span className="text-[10px] text-text-muted font-mono">
+                        {new Date(item.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-bold text-text-primary mb-2 leading-snug">
+                    {item.market_question ?? item.ticker}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    {item.current_price != null && (
+                      <span className="text-xs font-mono text-win">
+                        YES {Math.round(item.current_price * 100)}%
+                      </span>
+                    )}
+                    <Link
+                      href={`/${item.author_handle}`}
+                      className="text-xs text-text-muted hover:text-accent transition-colors"
+                    >
+                      @{item.author_handle}
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Items */}
         {loading ? (
@@ -361,9 +420,27 @@ export function EventsClient({ initialItems, initialCategory }: EventsClientProp
         )}
       </div>
 
-      <footer className="border-t border-border py-8 px-4 text-center text-xs text-text-muted mt-12">
+      {/* What's the Bet? CTA */}
+      <div className="max-w-3xl mx-auto px-4 mt-8 mb-4">
+        <div className="bg-surface border border-border rounded-lg p-6">
+          <h3 className="text-sm font-bold text-text-primary mb-1">
+            What&apos;s the Bet?
+          </h3>
+          <p className="text-text-muted text-xs mb-3">
+            Ask a question like &quot;Will Kentucky win March Madness?&quot; and we find the Polymarket event.
+          </p>
+          <Link
+            href="/trade?q="
+            className="inline-block border border-border rounded-lg px-4 py-2 text-xs font-bold text-text-primary hover:border-accent transition-colors"
+          >
+            Find a Market
+          </Link>
+        </div>
+      </div>
+
+      <footer className="border-t border-border py-8 px-4 text-center text-xs text-text-muted mt-8">
         <p>
-          paste.markets — Prediction market calls from{" "}
+          paste.markets — Event market data from{" "}
           <a
             href="https://paste.trade"
             target="_blank"
@@ -372,6 +449,7 @@ export function EventsClient({ initialItems, initialCategory }: EventsClientProp
           >
             paste.trade
           </a>
+          {" "}+ Polymarket
         </p>
       </footer>
     </main>

@@ -4,17 +4,17 @@ import { EventsClient } from "./client";
 import type { EventItem } from "@/app/api/events/route";
 
 export const metadata: Metadata = {
-  title: "Events & Predictions — paste.markets",
+  title: "Event Markets — paste.markets",
   description:
-    "Polymarket prediction calls on sports, politics, macro events, and entertainment. Real P&L from CT callers.",
+    "Browse sports, politics, crypto & entertainment prediction markets from Polymarket. See who is calling what — real P&L tracked.",
   openGraph: {
-    title: "Events & Predictions — paste.markets",
-    description: "Sports, politics, and macro prediction calls from CT. Real P&L data.",
+    title: "Event Markets — paste.markets",
+    description: "Sports betting, elections, crypto milestones — Polymarket event markets tracked by CT callers.",
     images: [{ url: "/api/og/events", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Events & Predictions — paste.markets",
+    title: "Event Markets — paste.markets",
     images: ["/api/og/events"],
   },
 };
@@ -35,12 +35,31 @@ async function getInitialEvents(): Promise<EventItem[]> {
   }
 }
 
+async function getTrendingEvents(): Promise<EventItem[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  try {
+    const res = await fetch(`${baseUrl}/api/events/trending`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.items ?? []) as EventItem[];
+  } catch {
+    return [];
+  }
+}
+
 export default async function EventsPage() {
-  const initialItems = await getInitialEvents();
+  const [initialItems, trendingItems] = await Promise.all([
+    getInitialEvents(),
+    getTrendingEvents(),
+  ]);
 
   return (
     <Suspense fallback={null}>
-      <EventsClient initialItems={initialItems} initialCategory="all" />
+      <EventsClient
+        initialItems={initialItems}
+        initialCategory="all"
+        trendingItems={trendingItems}
+      />
     </Suspense>
   );
 }

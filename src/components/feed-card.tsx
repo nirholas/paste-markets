@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
 import { tierColor } from "@/lib/alpha";
+import { DoubleDownButton } from "@/components/double-down-popover";
 
 function timeAgo(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
@@ -144,32 +145,43 @@ export function FeedCard({ item, showWagerCta = false, onWagerClick }: FeedCardP
         <PnlBadge pnl={item.pnl_pct} />
       </div>
 
-      {/* Footer: CTAs + wager stats */}
+      {/* Wager social proof */}
+      {item.wager_count > 0 && (
+        <div className="flex items-center gap-2 text-[11px] text-[#555568] font-mono">
+          <span className="text-[#f0f0f0]">&#x2B06; {item.wager_count}</span> backed
+          <span>·</span>
+          <span>{item.wager_total.toFixed(0)} USDC wagered</span>
+        </div>
+      )}
+
+      {/* Footer: CTAs + Double Down */}
       <div className="flex items-center justify-between pt-2 border-t border-[#1a1a2e]">
         <div className="flex items-center gap-3">
+          <DoubleDownButton
+            tradeId={item.id}
+            ticker={item.ticker}
+            direction={item.direction}
+            authorHandle={handle}
+            totalWagered={item.wager_total}
+            backerCount={item.wager_count}
+          />
           <a
             href={tradeHref}
             target={item.source_url ? "_blank" : undefined}
             rel={item.source_url ? "noopener noreferrer" : undefined}
             className="text-[11px] text-[#555568] hover:text-[#3b82f6] transition-colors font-mono"
           >
-            View Full Card →
+            View Trade
           </a>
-          {showWagerCta && item.wager_count === 0 && onWagerClick && (
-            <button
-              onClick={() => onWagerClick(item)}
-              className="text-[11px] text-[#f39c12] hover:text-[#f39c12]/70 transition-colors font-mono"
-            >
-              Back This Call
-            </button>
-          )}
         </div>
-        {item.wager_count > 0 && (
-          <span className="text-[11px] text-[#555568] font-mono">
-            {item.wager_count} {item.wager_count === 1 ? "backer" : "backers"}
-            {item.wager_total > 0 && ` · ${item.wager_total.toFixed(0)} USDC`}
-          </span>
-        )}
+        <a
+          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I'm backing @${handle}'s $${item.ticker.toUpperCase()} ${item.direction} call on paste.markets`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] text-[#555568] hover:text-[#3b82f6] transition-colors font-mono"
+        >
+          Share
+        </a>
       </div>
     </div>
   );

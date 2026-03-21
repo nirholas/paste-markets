@@ -69,6 +69,23 @@ db.exec(schema);
   }
 }
 
+// Wagers table migrations — add social columns
+{
+  const wagerCols = new Set(
+    (db.pragma("table_info(wagers)") as Array<{ name: string }>).map((c) => c.name),
+  );
+  const newWagerCols: Array<[string, string]> = [
+    ["display_on_feed", "INTEGER DEFAULT 1"],
+    ["backer_handle", "TEXT"],
+    ["backer_avatar_url", "TEXT"],
+  ];
+  for (const [col, def] of newWagerCols) {
+    if (!wagerCols.has(col)) {
+      db.exec(`ALTER TABLE wagers ADD COLUMN ${col} ${def}`);
+    }
+  }
+}
+
 export interface Author {
   handle: string;
   display_name: string | null;
@@ -1112,6 +1129,385 @@ export function getTriggeredAlerts(userHandle: string): TriggeredAlert[] {
   }
 
   return triggered;
+}
+
+// ---------------------------------------------------------------------------
+// Source Extractions ("What's The Trade?" multi-thesis)
+// ---------------------------------------------------------------------------
+
+export interface SourceExtractionRow {
+  id: string;
+  source_type: string;
+  source_url: string | null;
+  title: string;
+  author: string | null;
+  summary: string | null;
+  word_count: number;
+  thesis_count: number;
+  processing_time_ms: number;
+  created_at: string;
+}
+
+export interface ExtractedThesisRow {
+  id: string;
+  extraction_id: string;
+  ticker: string;
+  direction: string;
+  platform: string;
+  confidence: number;
+  reasoning: string | null;
+  quote: string | null;
+  timeframe: string | null;
+  conviction: string;
+  price_at_extraction: number | null;
+  paste_trade_id: string | null;
+  paste_trade_url: string | null;
+  current_pnl: number | null;
+  tracked_at: string | null;
+  created_at: string;
+}
+
+const extractionStmts = {
+  insertExtraction: db.prepare(`
+    INSERT INTO source_extractions (id, source_type, source_url, title, author, summary, word_count, thesis_count, processing_time_ms)
+    VALUES (@id, @source_type, @source_url, @title, @author, @summary, @word_count, @thesis_count, @processing_time_ms)
+  `),
+
+  insertThesis: db.prepare(`
+    INSERT INTO extracted_theses (id, extraction_id, ticker, direction, platform, confidence, reasoning, quote, timeframe, conviction, price_at_extraction)
+    VALUES (@id, @extraction_id, @ticker, @direction, @platform, @confidence, @reasoning, @quote, @timeframe, @conviction, @price_at_extraction)
+  `),
+
+  getExtraction: db.prepare<[string], SourceExtractionRow>(
+    "SELECT * FROM source_extractions WHERE id = ?",
+  ),
+
+  getExtractionTheses: db.prepare<[string], ExtractedThesisRow>(
+    "SELECT * FROM extracted_theses WHERE extraction_id = ? ORDER BY confidence DESC",
+  ),
+
+  getRecentExtractions: db.prepare<[number], SourceExtractionRow>(
+    "SELECT * FROM source_extractions ORDER BY created_at DESC LIMIT ?",
+  ),
+
+  updateThesisTracking: db.prepare(`
+    UPDATE extracted_theses
+    SET paste_trade_id = @paste_trade_id,
+        paste_trade_url = @paste_trade_url,
+        price_at_extraction = @price_at_extraction,
+        tracked_at = datetime('now')
+    WHERE id = @id
+  `),
+
+  updateThesisPnl: db.prepare(`
+    UPDATE extracted_theses SET current_pnl = @current_pnl WHERE id = @id
+  `),
+};
+
+export function saveExtraction(extraction: {
+  id: string;
+  source_type: string;
+  source_url: string | null;
+  title: string;
+  author: string | null;
+  summary: string;
+  word_count: number;
+  thesis_count: number;
+  processing_time_ms: number;
+  theses: Array<{
+    id: string;
+    ticker: string;
+    direction: string;
+    platform: string;
+    confidence: number;
+    reasoning: string;
+    quote: string;
+    timeframe: string | null;
+    conviction: string;
+    price_at_extraction: number | null;
+  }>;
+}): void {
+  const txn = db.transaction(() => {
+    extractionStmts.insertExtraction.run({
+      id: extraction.id,
+      source_type: extraction.source_type,
+      source_url: extraction.source_url,
+      title: extraction.title,
+      author: extraction.author,
+      summary: extraction.summary,
+      word_count: extraction.word_count,
+      thesis_count: extraction.thesis_count,
+      processing_time_ms: extraction.processing_time_ms,
+    });
+
+    for (const thesis of extraction.theses) {
+      extractionStmts.insertThesis.run({
+        id: thesis.id,
+        extraction_id: extraction.id,
+        ticker: thesis.ticker,
+        direction: thesis.direction,
+        platform: thesis.platform,
+        confidence: thesis.confidence,
+        reasoning: thesis.reasoning,
+        quote: thesis.quote,
+        timeframe: thesis.timeframe,
+        conviction: thesis.conviction,
+        price_at_extraction: thesis.price_at_extraction,
+      });
+    }
+  });
+  txn();
+}
+
+export function getExtraction(id: string): (SourceExtractionRow & { theses: ExtractedThesisRow[] }) | null {
+  const row = extractionStmts.getExtraction.get(id);
+  if (!row) return null;
+  const theses = extractionStmts.getExtractionTheses.all(id);
+  return { ...row, theses };
+}
+
+export function getRecentExtractions(limit = 10): SourceExtractionRow[] {
+  return extractionStmts.getRecentExtractions.all(limit);
+}
+
+export function trackThesis(
+  thesisId: string,
+  pasteTradeId: string,
+  pasteTradeUrl: string,
+  priceAtExtraction: number | null,
+): void {
+  extractionStmts.updateThesisTracking.run({
+    id: thesisId,
+    paste_trade_id: pasteTradeId,
+    paste_trade_url: pasteTradeUrl,
+    price_at_extraction: priceAtExtraction,
+  });
+}
+
+export function getSourcePerformance(extractionId: string): {
+  total: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  avgPnl: number;
+  tracked: number;
+} {
+  const theses = extractionStmts.getExtractionTheses.all(extractionId);
+  const tracked = theses.filter((t) => t.paste_trade_id != null);
+  const withPnl = tracked.filter((t) => t.current_pnl != null);
+  const wins = withPnl.filter((t) => (t.current_pnl ?? 0) > 0).length;
+  const losses = withPnl.filter((t) => (t.current_pnl ?? 0) <= 0).length;
+  const totalPnl = withPnl.reduce((sum, t) => sum + (t.current_pnl ?? 0), 0);
+
+  return {
+    total: theses.length,
+    wins,
+    losses,
+    winRate: withPnl.length > 0 ? (wins / withPnl.length) * 100 : 0,
+    avgPnl: withPnl.length > 0 ? totalPnl / withPnl.length : 0,
+    tracked: tracked.length,
+  };
+}
+
+// ── Copytrading Alert Rules ──────────────────────────────────────────────────
+
+import type { AlertRule, AlertCondition, AlertChannel } from "./alert-rules";
+
+export interface AlertRuleRow {
+  id: string;
+  user_id: string;
+  name: string;
+  conditions: string;
+  channels: string;
+  enabled: number;
+  match_count: number;
+  last_matched_at: string | null;
+  created_at: string;
+}
+
+export interface AlertNotificationRow {
+  id: string;
+  rule_id: string;
+  trade_id: string | null;
+  caller_handle: string | null;
+  ticker: string | null;
+  direction: string | null;
+  message: string;
+  channel: string;
+  delivered: number;
+  read_at: string | null;
+  created_at: string;
+}
+
+const alertRuleStmts = {
+  getByUser: db.prepare<[string], AlertRuleRow>(
+    "SELECT * FROM alert_rules WHERE user_id = ? ORDER BY created_at DESC",
+  ),
+  getEnabled: db.prepare<[], AlertRuleRow>(
+    "SELECT * FROM alert_rules WHERE enabled = 1",
+  ),
+  getById: db.prepare<[string], AlertRuleRow>(
+    "SELECT * FROM alert_rules WHERE id = ?",
+  ),
+  insert: db.prepare(`
+    INSERT INTO alert_rules (id, user_id, name, conditions, channels, enabled)
+    VALUES (@id, @user_id, @name, @conditions, @channels, @enabled)
+  `),
+  update: db.prepare(`
+    UPDATE alert_rules SET name = @name, conditions = @conditions, channels = @channels, enabled = @enabled
+    WHERE id = @id AND user_id = @user_id
+  `),
+  delete: db.prepare<[string, string]>(
+    "DELETE FROM alert_rules WHERE id = ? AND user_id = ?",
+  ),
+  toggleEnabled: db.prepare<[string, string]>(
+    "UPDATE alert_rules SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END WHERE id = ? AND user_id = ?",
+  ),
+  incrementMatch: db.prepare<[string]>(
+    "UPDATE alert_rules SET match_count = match_count + 1, last_matched_at = datetime('now') WHERE id = ?",
+  ),
+};
+
+const alertNotifStmts = {
+  insert: db.prepare(`
+    INSERT INTO alert_notifications (id, rule_id, trade_id, caller_handle, ticker, direction, message, channel, delivered)
+    VALUES (@id, @rule_id, @trade_id, @caller_handle, @ticker, @direction, @message, @channel, @delivered)
+  `),
+  getUnreadByUser: db.prepare<[string], AlertNotificationRow>(`
+    SELECT n.* FROM alert_notifications n
+    JOIN alert_rules r ON r.id = n.rule_id
+    WHERE r.user_id = ? AND n.read_at IS NULL
+    ORDER BY n.created_at DESC
+    LIMIT 50
+  `),
+  getByUser: db.prepare<[string, number], AlertNotificationRow>(`
+    SELECT n.* FROM alert_notifications n
+    JOIN alert_rules r ON r.id = n.rule_id
+    WHERE r.user_id = ?
+    ORDER BY n.created_at DESC
+    LIMIT ?
+  `),
+  markRead: db.prepare<[string, string]>(
+    "UPDATE alert_notifications SET read_at = datetime('now') WHERE rule_id IN (SELECT id FROM alert_rules WHERE user_id = ?) AND read_at IS NULL AND id = ?",
+  ),
+  markAllRead: db.prepare<[string]>(
+    "UPDATE alert_notifications SET read_at = datetime('now') WHERE rule_id IN (SELECT id FROM alert_rules WHERE user_id = ?) AND read_at IS NULL",
+  ),
+  countUnread: db.prepare<[string], { count: number }>(`
+    SELECT COUNT(*) as count FROM alert_notifications n
+    JOIN alert_rules r ON r.id = n.rule_id
+    WHERE r.user_id = ? AND n.read_at IS NULL
+  `),
+};
+
+function rowToAlertRule(row: AlertRuleRow): AlertRule {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    enabled: row.enabled === 1,
+    conditions: JSON.parse(row.conditions) as AlertCondition[],
+    channels: JSON.parse(row.channels) as AlertChannel[],
+    matchCount: row.match_count,
+    lastMatchedAt: row.last_matched_at,
+    createdAt: row.created_at,
+  };
+}
+
+export function getAlertRulesByUser(userId: string): AlertRule[] {
+  return alertRuleStmts.getByUser.all(userId).map(rowToAlertRule);
+}
+
+export function getAllEnabledAlertRules(): AlertRule[] {
+  return alertRuleStmts.getEnabled.all().map(rowToAlertRule);
+}
+
+export function getAlertRuleById(id: string): AlertRule | null {
+  const row = alertRuleStmts.getById.get(id);
+  return row ? rowToAlertRule(row) : null;
+}
+
+export function insertAlertRule(rule: AlertRule): void {
+  alertRuleStmts.insert.run({
+    id: rule.id,
+    user_id: rule.userId,
+    name: rule.name,
+    conditions: JSON.stringify(rule.conditions),
+    channels: JSON.stringify(rule.channels),
+    enabled: rule.enabled ? 1 : 0,
+  });
+}
+
+export function updateAlertRule(rule: AlertRule): boolean {
+  const result = alertRuleStmts.update.run({
+    id: rule.id,
+    user_id: rule.userId,
+    name: rule.name,
+    conditions: JSON.stringify(rule.conditions),
+    channels: JSON.stringify(rule.channels),
+    enabled: rule.enabled ? 1 : 0,
+  });
+  return result.changes > 0;
+}
+
+export function deleteAlertRule(id: string, userId: string): boolean {
+  const result = alertRuleStmts.delete.run(id, userId);
+  return result.changes > 0;
+}
+
+export function toggleAlertRule(id: string, userId: string): AlertRule | null {
+  alertRuleStmts.toggleEnabled.run(id, userId);
+  const row = alertRuleStmts.getById.get(id);
+  return row && row.user_id === userId ? rowToAlertRule(row) : null;
+}
+
+export function incrementAlertRuleMatch(id: string): void {
+  alertRuleStmts.incrementMatch.run(id);
+}
+
+export function insertAlertNotification(notif: {
+  id: string;
+  ruleId: string;
+  tradeId?: string;
+  callerHandle?: string;
+  ticker?: string;
+  direction?: string;
+  message: string;
+  channel: string;
+  delivered: boolean;
+}): void {
+  alertNotifStmts.insert.run({
+    id: notif.id,
+    rule_id: notif.ruleId,
+    trade_id: notif.tradeId ?? null,
+    caller_handle: notif.callerHandle ?? null,
+    ticker: notif.ticker ?? null,
+    direction: notif.direction ?? null,
+    message: notif.message,
+    channel: notif.channel,
+    delivered: notif.delivered ? 1 : 0,
+  });
+}
+
+export function getUnreadNotifications(userId: string): AlertNotificationRow[] {
+  return alertNotifStmts.getUnreadByUser.all(userId);
+}
+
+export function getNotificationsByUser(userId: string, limit = 50): AlertNotificationRow[] {
+  return alertNotifStmts.getByUser.all(userId, limit);
+}
+
+export function markNotificationRead(userId: string, notifId: string): void {
+  alertNotifStmts.markRead.run(userId, notifId);
+}
+
+export function markAllNotificationsRead(userId: string): void {
+  alertNotifStmts.markAllRead.run(userId);
+}
+
+export function countUnreadNotifications(userId: string): number {
+  const row = alertNotifStmts.countUnread.get(userId);
+  return row?.count ?? 0;
 }
 
 export { db };

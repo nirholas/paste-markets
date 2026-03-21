@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
 import { TradeCard } from "@/components/trade-card";
+import { LiveSignalCard } from "@/components/live-signal-card";
+import { useEventStream } from "@/lib/use-event-stream";
 
 const PAGE_SIZE = 20;
 
@@ -38,6 +41,87 @@ function SkeletonCard() {
   );
 }
 
+function timeAgoShort(isoString: string | null): string {
+  if (!isoString) return "never";
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+// ── Add Caller Modal ─────────────────────────────────────────────────────────
+
+function AddCallerModal({ onClose, onAdd }: { onClose: () => void; onAdd: (handle: string) => void }) {
+  const [handle, setHandle] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    const h = handle.trim().replace(/^@/, "");
+    if (!h) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: h }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to add caller");
+        return;
+      }
+      onAdd(h);
+      onClose();
+    } catch {
+      setError("Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-[#0f0f22] border border-[#1a1a2e] rounded-lg p-6 w-full max-w-sm space-y-4">
+        <h3 className="text-sm font-bold text-[#f0f0f0] uppercase tracking-widest">
+          Add Caller to Watch
+        </h3>
+        <input
+          type="text"
+          value={handle}
+          onChange={(e) => setHandle(e.target.value)}
+          placeholder="@handle"
+          className="w-full border border-[#1a1a2e] bg-[#0a0a1a] text-[#c8c8d0] text-xs px-3 py-2 rounded focus:outline-none focus:border-[#3b82f6] font-mono"
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          autoFocus
+        />
+        {error && <p className="text-[#e74c3c] text-xs">{error}</p>}
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="text-xs text-[#555568] hover:text-[#c8c8d0] transition-colors px-3 py-1.5"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={submitting || !handle.trim()}
+            className="text-xs border border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6]/10 transition-colors px-4 py-1.5 rounded disabled:opacity-50"
+          >
+            {submitting ? "Adding..." : "Add"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main FeedClient ──────────────────────────────────────────────────────────
+
 export function FeedClient() {
   const [trades, setTrades] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,8 +130,11 @@ export function FeedClient() {
   const [ticker, setTicker] = useState("");
   const [platform, setPlatform] = useState("");
   const [category, setCategory] = useState("");
+  const [liveMode, setLiveMode] = useState(false);
+  const [showAddCaller, setShowAddCaller] = useState(false);
   const offsetRef = useRef(0);
 
+  const stream = useEventStream(liveMode);
   const showCategoryFilter = platform === "polymarket" || platform === "";
 
   const fetchTrades = useCallback(
@@ -88,13 +175,14 @@ export function FeedClient() {
     fetchTrades(0, false).finally(() => setLoading(false));
   }, [fetchTrades]);
 
-  // Auto-refresh every 60s
+  // Auto-refresh every 60s (only when not in live mode)
   useEffect(() => {
+    if (liveMode) return;
     const interval = setInterval(() => {
       fetchTrades(0, false);
     }, 60_000);
     return () => clearInterval(interval);
-  }, [ticker, platform, category]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ticker, platform, category, liveMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset category when switching away from polymarket
   function handlePlatformChange(p: string) {
@@ -119,6 +207,69 @@ export function FeedClient() {
 
   return (
     <div>
+      {/* Header with LIVE toggle */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs uppercase tracking-widest text-text-muted">
+            LIVE FEED
+          </p>
+          <button
+            onClick={() => setLiveMode(!liveMode)}
+            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-mono border rounded transition-all ${
+              liveMode
+                ? "border-[#2ecc71] text-[#2ecc71] bg-[#2ecc71]/10"
+                : "border-[#1a1a2e] text-[#555568] hover:border-[#555568]"
+            }`}
+          >
+            {liveMode && (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2ecc71] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2ecc71]" />
+              </span>
+            )}
+            {liveMode ? "LIVE" : "Go Live"}
+          </button>
+        </div>
+        <h1 className="text-2xl font-bold text-text-primary">
+          Real-time trade calls from CT
+        </h1>
+        <p className="text-text-secondary text-sm mt-2">
+          {liveMode
+            ? `Monitoring ${stream.activeCallers} callers | Last signal: ${timeAgoShort(stream.lastSignalAt)}`
+            : "All trades being posted to paste.trade. Refreshes every 60 seconds."}
+        </p>
+      </div>
+
+      {/* Live mode status bar */}
+      {liveMode && (
+        <div className="flex items-center justify-between mb-4 px-3 py-2 border border-[#1a1a2e] rounded bg-[#0f0f22]">
+          <div className="flex items-center gap-3">
+            <span className={`text-[10px] uppercase tracking-widest font-mono ${stream.connected ? "text-[#2ecc71]" : "text-[#e74c3c]"}`}>
+              {stream.connected ? "Connected" : "Reconnecting..."}
+            </span>
+            {stream.tradesFoundToday > 0 && (
+              <span className="text-[10px] text-[#555568] font-mono">
+                {stream.tradesFoundToday} signals today
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAddCaller(true)}
+              className="text-[10px] text-[#3b82f6] hover:text-[#3b82f6]/70 transition-colors font-mono"
+            >
+              + Add Caller
+            </button>
+            <Link
+              href="/signals"
+              className="text-[10px] text-[#f39c12] hover:text-[#f39c12]/70 transition-colors font-mono"
+            >
+              View Signals →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <input
@@ -166,6 +317,20 @@ export function FeedClient() {
               {o.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Live streaming signals (shown above regular feed) */}
+      {liveMode && stream.liveEvents.length > 0 && (
+        <div className="space-y-3 mb-6">
+          {stream.liveEvents.map((event, i) => (
+            <LiveSignalCard
+              key={`${event.handle}-${event.tweetUrl}-${i}`}
+              event={event}
+              animate={i === 0}
+            />
+          ))}
+          <div className="border-b border-[#1a1a2e] my-4" />
         </div>
       )}
 
@@ -217,6 +382,16 @@ export function FeedClient() {
             {loadingMore ? "Loading..." : "Load more"}
           </button>
         </div>
+      )}
+
+      {/* Add Caller Modal */}
+      {showAddCaller && (
+        <AddCallerModal
+          onClose={() => setShowAddCaller(false)}
+          onAdd={() => {
+            // Could refresh stats here
+          }}
+        />
       )}
     </div>
   );
