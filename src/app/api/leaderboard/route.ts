@@ -67,6 +67,14 @@ export async function GET(request: NextRequest) {
   const platformRaw = (venueRaw ? (VENUE_TO_PLATFORM[venueRaw] ?? venueRaw) : searchParams.get("platform") ?? "all").toLowerCase();
   const platform = VALID_PLATFORMS.has(platformRaw) ? platformRaw : "all";
 
+  const offsetRaw = parseInt(searchParams.get("offset") ?? "0", 10);
+  const offset = isNaN(offsetRaw) ? 0 : Math.max(0, offsetRaw);
+
+  const minTradesRaw = parseInt(searchParams.get("min_trades") ?? "0", 10);
+  const minTrades = isNaN(minTradesRaw) ? 0 : Math.max(0, minTradesRaw);
+
+  const order = searchParams.get("order") === "asc" ? "asc" : "desc";
+
   const ticker = searchParams.get("ticker")?.toUpperCase() ?? null;
   const mode = searchParams.get("mode"); // "streaks" for hot streaks view
 
