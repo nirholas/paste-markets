@@ -36,7 +36,16 @@ export async function GET(request: NextRequest) {
     ? 3
     : Math.max(2, Math.min(minCallersRaw, 20));
 
-  const platformFilter = (searchParams.get("platform") ?? "").toLowerCase();
+  // Accept "venue" as an alias for "platform"
+  const VENUE_TO_PLATFORM: Record<string, string> = {
+    stocks: "robinhood",
+    perps: "hyperliquid",
+    prediction: "polymarket",
+  };
+  const venueRaw = searchParams.get("venue")?.toLowerCase();
+  const platformFilter = venueRaw
+    ? (VENUE_TO_PLATFORM[venueRaw] ?? venueRaw)
+    : (searchParams.get("platform") ?? "").toLowerCase();
 
   const cacheKey = `${timeframe}:${minCallers}:${platformFilter}`;
   const cached = cache.get(cacheKey);
