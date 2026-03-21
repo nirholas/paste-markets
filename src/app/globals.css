@@ -3,25 +3,13 @@
 @tailwind utilities;
 
 body {
-  background-color: #0a0a1a;
-  color: #f0f0f0;
-}
-
-/* Subtle dot grid background */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background-image: radial-gradient(circle, #1a1a2e 1px, transparent 1px);
-  background-size: 24px 24px;
-  opacity: 0.4;
-  pointer-events: none;
+  background-color: #0a0a0f;
+  color: #f5f5f7;
 }
 
 ::selection {
-  background-color: #3b82f6;
-  color: #f0f0f0;
+  background-color: #6366f1;
+  color: #f5f5f7;
 }
 
 /* Custom scrollbar */
@@ -29,51 +17,14 @@ body::before {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a1a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1a1a2e;
+  background: #ffffff14;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2a2a4e;
-}
-
-/* Hero glow */
-.hero-glow {
-  position: relative;
-}
-.hero-glow::before {
-  content: "";
-  position: absolute;
-  top: -40%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 600px;
-  height: 400px;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(59, 130, 246, 0.08) 0%,
-    rgba(59, 130, 246, 0.03) 40%,
-    transparent 70%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Input glow on focus */
-.input-glow:focus-within {
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3),
-    0 0 20px rgba(59, 130, 246, 0.08);
-}
-
-/* Card hover glow */
-.card-glow {
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.card-glow:hover {
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3),
-    0 0 1px rgba(59, 130, 246, 0.15);
+  background: #ffffff28;
 }
 
 /* Feed row animation */
@@ -107,7 +58,7 @@ body::before {
   animation-play-state: paused;
 }
 
-/* New trade toast slide-up */
+/* Toast slide-up */
 @keyframes slide-up {
   from {
     opacity: 0;
@@ -123,7 +74,7 @@ body::before {
   animation: slide-up 0.25s ease-out forwards;
 }
 
-/* Live signal card slide-in */
+/* Card slide-in */
 @keyframes live-slide-in {
   from {
     opacity: 0;
@@ -139,12 +90,12 @@ body::before {
   animation: live-slide-in 0.3s ease-out forwards;
 }
 
-/* Wall card hover glow */
+/* Wall card hover */
 .wall-card-glow:hover {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Wrapped story slide entrance */
+/* Wrapped story slide */
 @keyframes story-slide-in {
   from {
     opacity: 0;
@@ -160,13 +111,12 @@ body::before {
   animation: story-slide-in 0.4s ease-out forwards;
 }
 
-/* Stat shimmer */
-@keyframes shimmer {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 0.5; }
+/* Live pulse */
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-.stat-pulse {
-  animation: shimmer 3s ease-in-out infinite;
+.animate-live {
+  animation: pulse-live 2s ease-in-out infinite;
 }

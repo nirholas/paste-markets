@@ -152,11 +152,11 @@ export async function GET(request: Request) {
           ORDER BY posted_at DESC
           LIMIT 200
         `
-    ) as Promise<PredictionRow[]>,
+    ) as unknown as Promise<PredictionRow[]>,
     fetchLiveEnrichmentMap(),
   ]);
 
-  const trades = rows.map((row) => {
+  const trades = (rows as PredictionRow[]).map((row) => {
     const key = `${row.author_handle.toLowerCase()}::${row.ticker.toLowerCase()}`;
     return rowToPredictionTrade(row, liveMap.get(key));
   });
@@ -196,12 +196,12 @@ export async function POST() {
       WHERE platform = 'polymarket'
       ORDER BY posted_at DESC
       LIMIT 500
-    ` as Promise<PredictionRow[]>,
+    ` as unknown as Promise<PredictionRow[]>,
     fetchLiveEnrichmentMap(),
   ]);
 
   const byHandle = new Map<string, PredictionTrade[]>();
-  for (const row of rows) {
+  for (const row of (rows as PredictionRow[])) {
     const key = `${row.author_handle.toLowerCase()}::${row.ticker.toLowerCase()}`;
     const trade = rowToPredictionTrade(row, liveMap.get(key));
     const existing = byHandle.get(row.author_handle) ?? [];
