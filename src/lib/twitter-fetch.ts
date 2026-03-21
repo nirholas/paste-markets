@@ -175,11 +175,13 @@ function parseMetricCount(value: string | null | undefined): number {
 }
 
 async function fetchViaXactions(handle: string, maxTweets: number): Promise<Tweet[]> {
-  const { createBrowser, createPage, scrapeTweets } = await import("xactions");
+  const { createBrowser, createPage, loginWithCookie, scrapeTweets } = await import("xactions");
 
   const browser = await createBrowser();
   try {
     const page = await createPage(browser);
+    const cookie = process.env["XACTIONS_SESSION_COOKIE"];
+    if (cookie) await loginWithCookie(page, cookie);
     const raw = await scrapeTweets(page, handle, { limit: maxTweets });
 
     const tweets: Tweet[] = [];
@@ -236,10 +238,12 @@ export async function fetchProfile(handle: string): Promise<TwitterProfile | nul
   // Fall back to xactions Puppeteer
   if (mode !== "http") {
     try {
-      const { createBrowser, createPage, scrapeProfile } = await import("xactions");
+      const { createBrowser, createPage, loginWithCookie, scrapeProfile } = await import("xactions");
       const browser = await createBrowser();
       try {
         const page = await createPage(browser);
+        const cookie = process.env["XACTIONS_SESSION_COOKIE"];
+        if (cookie) await loginWithCookie(page, cookie);
         const raw = await scrapeProfile(page, handle);
         if (!raw || (!raw.username && !raw.name)) return null;
 
@@ -279,10 +283,12 @@ export async function searchTweets(query: string, maxResults = 50): Promise<Twee
 
   // Fall back to xactions Puppeteer
   if (mode !== "http") {
-    const { createBrowser, createPage, searchTweets: xSearch } = await import("xactions");
+    const { createBrowser, createPage, loginWithCookie, searchTweets: xSearch } = await import("xactions");
     const browser = await createBrowser();
     try {
       const page = await createPage(browser);
+      const cookie = process.env["XACTIONS_SESSION_COOKIE"];
+      if (cookie) await loginWithCookie(page, cookie);
       const raw = await xSearch(page, query, { limit: maxResults, filter: "latest" });
 
       return raw

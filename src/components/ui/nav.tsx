@@ -161,23 +161,23 @@ export default function Nav() {
   const pathname = usePathname();
 
   return (
-    <nav className="relative bg-[#0f0f22] border-b border-[#1a1a2e] px-4 md:px-6 py-3 font-mono">
-      <div className="flex items-center gap-6">
+    <nav className="sticky top-0 z-40 bg-[#0a0a1a]/80 backdrop-blur-md border-b border-[#1a1a2e]/80 px-4 md:px-6 py-3 font-mono">
+      <div className="max-w-7xl mx-auto flex items-center gap-6">
         {/* Logo */}
         <Link href="/" className="text-[#f0f0f0] font-bold text-lg tracking-tight hover:text-[#3b82f6] transition-colors shrink-0">
-          paste.markets
+          paste<span className="text-[#3b82f6]">.</span>markets
         </Link>
 
         {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-5 flex-1">
+        <div className="hidden md:flex items-center gap-1 flex-1">
           {PRIMARY_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm transition-colors ${
+              className={`text-sm px-3 py-1.5 rounded transition-colors ${
                 pathname === link.href
-                  ? "text-[#f0f0f0]"
-                  : "text-[#555568] hover:text-[#c8c8d0]"
+                  ? "text-[#f0f0f0] bg-[#1a1a2e]/60"
+                  : "text-[#555568] hover:text-[#c8c8d0] hover:bg-[#1a1a2e]/30"
               }`}
             >
               {link.label}

@@ -7,11 +7,76 @@ body {
   color: #f0f0f0;
 }
 
+/* Subtle dot grid background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(circle, #1a1a2e 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 ::selection {
   background-color: #3b82f6;
   color: #f0f0f0;
 }
 
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a1a2e;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a2a4e;
+}
+
+/* Hero glow */
+.hero-glow {
+  position: relative;
+}
+.hero-glow::before {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(59, 130, 246, 0.08) 0%,
+    rgba(59, 130, 246, 0.03) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Input glow on focus */
+.input-glow:focus-within {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3),
+    0 0 20px rgba(59, 130, 246, 0.08);
+}
+
+/* Card hover glow */
+.card-glow {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.card-glow:hover {
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3),
+    0 0 1px rgba(59, 130, 246, 0.15);
+}
+
+/* Feed row animation */
 @keyframes slideInFromTop {
   from {
     opacity: 0;
@@ -93,4 +158,15 @@ body {
 
 .story-slide-enter {
   animation: story-slide-in 0.4s ease-out forwards;
+}
+
+/* Stat shimmer */
+@keyframes shimmer {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+.stat-pulse {
+  animation: shimmer 3s ease-in-out infinite;
 }

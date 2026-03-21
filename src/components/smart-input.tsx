@@ -73,17 +73,27 @@ export function SmartInput() {
     <div className="w-full">
       <form onSubmit={handleSubmit}>
         <div
-          className={`flex items-center bg-surface border rounded-lg px-4 py-3 transition-colors ${borderClass}`}
+          className={`input-glow flex items-center bg-[#0f0f22] border rounded-lg px-5 py-4 transition-all ${borderClass}`}
         >
+          <span className="text-[#555568] mr-3 text-lg select-none">/</span>
           <input
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={PLACEHOLDERS[placeholderIdx]}
-            className="flex-1 bg-transparent outline-none text-text-primary placeholder:text-text-muted font-mono text-base"
+            className="flex-1 bg-transparent outline-none text-[#f0f0f0] placeholder:text-[#555568] font-mono text-base"
             autoComplete="off"
             spellCheck={false}
           />
+          {type !== "empty" && (
+            <button
+              type="button"
+              onClick={() => setValue("")}
+              className="text-[#555568] hover:text-[#c8c8d0] transition-colors ml-2 text-sm"
+            >
+              &times;
+            </button>
+          )}
         </div>
 
         {/* Label */}
