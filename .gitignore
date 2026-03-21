@@ -12,3 +12,4 @@ dist/
 .vercel
 .vercel/
 .tls/
+.env*.local
