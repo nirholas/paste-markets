@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { getCachedBacktestReport } from "@/lib/backtest-db";
 import type { BacktestReport } from "@/lib/backtest-processor";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const WIDTH = 1200;
 const HEIGHT = 630;

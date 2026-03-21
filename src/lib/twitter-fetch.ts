@@ -1,14 +1,22 @@
 /**
  * Tweet fetching for bulk caller scan.
  *
- * Strategy (in order):
+ * Feature flag: TWITTER_SCRAPE_MODE
+ *   "http"    → Direct GraphQL API via cookies (fast, needs X_AUTH_TOKEN + X_CSRF_TOKEN)
+ *   "browser" → xactions Puppeteer stealth scraper (slow, no auth needed)
+ *   "auto"    → HTTP if cookies available, else browser (default)
+ *
+ * Full fallback chain:
  * 1. Twitter API v2 (if TWITTER_BEARER_TOKEN is set)
- * 2. xactions Puppeteer scraper (no API key needed, stealth mode)
- * 3. Nitter RSS feed (public, no auth required) — tries multiple instances
- * 4. Playwright browser scraper (if config/x-session.json exists)
+ * 2. HTTP GraphQL client (if cookies available + mode != "browser")
+ * 3. xactions Puppeteer scraper (if mode != "http")
+ * 4. Nitter RSS feed
+ * 5. Playwright browser scraper (if config/x-session.json exists)
  */
 
 import { existsSync } from "fs";
+import { TwitterHttpClient } from "./twitter-http-client";
+import type { TwitterTweet, TwitterUser } from "./twitter-http-client";
 
 export interface Tweet {
   id: string;
@@ -21,6 +29,7 @@ export interface Tweet {
     likes: number;
     retweets: number;
     replies: number;
+    views?: number;
   };
 }
 
@@ -30,8 +39,52 @@ export interface TwitterProfile {
   avatarUrl: string | null;
   bio: string | null;
   verified: boolean;
-  followers: string | null;
-  following: string | null;
+  followers: number;
+  following: number;
+}
+
+// ─── Feature flag ───────────────────────────────────────────────────────────
+
+type ScrapeMode = "http" | "browser" | "auto";
+
+function getScrapeMode(): ScrapeMode {
+  const mode = process.env["TWITTER_SCRAPE_MODE"]?.toLowerCase();
+  if (mode === "http" || mode === "browser") return mode;
+  return "auto";
+}
+
+// ─── Shared HTTP client singleton ───────────────────────────────────────────
+
+let _httpClient: TwitterHttpClient | null = null;
+
+function getHttpClient(): TwitterHttpClient {
+  if (!_httpClient) {
+    _httpClient = new TwitterHttpClient();
+  }
+  return _httpClient;
+}
+
+function httpClientAvailable(): boolean {
+  return getHttpClient().isAuthenticated;
+}
+
+// ─── Convert TwitterTweet → Tweet ───────────────────────────────────────────
+
+function toTweet(t: TwitterTweet): Tweet {
+  return {
+    id: t.id,
+    text: t.text,
+    created_at: new Date(t.createdAt).toISOString(),
+    url: `https://x.com/${t.authorUsername}/status/${t.id}`,
+    author_handle: t.authorUsername || undefined,
+    author_name: t.authorName || undefined,
+    metrics: {
+      likes: t.likes,
+      retweets: t.retweets,
+      replies: t.replies,
+      views: t.views,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -42,7 +95,6 @@ async function fetchViaTwitterApi(handle: string, maxTweets: number): Promise<Tw
   const token = process.env["TWITTER_BEARER_TOKEN"];
   if (!token) throw new Error("TWITTER_BEARER_TOKEN not configured");
 
-  // Resolve username → user ID
   const userRes = await fetch(
     `https://api.twitter.com/2/users/by/username/${encodeURIComponent(handle)}`,
     {
@@ -57,7 +109,6 @@ async function fetchViaTwitterApi(handle: string, maxTweets: number): Promise<Tw
   const userId = userData.data?.id;
   if (!userId) throw new Error(`Twitter user not found: @${handle}`);
 
-  // Paginate timeline
   const tweets: Tweet[] = [];
   let nextToken: string | undefined;
 
@@ -91,7 +142,6 @@ async function fetchViaTwitterApi(handle: string, maxTweets: number): Promise<Tw
     nextToken = data.meta?.next_token;
     if (!nextToken || tweets.length >= maxTweets) break;
 
-    // Small pause to stay within rate limits
     await new Promise((r) => setTimeout(r, 300));
   }
 
@@ -99,7 +149,21 @@ async function fetchViaTwitterApi(handle: string, maxTweets: number): Promise<Tw
 }
 
 // ---------------------------------------------------------------------------
-// xactions Puppeteer scraper (no API key needed)
+// HTTP GraphQL client (fast path — Swarmsy-style)
+// ---------------------------------------------------------------------------
+
+async function fetchViaHttp(handle: string, maxTweets: number): Promise<Tweet[]> {
+  const client = getHttpClient();
+  if (!client.isAuthenticated) {
+    throw new Error("HTTP client not authenticated — set X_AUTH_TOKEN + X_CSRF_TOKEN env vars or provide config/x-session.json");
+  }
+
+  const raw = await client.getAllUserTweets(handle, maxTweets);
+  return raw.map(toTweet);
+}
+
+// ---------------------------------------------------------------------------
+// xactions Puppeteer scraper (browser path)
 // ---------------------------------------------------------------------------
 
 function parseMetricCount(value: string | null | undefined): number {
@@ -120,10 +184,8 @@ async function fetchViaXactions(handle: string, maxTweets: number): Promise<Twee
 
     const tweets: Tweet[] = [];
     for (const t of raw) {
-      // Skip retweets
       if (t.isRetweet) continue;
       if (t.text?.startsWith("RT @")) continue;
-
       if (!t.id || !t.text) continue;
 
       tweets.push({
@@ -140,9 +202,7 @@ async function fetchViaXactions(handle: string, maxTweets: number): Promise<Twee
       });
     }
 
-    // Sort newest first
     tweets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
     return tweets.slice(0, maxTweets);
   } finally {
     await browser.close();
@@ -150,72 +210,101 @@ async function fetchViaXactions(handle: string, maxTweets: number): Promise<Twee
 }
 
 // ---------------------------------------------------------------------------
-// xactions profile scraper
+// Profile fetching (uses HTTP client or xactions)
 // ---------------------------------------------------------------------------
 
-export async function fetchProfileViaXactions(handle: string): Promise<TwitterProfile | null> {
-  const { createBrowser, createPage, scrapeProfile } = await import("xactions");
+export async function fetchProfile(handle: string): Promise<TwitterProfile | null> {
+  const mode = getScrapeMode();
 
-  const browser = await createBrowser();
-  try {
-    const page = await createPage(browser);
-    const raw = await scrapeProfile(page, handle);
-
-    if (!raw || (!raw.username && !raw.name)) return null;
-
-    return {
-      handle: raw.username || handle,
-      displayName: raw.name || null,
-      avatarUrl: raw.avatar || null,
-      bio: raw.bio || null,
-      verified: raw.verified ?? false,
-      followers: raw.followers || null,
-      following: raw.following || null,
-    };
-  } catch {
-    return null;
-  } finally {
-    await browser.close();
+  // Try HTTP client first (unless forced to browser)
+  if (mode !== "browser" && httpClientAvailable()) {
+    const client = getHttpClient();
+    const user = await client.getUser(handle);
+    if (user) {
+      return {
+        handle: user.username,
+        displayName: user.name,
+        avatarUrl: user.profileImageUrl ?? null,
+        bio: user.bio,
+        verified: user.verified,
+        followers: user.followersCount,
+        following: user.followingCount,
+      };
+    }
   }
+
+  // Fall back to xactions Puppeteer
+  if (mode !== "http") {
+    try {
+      const { createBrowser, createPage, scrapeProfile } = await import("xactions");
+      const browser = await createBrowser();
+      try {
+        const page = await createPage(browser);
+        const raw = await scrapeProfile(page, handle);
+        if (!raw || (!raw.username && !raw.name)) return null;
+
+        return {
+          handle: raw.username || handle,
+          displayName: raw.name || null,
+          avatarUrl: raw.avatar || null,
+          bio: raw.bio || null,
+          verified: raw.verified ?? false,
+          followers: parseMetricCount(raw.followers),
+          following: parseMetricCount(raw.following),
+        };
+      } finally {
+        await browser.close();
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
-// xactions tweet search
+// Tweet search (uses HTTP client or xactions)
 // ---------------------------------------------------------------------------
 
-export async function searchTweetsViaXactions(
-  query: string,
-  maxResults = 50,
-): Promise<Tweet[]> {
-  const { createBrowser, createPage, searchTweets } = await import("xactions");
+export async function searchTweets(query: string, maxResults = 50): Promise<Tweet[]> {
+  const mode = getScrapeMode();
 
-  const browser = await createBrowser();
-  try {
-    const page = await createPage(browser);
-    const raw = await searchTweets(page, query, { limit: maxResults, filter: "latest" });
-
-    const tweets: Tweet[] = [];
-    for (const t of raw) {
-      if (!t.id || !t.text) continue;
-
-      tweets.push({
-        id: t.id,
-        text: t.text,
-        created_at: t.timestamp || new Date().toISOString(),
-        url: t.url || `https://x.com/i/status/${t.id}`,
-        author_handle: t.author || undefined,
-        metrics: {
-          likes: parseMetricCount(t.likes),
-          retweets: 0,
-          replies: 0,
-        },
-      });
-    }
-
-    return tweets;
-  } finally {
-    await browser.close();
+  // Try HTTP client first
+  if (mode !== "browser" && httpClientAvailable()) {
+    const client = getHttpClient();
+    const result = await client.search(query, maxResults);
+    return result.tweets.map(toTweet);
   }
+
+  // Fall back to xactions Puppeteer
+  if (mode !== "http") {
+    const { createBrowser, createPage, searchTweets: xSearch } = await import("xactions");
+    const browser = await createBrowser();
+    try {
+      const page = await createPage(browser);
+      const raw = await xSearch(page, query, { limit: maxResults, filter: "latest" });
+
+      return raw
+        .filter((t: Record<string, unknown>) => t.id && t.text)
+        .map((t: Record<string, unknown>) => ({
+          id: t.id as string,
+          text: t.text as string,
+          created_at: (t.timestamp as string) || new Date().toISOString(),
+          url: (t.url as string) || `https://x.com/i/status/${t.id}`,
+          author_handle: (t.author as string) || undefined,
+          metrics: {
+            likes: parseMetricCount(t.likes as string),
+            retweets: 0,
+            replies: 0,
+          },
+        }));
+    } finally {
+      await browser.close();
+    }
+  }
+
+  throw new Error("[twitter-fetch] Search unavailable — no auth for HTTP mode and browser mode disabled");
 }
 
 // ---------------------------------------------------------------------------
@@ -235,28 +324,22 @@ function parseNitterRss(xml: string, handle: string): Tweet[] {
   for (const match of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
     const item = match[1] ?? "";
 
-    // Title = tweet text (CDATA wrapped)
     const titleMatch = item.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/);
     if (!titleMatch?.[1]) continue;
     let text = titleMatch[1].trim();
 
-    // Skip retweets
     if (text.startsWith("RT @")) continue;
 
-    // Strip any HTML tags that might be in the CDATA
     text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     if (!text || text.length < 10) continue;
 
-    // Link
     const linkMatch = item.match(/<link>(.*?)<\/link>/);
     const link = linkMatch?.[1]?.trim() ?? "";
 
-    // Tweet ID from URL
     const idMatch = link.match(/\/status\/(\d+)/);
     const id = idMatch?.[1] ?? "";
     if (!id) continue;
 
-    // Date
     const dateMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
     let created_at = new Date().toISOString();
     if (dateMatch?.[1]) {
@@ -355,30 +438,25 @@ async function fetchViaBrowser(handle: string, maxTweets: number): Promise<Tweet
     const IDLE_LIMIT = 15;
 
     for (let i = 0; i < MAX_SCROLLS && seen.size < maxTweets; i++) {
-      // Extract visible tweets
       const articles = await page.$$('article[data-testid="tweet"]');
 
       for (const article of articles) {
         try {
-          // Skip retweets
           const socialContext = await article.$('[data-testid="socialContext"]');
           if (socialContext) {
             const ctText = await socialContext.textContent();
             if (ctText?.toLowerCase().includes("reposted")) continue;
           }
 
-          // Tweet ID from permalink
           const permalink = await article.$('a[href*="/status/"]');
           if (!permalink) continue;
           const href = (await permalink.getAttribute("href")) ?? "";
           const tweetId = href.split("/status/")[1]?.split(/[/?]/)[0] ?? "";
           if (!tweetId || seen.has(tweetId)) continue;
 
-          // Tweet text
           const textEl = await article.$('[data-testid="tweetText"]');
           const text = ((await textEl?.innerText()) ?? "").trim();
 
-          // Timestamp
           const timeEl = await article.$("time[datetime]");
           const created_at =
             ((await timeEl?.getAttribute("datetime")) ?? "") || new Date().toISOString();
@@ -420,9 +498,10 @@ async function fetchViaBrowser(handle: string, maxTweets: number): Promise<Tweet
 // ---------------------------------------------------------------------------
 
 export async function fetchUserTweets(handle: string, maxTweets = 200): Promise<Tweet[]> {
+  const mode = getScrapeMode();
   const errors: string[] = [];
 
-  // 1. Prefer official API when configured
+  // 1. Official API when configured
   if (process.env["TWITTER_BEARER_TOKEN"]) {
     try {
       return await fetchViaTwitterApi(handle, maxTweets);
@@ -433,16 +512,31 @@ export async function fetchUserTweets(handle: string, maxTweets = 200): Promise<
     }
   }
 
-  // 2. Try xactions scraper (no API key needed, stealth Puppeteer)
-  try {
-    return await fetchViaXactions(handle, maxTweets);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn("[twitter-fetch] xactions failed:", msg);
-    errors.push(`xactions: ${msg}`);
+  // 2. HTTP GraphQL (fast path) — unless mode is "browser"
+  if (mode !== "browser" && httpClientAvailable()) {
+    try {
+      console.log(`[twitter-fetch] Using HTTP mode for @${handle}`);
+      return await fetchViaHttp(handle, maxTweets);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[twitter-fetch] HTTP GraphQL failed:", msg);
+      errors.push(`HTTP: ${msg}`);
+    }
   }
 
-  // 3. Try Nitter RSS
+  // 3. xactions Puppeteer (browser path) — unless mode is "http"
+  if (mode !== "http") {
+    try {
+      console.log(`[twitter-fetch] Using browser mode for @${handle}`);
+      return await fetchViaXactions(handle, maxTweets);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[twitter-fetch] xactions failed:", msg);
+      errors.push(`xactions: ${msg}`);
+    }
+  }
+
+  // 4. Nitter RSS
   try {
     return await fetchViaNitter(handle, maxTweets);
   } catch (err) {
@@ -451,7 +545,7 @@ export async function fetchUserTweets(handle: string, maxTweets = 200): Promise<
     errors.push(`Nitter: ${msg}`);
   }
 
-  // 4. Try Playwright browser scraper (only if session file exists)
+  // 5. Playwright browser scraper
   if (existsSync(SESSION_PATH)) {
     try {
       return await fetchViaBrowser(handle, maxTweets);
