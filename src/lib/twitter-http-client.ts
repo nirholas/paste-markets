@@ -115,7 +115,7 @@ export class TwitterHttpClient {
         followersCount: profile.followersCount ?? 0,
         followingCount: profile.followingCount ?? 0,
         tweetCount: profile.tweetsCount ?? 0,
-        verified: profile.isBlueVerified ?? profile.verified ?? false,
+        verified: profile.isBlueVerified ?? profile.isVerified ?? false,
         profileImageUrl: profile.avatar ?? undefined,
       };
     } catch {
@@ -149,7 +149,7 @@ export class TwitterHttpClient {
         quotedTweetId: tweet.quotedStatusId ?? undefined,
         inReplyToId: tweet.inReplyToStatusId ?? undefined,
         mediaUrls: (tweet.photos ?? []).map((p: { url: string }) => p.url),
-        language: tweet.lang ?? undefined,
+        language: undefined,
       });
 
       if (results.length >= maxTweets) break;
@@ -182,7 +182,7 @@ export class TwitterHttpClient {
         isRetweet: tweet.isRetweet ?? false,
         isQuote: tweet.isQuoted ?? false,
         mediaUrls: (tweet.photos ?? []).map((p: { url: string }) => p.url),
-        language: tweet.lang ?? undefined,
+        language: undefined,
       });
 
       if (tweets.length >= maxResults) break;
