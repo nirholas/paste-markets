@@ -4,10 +4,10 @@ import type { HeatmapResponse } from "@/app/api/heatmap/route";
 
 export const metadata: Metadata = {
   title: "Ticker Heatmap — paste.markets",
-  description: "What CT is trading right now. Sized by volume, colored by sentiment.",
+  description: "What CT is trading right now. Sized by call volume, colored by P&L.",
   openGraph: {
     title: "Ticker Heatmap — paste.markets",
-    description: "What CT is trading right now. Sized by volume, colored by sentiment.",
+    description: "What CT is trading right now. Sized by call volume, colored by P&L.",
     images: [{ url: "/api/og/heatmap", width: 1200, height: 630 }],
   },
   twitter: {
@@ -44,37 +44,36 @@ export default async function HeatmapPage() {
           TICKER HEATMAP
         </h1>
         <p className="text-sm" style={{ color: "#555568" }}>
-          What CT is trading right now — sized by volume, colored by sentiment
+          What CT is trading right now — sized by call volume, colored by P&L
         </p>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 mb-6 flex-wrap">
+      {/* P&L color legend */}
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <span className="text-xs uppercase tracking-widest" style={{ color: "#555568" }}>
-          Sentiment
+          Avg P&L
         </span>
-        {[
-          { label: "Strong Bull", color: "#2ecc71" },
-          { label: "Lean Bull", color: "#27ae60" },
-          { label: "Neutral", color: "#555568" },
-          { label: "Lean Bear", color: "#c0392b" },
-          { label: "Strong Bear", color: "#e74c3c" },
-        ].map(({ label, color }) => (
-          <div key={label} className="flex items-center gap-1">
-            <div
-              style={{ width: "10px", height: "10px", backgroundColor: color, borderRadius: "2px" }}
-            />
-            <span className="text-xs" style={{ color: "#c8c8d0" }}>
-              {label}
-            </span>
-          </div>
-        ))}
+        <div className="flex items-center gap-1">
+          <span className="text-xs" style={{ color: "#e74c3c" }}>-20%</span>
+          <div
+            style={{
+              width: "120px",
+              height: "12px",
+              borderRadius: "3px",
+              background: "linear-gradient(to right, #2e0a0a, #1a1a2e, #0a2e1a)",
+            }}
+          />
+          <span className="text-xs" style={{ color: "#2ecc71" }}>+20%</span>
+        </div>
         <span className="text-xs ml-4" style={{ color: "#555568" }}>
-          Size = volume of calls
+          Size = number of calls
+        </span>
+        <span className="text-xs" style={{ color: "#555568" }}>
+          Click a box to see caller breakdown
         </span>
       </div>
 
-      {/* Heatmap (client component handles timeframe toggle + refetch) */}
+      {/* Heatmap (client component handles timeframe/platform toggle + refetch) */}
       <TickerHeatmap initialData={data} />
     </main>
   );

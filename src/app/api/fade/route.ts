@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLeaderboard } from "@/lib/data";
+import { getLeaderboard, getAuthorMetrics } from "@/lib/data";
+import { computeFadeScore, type FadeStats } from "@/lib/metrics";
 import { searchPasteTrade } from "@/lib/paste-trade";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,12 @@ export interface FadeCaller {
   avgPnl: number;
   totalTrades: number;
   rank: number;
+  // Fade metrics
+  fadeWinRate: number;
+  fadeAvgPnl: number;
+  fadeTotalPnl: number;
+  fadeRating: FadeStats["fadeRating"];
+  isProfitableFade: boolean;
   // Most recent open/active call to fade
   fadeTicker: string | null;
   fadeDirection: "long" | "short" | "yes" | "no" | null;
@@ -35,15 +42,17 @@ async function buildFadeData(): Promise<FadeResponse> {
     return { callers: [], updatedAt: new Date().toISOString() };
   }
 
-  // Sort ascending by avg_pnl (worst performers first), filter to callers with 5+ trades
-  const worst = [...leaderboard]
-    .filter((e) => e.total_trades >= 5)
-    .sort((a, b) => a.avg_pnl - b.avg_pnl)
-    .slice(0, 15);
+  // Filter to callers with 5+ trades
+  const qualified = leaderboard.filter((e) => e.total_trades >= 5);
 
-  // Fetch their most recent trade to show as the "fade play"
-  const callers = await Promise.all(
-    worst.map(async (entry, i): Promise<FadeCaller> => {
+  // For each caller, compute fade score from their actual trades
+  const callersWithFade = await Promise.all(
+    qualified.map(async (entry) => {
+      const metrics = await getAuthorMetrics(entry.handle);
+      const trades = metrics?.recentTrades ?? [];
+      const fadeScore = computeFadeScore(trades);
+
+      // Fetch most recent trade for the fade play suggestion
       let fadeTicker: string | null = null;
       let fadeDirection: FadeCaller["fadeDirection"] = null;
       let fadePostedAt: string | null = null;
@@ -51,13 +60,13 @@ async function buildFadeData(): Promise<FadeResponse> {
       let fadePnlPct: number | null = null;
 
       try {
-        const trades = await searchPasteTrade({
+        const recentTrades = await searchPasteTrade({
           author: entry.handle,
           top: "7d",
           limit: 5,
         });
-        if (trades.length > 0) {
-          const latest = trades.sort(
+        if (recentTrades.length > 0) {
+          const latest = recentTrades.sort(
             (a, b) => new Date(b.posted_at).getTime() - new Date(a.posted_at).getTime()
           )[0]!;
           fadeTicker = latest.ticker;
@@ -67,7 +76,7 @@ async function buildFadeData(): Promise<FadeResponse> {
           fadePnlPct = latest.pnlPct ?? null;
         }
       } catch {
-        // ignore — just show caller without a live fade play
+        // ignore
       }
 
       return {
@@ -75,7 +84,11 @@ async function buildFadeData(): Promise<FadeResponse> {
         winRate: entry.win_rate,
         avgPnl: entry.avg_pnl,
         totalTrades: entry.total_trades,
-        rank: i + 1,
+        fadeWinRate: fadeScore.fadeWinRate,
+        fadeAvgPnl: fadeScore.fadeAvgPnl,
+        fadeTotalPnl: fadeScore.fadeTotalPnl,
+        fadeRating: fadeScore.fadeRating,
+        isProfitableFade: fadeScore.isProfitableFade,
         fadeTicker,
         fadeDirection,
         fadePostedAt,
@@ -85,7 +98,13 @@ async function buildFadeData(): Promise<FadeResponse> {
     })
   );
 
-  const data: FadeResponse = { callers, updatedAt: new Date().toISOString() };
+  // Sort by fade profitability: fade avg pnl descending (best fades first)
+  const sorted = callersWithFade
+    .sort((a, b) => b.fadeAvgPnl - a.fadeAvgPnl)
+    .slice(0, 25)
+    .map((c, i) => ({ ...c, rank: i + 1 }));
+
+  const data: FadeResponse = { callers: sorted, updatedAt: new Date().toISOString() };
   cache = { data, expiresAt: Date.now() + 10 * 60 * 1000 }; // 10min
   return data;
 }

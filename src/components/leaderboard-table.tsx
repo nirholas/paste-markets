@@ -7,13 +7,14 @@ import { tierColor, type CallerTier } from "@/lib/alpha";
 
 export interface LeaderboardRow {
   rank: number;
+  prevRank?: number | null;
   handle: string;
   winRate: number;
   avgPnl: number;
   totalTrades: number;
   alphaScore?: number;
   tier?: CallerTier;
-  streak?: string;
+  streak?: string | number;
   totalPnl?: number;
   bestTicker?: string;
   platform?: string;
@@ -34,6 +35,7 @@ function evColor(ev: number): string {
 interface LeaderboardTableProps {
   entries: LeaderboardRow[];
   loading?: boolean;
+  showStreakColumn?: boolean;
 }
 
 function rankColor(rank: number): string {
@@ -54,6 +56,44 @@ function winRateColor(pct: number): string {
   if (pct >= 65) return "text-win";
   if (pct >= 50) return "text-amber";
   return "text-loss";
+}
+
+function RankChange({ current, previous }: { current: number; previous?: number | null }) {
+  if (previous == null) {
+    return <span className="text-accent text-[10px] font-bold ml-1">NEW</span>;
+  }
+  const diff = previous - current;
+  if (diff === 0) return null;
+  if (diff > 0) {
+    return (
+      <span className="text-win text-[10px] font-bold ml-1">
+        {"\u25B2"}{diff}
+      </span>
+    );
+  }
+  return (
+    <span className="text-loss text-[10px] font-bold ml-1">
+      {"\u25BC"}{Math.abs(diff)}
+    </span>
+  );
+}
+
+function formatStreak(streak: string | number | undefined): string {
+  if (streak == null) return "--";
+  const num = typeof streak === "string" ? parseInt(streak, 10) : streak;
+  if (isNaN(num) || num === 0) return "--";
+  if (num > 0) return `${num}W`;
+  return `${Math.abs(num)}L`;
+}
+
+function streakColor(streak: string | number | undefined): string {
+  if (streak == null) return "text-text-muted";
+  const num = typeof streak === "string" ? parseInt(streak, 10) : streak;
+  if (isNaN(num) || num === 0) return "text-text-muted";
+  if (num >= 5) return "text-win";
+  if (num > 0) return "text-win/70";
+  if (num <= -5) return "text-loss";
+  return "text-loss/70";
 }
 
 function SkeletonRow() {
@@ -84,7 +124,7 @@ function SkeletonRow() {
   );
 }
 
-export function LeaderboardTable({ entries, loading }: LeaderboardTableProps) {
+export function LeaderboardTable({ entries, loading, showStreakColumn }: LeaderboardTableProps) {
   const router = useRouter();
 
   if (loading) {
@@ -151,6 +191,11 @@ export function LeaderboardTable({ entries, loading }: LeaderboardTableProps) {
             <th className="py-2 px-3 text-xs uppercase tracking-widest text-text-muted font-normal">
               Trader
             </th>
+            {showStreakColumn && (
+              <th className="py-2 px-3 text-xs uppercase tracking-widest text-text-muted font-normal">
+                Streak
+              </th>
+            )}
             <th className="py-2 px-3 text-xs uppercase tracking-widest text-text-muted font-normal hidden sm:table-cell">
               Win Rate
             </th>
@@ -166,15 +211,18 @@ export function LeaderboardTable({ entries, loading }: LeaderboardTableProps) {
             <th className="py-2 px-3 text-xs uppercase tracking-widest text-text-muted font-normal hidden xl:table-cell">
               EV/trade
             </th>
-            <th className="py-2 px-3 text-xs uppercase tracking-widest text-text-muted font-normal hidden lg:table-cell">
-              Streak
-            </th>
+            {!showStreakColumn && (
+              <th className="py-2 px-3 text-xs uppercase tracking-widest text-text-muted font-normal hidden lg:table-cell">
+                Streak
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
           {entries.map((entry) => {
             const isTop3 = entry.rank <= 3;
             const ev = evScore(entry.winRate, entry.avgPnl);
+            const streakNum = typeof entry.streak === "string" ? parseInt(entry.streak, 10) : (entry.streak ?? 0);
             return (
               <tr
                 key={entry.handle}
@@ -184,9 +232,12 @@ export function LeaderboardTable({ entries, loading }: LeaderboardTableProps) {
                 }`}
               >
                 <td className="py-3 px-3">
-                  <span className={`text-sm font-bold ${rankColor(entry.rank)}`}>
-                    {rankLabel(entry.rank)}
-                  </span>
+                  <div className="flex items-center">
+                    <span className={`text-sm font-bold ${rankColor(entry.rank)}`}>
+                      {rankLabel(entry.rank)}
+                    </span>
+                    <RankChange current={entry.rank} previous={entry.prevRank} />
+                  </div>
                 </td>
                 <td className="py-3 px-3">
                   <div className="flex items-center gap-2">
@@ -207,6 +258,14 @@ export function LeaderboardTable({ entries, loading }: LeaderboardTableProps) {
                     )}
                   </div>
                 </td>
+                {showStreakColumn && (
+                  <td className="py-3 px-3">
+                    <span className={`text-sm font-bold font-mono ${streakColor(entry.streak)}`}>
+                      {streakNum >= 5 && "\uD83D\uDD25"}
+                      {formatStreak(entry.streak)}
+                    </span>
+                  </td>
+                )}
                 <td className="py-3 px-3 hidden sm:table-cell">
                   <span className={winRateColor(entry.winRate)}>
                     {Math.round(entry.winRate)}%
@@ -226,11 +285,14 @@ export function LeaderboardTable({ entries, loading }: LeaderboardTableProps) {
                     {ev >= 0 ? "+" : ""}{ev.toFixed(1)}
                   </span>
                 </td>
-                <td className="py-3 px-3 hidden lg:table-cell">
-                  <span className="text-text-muted text-xs">
-                    {entry.streak ?? "--"}
-                  </span>
-                </td>
+                {!showStreakColumn && (
+                  <td className="py-3 px-3 hidden lg:table-cell">
+                    <span className={`text-xs font-mono ${streakColor(entry.streak)}`}>
+                      {streakNum >= 5 && "\uD83D\uDD25"}
+                      {formatStreak(entry.streak)}
+                    </span>
+                  </td>
+                )}
               </tr>
             );
           })}

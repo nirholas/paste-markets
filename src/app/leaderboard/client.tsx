@@ -7,27 +7,24 @@ import {
   LeaderboardTable,
   type LeaderboardRow,
 } from "@/components/leaderboard-table";
+import { VenueFilter, type VenueFilterValue } from "@/components/venue-filter";
+import { venueTypeToPlatform } from "@/lib/venues";
 
-const TIMEFRAMES = ["7d", "30d", "all"] as const;
+const TIMEFRAMES = ["24h", "7d", "30d", "all"] as const;
 const TIMEFRAME_LABELS: Record<string, string> = {
+  "24h": "24H",
   "7d": "7D",
   "30d": "30D",
   all: "ALL",
 };
-
-const PLATFORMS = [
-  { value: "all", label: "ALL" },
-  { value: "hyperliquid", label: "HYPERLIQUID" },
-  { value: "polymarket", label: "POLYMARKET" },
-  { value: "robinhood", label: "ROBINHOOD" },
-  { value: "events", label: "SPORTS & EVENTS" },
-] as const;
 
 const SORT_OPTIONS = [
   { value: "win_rate", label: "Win Rate" },
   { value: "avg_pnl", label: "Avg P&L" },
   { value: "total_trades", label: "Total Trades" },
 ] as const;
+
+type ViewMode = "rankings" | "streaks";
 
 const PAGE_SIZE = 25;
 
@@ -61,6 +58,7 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
   const [total, setTotal] = useState(initialEntries.length);
   const [timeframe, setTimeframe] = useState("30d");
   const [platform, setPlatform] = useState(initialPlatform ?? "all");
+  const [venueFilter, setVenueFilter] = useState<VenueFilterValue>("all");
   const [sort, setSort] = useState("win_rate");
   const [minTrades, setMinTrades] = useState(5);
   const [offset, setOffset] = useState(0);
@@ -68,6 +66,7 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [fadeMode, setFadeMode] = useState(false);
   const [liveOnly, setLiveOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("rankings");
 
   // Handle submission
   const [submitHandle, setSubmitHandle] = useState("");
@@ -76,6 +75,7 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
   // Read initial fade state from URL
   useEffect(() => {
     setFadeMode(searchParams.get("fade") === "true");
+    if (searchParams.get("view") === "streaks") setViewMode("streaks");
   }, [searchParams]);
 
   const fetchData = useCallback(
@@ -87,12 +87,14 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
       offset: number;
       fade: boolean;
       liveOnly?: boolean;
+      viewMode: ViewMode;
     }) => {
       setLoading(true);
       try {
         // "events" is a UI alias for polymarket — map it before the API call
         const apiPlatform = params.platform === "events" ? "polymarket" : params.platform;
-        const qs = new URLSearchParams({
+
+        const qsObj: Record<string, string> = {
           window: params.timeframe,
           platform: apiPlatform,
           sort: params.sort,
@@ -101,7 +103,13 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
           min_trades: String(params.minTrades),
           ...(params.fade ? { order: "asc" } : {}),
           ...(params.liveOnly ? { live_only: "true" } : {}),
-        });
+        };
+
+        if (params.viewMode === "streaks") {
+          qsObj.mode = "streaks";
+        }
+
+        const qs = new URLSearchParams(qsObj);
         const res = await fetch(`/api/leaderboard?${qs.toString()}`);
         if (!res.ok) throw new Error("Failed to fetch leaderboard");
         const data: ApiResponse = await res.json();
@@ -124,8 +132,8 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
       setMounted(true);
       return;
     }
-    fetchData({ timeframe, platform, sort, minTrades, offset, fade: fadeMode, liveOnly });
-  }, [timeframe, platform, sort, minTrades, offset, fadeMode, liveOnly, fetchData, mounted]);
+    fetchData({ timeframe, platform, sort, minTrades, offset, fade: fadeMode, liveOnly, viewMode });
+  }, [timeframe, platform, sort, minTrades, offset, fadeMode, liveOnly, viewMode, fetchData, mounted]);
 
   function handleTimeframeChange(tf: string) {
     setOffset(0);
@@ -135,6 +143,12 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
   function handlePlatformChange(p: string) {
     setOffset(0);
     setPlatform(p);
+  }
+
+  function handleVenueFilterChange(v: VenueFilterValue) {
+    setVenueFilter(v);
+    setOffset(0);
+    setPlatform(venueTypeToPlatform(v));
   }
 
   function handleSortChange(s: string) {
@@ -164,6 +178,18 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
     router.replace(`/leaderboard?${params.toString()}`, { scroll: false });
   }
 
+  function handleViewModeChange(mode: ViewMode) {
+    setViewMode(mode);
+    setOffset(0);
+    const params = new URLSearchParams(searchParams.toString());
+    if (mode === "streaks") {
+      params.set("view", "streaks");
+    } else {
+      params.delete("view");
+    }
+    router.replace(`/leaderboard?${params.toString()}`, { scroll: false });
+  }
+
   const currentStart = offset + 1;
   const currentEnd = Math.min(offset + PAGE_SIZE, total);
   const hasPrev = offset > 0;
@@ -186,7 +212,7 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
         setSubmitStatus(`@${handle} added. Refreshing...`);
         setSubmitHandle("");
         // Refresh the leaderboard
-        await fetchData({ timeframe, platform, sort, minTrades, offset, fade: fadeMode, liveOnly });
+        await fetchData({ timeframe, platform, sort, minTrades, offset, fade: fadeMode, liveOnly, viewMode });
         setSubmitStatus(null);
       } else {
         setSubmitStatus(`Could not find @${handle}`);
@@ -209,11 +235,13 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
               paste.markets
             </Link>
             <h1 className="text-2xl font-bold text-text-primary mt-1 flex items-center gap-3">
-              {platform === "events"
-                ? "SPORTS & EVENTS CALLERS"
-                : platform !== "all"
-                  ? `${platform.toUpperCase()} CALLERS`
-                  : "CT LEADERBOARD"}
+              {viewMode === "streaks"
+                ? "HOT STREAKS"
+                : platform === "events"
+                  ? "SPORTS & EVENTS CALLERS"
+                  : platform !== "all"
+                    ? `${platform.toUpperCase()} CALLERS`
+                    : "CT LEADERBOARD"}
               {fadeMode && (
                 <span className="text-xs font-mono px-2 py-0.5 rounded border border-loss text-loss tracking-widest">
                   FADE MODE
@@ -221,13 +249,15 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
               )}
             </h1>
             <p className="text-text-muted text-xs mt-1">
-              {fadeMode
-                ? "Inverted rankings — best fade signals at the top"
-                : platform === "events"
-                  ? "Best Polymarket callers on CT — sports, politics, macro"
-                  : platform !== "all"
-                    ? `Best ${platform} callers on CT by win rate`
-                    : "Real P&L rankings for Crypto Twitter"}
+              {viewMode === "streaks"
+                ? "Callers currently on winning streaks"
+                : fadeMode
+                  ? "Inverted rankings — best fade signals at the top"
+                  : platform === "events"
+                    ? "Best Polymarket callers on CT — sports, politics, macro"
+                    : platform !== "all"
+                      ? `Best ${platform} callers on CT by win rate`
+                      : "Real P&L rankings for Crypto Twitter"}
             </p>
           </div>
           {updatedAt && (
@@ -243,69 +273,91 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* View Mode Tabs */}
+        <div className="flex items-center gap-1 mb-4 border-b border-border">
+          <button
+            onClick={() => handleViewModeChange("rankings")}
+            className={`px-4 py-2 text-xs font-mono transition-colors ${
+              viewMode === "rankings"
+                ? "text-text-primary border-b-2 border-accent"
+                : "text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            RANKINGS
+          </button>
+          <button
+            onClick={() => handleViewModeChange("streaks")}
+            className={`px-4 py-2 text-xs font-mono transition-colors ${
+              viewMode === "streaks"
+                ? "text-text-primary border-b-2 border-accent"
+                : "text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            HOT STREAKS
+          </button>
+          <Link
+            href="/leaderboard/BTC"
+            className="px-4 py-2 text-xs font-mono text-text-muted hover:text-text-secondary transition-colors"
+          >
+            BY ASSET
+          </Link>
+        </div>
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-4 mb-6">
           {/* Timeframe */}
-          <div className="flex items-center border border-border rounded-lg overflow-hidden">
-            {TIMEFRAMES.map((tf) => (
-              <button
-                key={tf}
-                onClick={() => handleTimeframeChange(tf)}
-                className={`px-3 py-1.5 text-xs font-mono transition-colors ${
-                  timeframe === tf
-                    ? "bg-accent text-text-primary"
-                    : "text-text-muted hover:text-text-secondary hover:bg-surface"
-                }`}
-              >
-                {TIMEFRAME_LABELS[tf]}
-              </button>
-            ))}
-          </div>
+          {viewMode === "rankings" && (
+            <div className="flex items-center border border-border rounded-lg overflow-hidden">
+              {TIMEFRAMES.map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => handleTimeframeChange(tf)}
+                  className={`px-3 py-1.5 text-xs font-mono transition-colors ${
+                    timeframe === tf
+                      ? "bg-accent text-text-primary"
+                      : "text-text-muted hover:text-text-secondary hover:bg-surface"
+                  }`}
+                >
+                  {TIMEFRAME_LABELS[tf]}
+                </button>
+              ))}
+            </div>
+          )}
 
-          {/* Platform */}
-          <div className="flex items-center border border-border rounded-lg overflow-hidden">
-            {PLATFORMS.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => handlePlatformChange(p.value)}
-                className={`px-3 py-1.5 text-xs font-mono transition-colors ${
-                  platform === p.value
-                    ? "bg-accent text-text-primary"
-                    : "text-text-muted hover:text-text-secondary hover:bg-surface"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          {/* Venue Filter */}
+          <VenueFilter value={venueFilter} onChange={handleVenueFilterChange} />
 
           {/* Sort */}
-          <div className="flex items-center gap-2">
-            <label className="text-text-muted text-xs">Sort:</label>
-            <select
-              value={sort}
-              onChange={(e) => handleSortChange(e.target.value)}
-              className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-secondary outline-none focus:border-accent transition-colors font-mono appearance-none cursor-pointer"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {viewMode === "rankings" && (
+            <div className="flex items-center gap-2">
+              <label className="text-text-muted text-xs">Sort:</label>
+              <select
+                value={sort}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-secondary outline-none focus:border-accent transition-colors font-mono appearance-none cursor-pointer"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Min trades */}
-          <div className="flex items-center gap-2">
-            <label className="text-text-muted text-xs">Min Trades:</label>
-            <input
-              type="number"
-              min={0}
-              value={minTrades}
-              onChange={(e) => handleMinTradesChange(e.target.value)}
-              className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-secondary outline-none focus:border-accent transition-colors font-mono w-16"
-            />
-          </div>
+          {viewMode === "rankings" && (
+            <div className="flex items-center gap-2">
+              <label className="text-text-muted text-xs">Min Trades:</label>
+              <input
+                type="number"
+                min={0}
+                value={minTrades}
+                onChange={(e) => handleMinTradesChange(e.target.value)}
+                className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-secondary outline-none focus:border-accent transition-colors font-mono w-16"
+              />
+            </div>
+          )}
 
           {/* Live Only toggle */}
           <button
@@ -321,16 +373,18 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
           </button>
 
           {/* Fade toggle */}
-          <button
-            onClick={handleFadeToggle}
-            className={`ml-auto px-3 py-1.5 text-xs font-mono border rounded-lg transition-colors ${
-              fadeMode
-                ? "border-loss text-loss bg-loss/10 hover:bg-loss/20"
-                : "border-border text-text-muted hover:border-loss hover:text-loss"
-            }`}
-          >
-            {fadeMode ? "FADE ON" : "FADE MODE"}
-          </button>
+          {viewMode === "rankings" && (
+            <button
+              onClick={handleFadeToggle}
+              className={`ml-auto px-3 py-1.5 text-xs font-mono border rounded-lg transition-colors ${
+                fadeMode
+                  ? "border-loss text-loss bg-loss/10 hover:bg-loss/20"
+                  : "border-border text-text-muted hover:border-loss hover:text-loss"
+              }`}
+            >
+              {fadeMode ? "FADE ON" : "FADE MODE"}
+            </button>
+          )}
         </div>
 
         {/* Table */}
@@ -339,7 +393,11 @@ export function LeaderboardClient({ initialEntries, initialPlatform }: Leaderboa
             fadeMode ? "border-loss/40" : "border-border"
           }`}
         >
-          <LeaderboardTable entries={displayEntries} loading={loading} />
+          <LeaderboardTable
+            entries={displayEntries}
+            loading={loading}
+            showStreakColumn={viewMode === "streaks"}
+          />
         </div>
 
         {/* Pagination */}

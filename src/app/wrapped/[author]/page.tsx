@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { WrappedCard } from "@/components/wrapped-card";
+import { WrappedStory } from "@/components/wrapped-story";
 
 interface PageProps {
   params: Promise<{ author: string }>;
@@ -19,8 +19,10 @@ interface WrappedApiResponse {
     riskManagement: string;
   };
   personality: {
+    id: string;
     label: string;
     description: string;
+    color: string;
   };
   highlights: {
     totalTrades: number;
@@ -134,19 +136,8 @@ export default async function WrappedPage({
   }
 
   return (
-    <main className="min-h-screen px-4 py-12">
-      {/* Page heading */}
-      <div className="max-w-lg mx-auto mb-6">
-        <div className="text-[11px] uppercase tracking-[2px] text-text-muted mb-1">
-          CT Wrapped
-        </div>
-        <p className="text-[13px] text-text-muted">
-          Your trading year, distilled.
-        </p>
-      </div>
-
-      {/* Wrapped Card */}
-      <WrappedCard data={data} />
+    <main className="min-h-screen flex items-center justify-center px-4 py-8">
+      <WrappedStory data={data} />
     </main>
   );
 }

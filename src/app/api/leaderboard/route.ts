@@ -5,7 +5,7 @@ import { computeAlphaScore, callerTier } from "@/lib/alpha";
 export const dynamic = "force-dynamic";
 
 const PASTE_TRADE_BASE = "https://paste.trade";
-const VALID_WINDOWS = new Set(["7d", "30d", "all"]);
+const VALID_WINDOWS = new Set(["24h", "7d", "30d", "all"]);
 const VALID_SORTS = new Set(["avg_pnl", "win_rate", "total_trades"]);
 const VALID_PLATFORMS = new Set(["all", "hyperliquid", "polymarket", "robinhood"]);
 const DEFAULT_WINDOW = "30d";
@@ -14,6 +14,34 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
 const useSqlite = process.env["USE_SQLITE"] !== "false";
+
+function mapEntry(e: {
+  handle: string;
+  rank: number;
+  prev_rank?: number | null;
+  win_rate: number;
+  avg_pnl: number;
+  total_trades: number;
+  total_pnl?: number | null;
+  streak?: number;
+}, idx: number, platform: string) {
+  const alpha = computeAlphaScore(e.win_rate, e.avg_pnl, e.total_trades);
+  return {
+    rank: idx + 1,
+    prevRank: e.prev_rank ?? null,
+    handle: e.handle,
+    winRate: e.win_rate,
+    avgPnl: e.avg_pnl,
+    totalTrades: e.total_trades,
+    totalPnl: e.total_pnl ?? null,
+    bestTicker: null as string | null,
+    platform: platform !== "all" ? platform : null,
+    avatarUrl: null as string | null,
+    alphaScore: alpha,
+    tier: callerTier(alpha),
+    streak: e.streak ?? 0,
+  };
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -32,19 +60,59 @@ export async function GET(request: NextRequest) {
   const platformRaw = (searchParams.get("platform") ?? "all").toLowerCase();
   const platform = VALID_PLATFORMS.has(platformRaw) ? platformRaw : "all";
 
+  const ticker = searchParams.get("ticker")?.toUpperCase() ?? null;
+  const mode = searchParams.get("mode"); // "streaks" for hot streaks view
+
   // ── SQLite mode (Railway / persistent disk) ──────────────────────────────
   if (useSqlite) {
     try {
-      const { getLeaderboard } = await import("@/lib/data");
+      const data = await import("@/lib/data");
 
-      let entries = await getLeaderboard(window, limit, 0, platform);
+      // Ticker-specific leaderboard
+      if (ticker) {
+        const entries = await data.getTickerLeaderboard(ticker, limit);
+        const mapped = entries.map((e, i) => mapEntry(e, i, platform));
+        const response = NextResponse.json({
+          entries: mapped,
+          total: mapped.length,
+          window,
+          sort,
+          platform,
+          ticker,
+          updatedAt: new Date().toISOString(),
+        });
+        response.headers.set("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
+        return response;
+      }
+
+      // Streak leaderboard
+      if (mode === "streaks") {
+        const entries = await data.getStreakLeaderboard(limit, 0);
+        const mapped = entries.map((e, i) => mapEntry(e, i, platform));
+        const response = NextResponse.json({
+          entries: mapped,
+          total: mapped.length,
+          window: "30d",
+          sort: "streak",
+          platform,
+          mode: "streaks",
+          updatedAt: new Date().toISOString(),
+        });
+        response.headers.set("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
+        return response;
+      }
+
+      // For 24h window, use 7d data and let the API consumer know
+      // (rankings table stores 7d/30d/all — 24h maps to 7d with a note)
+      const dbWindow = window === "24h" ? "7d" : window;
+      let entries = await data.getLeaderboard(dbWindow, limit, 0, platform);
 
       // Auto-seed on first visit if leaderboard is empty
       if (entries.length === 0) {
         console.log("[api/leaderboard] Leaderboard empty — triggering seed sync...");
         const { seedFromApi } = await import("@/lib/seed-from-api");
         await seedFromApi();
-        entries = await getLeaderboard(window, limit, 0, platform);
+        entries = await data.getLeaderboard(dbWindow, limit, 0, platform);
       }
 
       // Sort entries per requested sort param
@@ -55,22 +123,7 @@ export async function GET(request: NextRequest) {
       }
       // win_rate is already the default sort from getLeaderboard
 
-      const mapped = entries.map((e, i) => {
-        const alpha = computeAlphaScore(e.win_rate, e.avg_pnl, e.total_trades);
-        return {
-          rank: i + 1,
-          handle: e.handle,
-          winRate: e.win_rate,
-          avgPnl: e.avg_pnl,
-          totalTrades: e.total_trades,
-          totalPnl: null as number | null,
-          bestTicker: null as string | null,
-          platform: platform !== "all" ? platform : null,
-          avatarUrl: null as string | null,
-          alphaScore: alpha,
-          tier: callerTier(alpha),
-        };
-      });
+      const mapped = entries.map((e, i) => mapEntry(e, i, platform));
 
       const response = NextResponse.json({
         entries: mapped,
@@ -90,14 +143,61 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Serverless / proxy mode ──────────────────────────────────────────────
+
+  // Handle ticker mode in serverless
+  if (ticker) {
+    try {
+      const data = await import("@/lib/data");
+      const entries = await data.getTickerLeaderboard(ticker, limit);
+      const mapped = entries.map((e, i) => mapEntry(e, i, platform));
+      const response = NextResponse.json({
+        entries: mapped,
+        total: mapped.length,
+        window,
+        sort,
+        platform,
+        ticker,
+        updatedAt: new Date().toISOString(),
+      });
+      response.headers.set("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
+      return response;
+    } catch (err) {
+      console.error("[api/leaderboard] Ticker mode error:", err);
+    }
+  }
+
+  // Handle streaks mode in serverless
+  if (mode === "streaks") {
+    try {
+      const data = await import("@/lib/data");
+      const entries = await data.getStreakLeaderboard(limit, 0);
+      const mapped = entries.map((e, i) => mapEntry(e, i, platform));
+      const response = NextResponse.json({
+        entries: mapped,
+        total: mapped.length,
+        window: "30d",
+        sort: "streak",
+        platform,
+        mode: "streaks",
+        updatedAt: new Date().toISOString(),
+      });
+      response.headers.set("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
+      return response;
+    } catch (err) {
+      console.error("[api/leaderboard] Streaks mode error:", err);
+    }
+  }
+
   const key = process.env.PASTE_TRADE_KEY;
   if (!key) {
     console.error("[api/leaderboard] PASTE_TRADE_KEY is not set");
     return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
   }
 
+  // Map 24h to 7d for upstream (paste.trade doesn't support 24h)
+  const upstreamWindow = window === "24h" ? "7d" : window;
   const upstream = new URL(`${PASTE_TRADE_BASE}/api/leaderboard`);
-  upstream.searchParams.set("window", window);
+  upstream.searchParams.set("window", upstreamWindow);
   upstream.searchParams.set("sort", sort);
   upstream.searchParams.set("limit", String(limit));
 
@@ -157,6 +257,7 @@ export async function GET(request: NextRequest) {
     const alpha = computeAlphaScore(item.stats.win_rate, item.stats.avg_pnl, item.stats.trade_count);
     return {
       rank: item.rank,
+      prevRank: null as number | null,
       handle: item.author.handle,
       winRate: item.stats.win_rate,
       avgPnl: item.stats.avg_pnl,
@@ -167,6 +268,7 @@ export async function GET(request: NextRequest) {
       avatarUrl,
       alphaScore: alpha,
       tier: callerTier(alpha),
+      streak: 0,
     };
   });
 
@@ -175,7 +277,7 @@ export async function GET(request: NextRequest) {
     const { searchPasteTrade } = await import("@/lib/paste-trade");
     const { computeMetrics } = await import("@/lib/metrics");
 
-    const tf = (window === "7d" ? "7d" : window === "all" ? "all" : "30d") as
+    const tf = (window === "7d" || window === "24h" ? "7d" : window === "all" ? "all" : "30d") as
       | "7d" | "30d" | "90d" | "all";
 
     const filtered = await Promise.all(

@@ -41,9 +41,12 @@ export interface Author {
 export interface LeaderboardEntry {
   handle: string;
   rank: number;
+  prev_rank: number | null;
   win_rate: number;
   avg_pnl: number;
   total_trades: number;
+  total_pnl: number | null;
+  streak: number;
 }
 
 // ---------- In-memory mode (Vercel) ----------
@@ -229,9 +232,12 @@ function buildLeaderboardEntries(
     entries.push({
       handle,
       rank: 0,
+      prev_rank: null,
       win_rate: metrics.winRate,
       avg_pnl: metrics.avgPnl,
       total_trades: metrics.totalTrades,
+      total_pnl: metrics.totalPnl,
+      streak: metrics.streak,
     });
   }
 
@@ -267,9 +273,12 @@ async function filterLeaderboardByPlatform(
       return {
         handle: e.handle,
         rank: 0,
+        prev_rank: null,
         win_rate: metrics.winRate,
         avg_pnl: metrics.avgPnl,
         total_trades: metrics.totalTrades,
+        total_pnl: metrics.totalPnl,
+        streak: metrics.streak,
       } as LeaderboardEntry;
     }),
   );
@@ -291,6 +300,45 @@ export async function updateRankings(timeframe?: string): Promise<void> {
     db.updateRankings(timeframe);
   }
   // No-op in serverless mode
+}
+
+export async function getStreakLeaderboard(limit = 50, offset = 0): Promise<LeaderboardEntry[]> {
+  if (useSqlite) {
+    const db = await import("./db");
+    return db.getStreakLeaderboard(limit, offset);
+  }
+  // Serverless: compute from global feed
+  const entries = await getLeaderboard("30d", 100, 0);
+  return entries
+    .filter((e) => e.streak > 0)
+    .sort((a, b) => b.streak - a.streak)
+    .slice(offset, offset + limit);
+}
+
+export async function getTickerLeaderboard(ticker: string, limit = 50): Promise<LeaderboardEntry[]> {
+  if (useSqlite) {
+    const db = await import("./db");
+    return db.getTickerLeaderboard(ticker, limit);
+  }
+  // Serverless: filter global feed by ticker
+  const trades = await searchPasteTrade({ ticker, top: "all", limit: 200 });
+  const byAuthor = new Map<string, typeof trades>();
+  for (const trade of trades) {
+    if (!trade.author_handle) continue;
+    const existing = byAuthor.get(trade.author_handle) ?? [];
+    existing.push(trade);
+    byAuthor.set(trade.author_handle, existing);
+  }
+  return buildLeaderboardEntries(byAuthor, "all").slice(0, limit);
+}
+
+export async function getPopularTickers(limit = 20): Promise<string[]> {
+  if (useSqlite) {
+    const db = await import("./db");
+    return db.getPopularTickers(limit);
+  }
+  const assets = await getAssets();
+  return assets.slice(0, limit).map((a) => a.ticker);
 }
 
 export async function recordView(handle: string, page: string): Promise<void> {

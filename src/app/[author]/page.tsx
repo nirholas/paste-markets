@@ -12,6 +12,11 @@ import { searchFullTrades } from "@/lib/paste-trade";
 import { getCallerTipsEarned, getCallerWagerHistory } from "@/lib/wager-db";
 import { calculateReputationScore, getCachedScore, setCachedScore } from "@/lib/reputation";
 import { ReputationBadge, ScoreBreakdownPanel } from "@/components/reputation-badge";
+import { computeBadges } from "@/lib/compute-badges";
+import { BadgeShelf } from "@/components/badge-card";
+import { PredictionStats } from "@/components/prediction-stats";
+import { computeFadeScore } from "@/lib/metrics";
+import { VenueBreakdown, computeVenueStats } from "@/components/venue-breakdown";
 
 const PASTE_TRADE_BASE = "https://paste.trade";
 
@@ -157,6 +162,9 @@ export default async function AuthorPage({ params }: PageProps) {
     entry_date: t.entry_date ?? t.posted_at ?? "",
   }));
 
+  // Venue performance stats
+  const venueStats = computeVenueStats(metrics.recentTrades);
+
   // Integrity stats (SQLite only — null in serverless mode)
   const integrityStats = await getIntegrityStats(handle);
 
@@ -177,6 +185,16 @@ export default async function AuthorPage({ params }: PageProps) {
       // score is optional
     }
   }
+
+  // Compute fade stats
+  const fadeStats = computeFadeScore(metrics.recentTrades);
+
+  // Compute achievement badges
+  const earnedBadges = computeBadges(metrics, metrics.recentTrades);
+  const badgeData = earnedBadges.map((e) => ({
+    id: e.badge.id,
+    earnedAt: e.earnedAt,
+  }));
 
   // Best 5 trades sorted by PnL descending
   const best5 = [...metrics.recentTrades]
@@ -307,6 +325,14 @@ export default async function AuthorPage({ params }: PageProps) {
         )}
       </div>
 
+      {/* Achievement badges */}
+      <div className="mb-8">
+        <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">
+          Achievements
+        </h2>
+        <BadgeShelf earnedBadges={badgeData} />
+      </div>
+
       {/* Reputation score breakdown */}
       {repScore && repScore.qualifyingCalls >= 5 && (
         <ScoreBreakdownPanel breakdown={repScore.breakdown} tier={repScore.tier} />
@@ -324,6 +350,7 @@ export default async function AuthorPage({ params }: PageProps) {
           worstTrade: metrics.worstTrade,
         }}
         rank={refreshed.rank}
+        fadeStats={fadeStats}
       />
 
       {/* Action buttons */}
@@ -476,8 +503,18 @@ export default async function AuthorPage({ params }: PageProps) {
         <TradeHistory trades={trades} />
       </div>
 
-      {/* Platform breakdown */}
-      {Object.keys(metrics.tradesByPlatform).length > 0 && (
+      {/* Venue performance breakdown */}
+      {venueStats.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xs uppercase tracking-widest text-text-muted mb-4">
+            Venue Performance
+          </h2>
+          <VenueBreakdown stats={venueStats} />
+        </div>
+      )}
+
+      {/* Platform breakdown (legacy) */}
+      {Object.keys(metrics.tradesByPlatform).length > 0 && venueStats.length === 0 && (
         <div className="mt-10">
           <h2 className="text-xs uppercase tracking-widest text-text-muted mb-4">
             Platforms
@@ -485,6 +522,9 @@ export default async function AuthorPage({ params }: PageProps) {
           <PlatformBreakdown platforms={metrics.tradesByPlatform} />
         </div>
       )}
+
+      {/* Prediction market stats */}
+      <PredictionStats handle={handle} />
 
       {/* Integrity score */}
       {integrityStats && integrityStats.total > 0 && (

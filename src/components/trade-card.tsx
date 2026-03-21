@@ -8,6 +8,7 @@ import {
   formatProbability,
   formatVolume,
 } from "@/lib/category";
+import { getVenueConfig, getDirectionLabel } from "@/lib/venues";
 
 export interface TradeCardProps {
   tradeId?: string | null;
@@ -36,6 +37,7 @@ export interface TradeCardProps {
   expiresAt?: string | null;       // ISO date when market resolves
   polymarketUrl?: string | null;   // Direct link to the Polymarket market
   category?: string | null;        // sports | politics | macro_event | entertainment | prediction
+  leverage?: number | null;         // For perps (e.g. 10x)
 }
 
 function timeAgo(isoString: string): string {
@@ -49,18 +51,19 @@ function timeAgo(isoString: string): string {
   return `${days}d ago`;
 }
 
-function DirectionBadge({ direction }: { direction: TradeCardProps["direction"] }) {
+function DirectionBadge({ direction, platform }: { direction: TradeCardProps["direction"]; platform?: string | null }) {
   const styles: Record<string, string> = {
     long: "text-win border-win",
     yes: "text-accent border-accent",
     short: "text-loss border-loss",
     no: "text-loss border-loss",
   };
+  const label = getDirectionLabel(direction, platform);
   return (
     <span
       className={`border px-2 py-0.5 text-xs uppercase tracking-widest font-bold ${styles[direction]}`}
     >
-      {direction}
+      {label}
     </span>
   );
 }
@@ -209,11 +212,14 @@ export function TradeCard({
   expiresAt,
   polymarketUrl,
   category,
+  leverage,
 }: TradeCardProps) {
   const quote = headlineQuote ?? thesis;
   const handle = authorHandle ? authorHandle.replace(/^@/, "") : null;
   const showIntegrity = integrity != null && integrity !== "unknown";
   const isPolymarket = platform?.toLowerCase() === "polymarket";
+  const venueConfig = getVenueConfig(platform);
+  const isPerps = venueConfig?.type === "perps";
 
   // For Polymarket, use contractTitle > instrument as the display ticker label
   const displayTitle = isPolymarket && contractTitle ? contractTitle : null;
@@ -223,13 +229,33 @@ export function TradeCard({
       {/* Header: ticker + direction + platform + category + time */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
+          {venueConfig && (
+            <span
+              className="flex items-center justify-center w-6 h-6 rounded-full text-xs"
+              style={{ backgroundColor: `${venueConfig.color}20`, color: venueConfig.color }}
+              title={venueConfig.name}
+            >
+              {venueConfig.icon}
+            </span>
+          )}
           <span className="text-xl font-bold text-text-primary tracking-tight">
             {isPolymarket ? ticker.toUpperCase() : `$${ticker.toUpperCase()}`}
           </span>
-          <DirectionBadge direction={direction} />
+          <DirectionBadge direction={direction} platform={platform} />
+          {isPerps && leverage != null && leverage > 1 && (
+            <span className="text-xs font-bold px-1.5 py-0.5 border border-accent text-accent rounded">
+              {leverage}x
+            </span>
+          )}
           {platform && (
-            <span className="text-xs uppercase tracking-widest text-text-muted border border-border px-2 py-0.5">
-              {platform}
+            <span
+              className="text-xs uppercase tracking-widest border px-2 py-0.5"
+              style={{
+                color: venueConfig?.color ?? "#555568",
+                borderColor: venueConfig ? `${venueConfig.color}40` : "#1a1a2e",
+              }}
+            >
+              {venueConfig?.name ?? platform}
             </span>
           )}
           {category && isPolymarket && (

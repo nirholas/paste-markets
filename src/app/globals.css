@@ -57,3 +57,24 @@ body {
 .animate-slide-up {
   animation: slide-up 0.25s ease-out forwards;
 }
+
+/* Wall card hover glow */
+.wall-card-glow:hover {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Wrapped story slide entrance */
+@keyframes story-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.story-slide-enter {
+  animation: story-slide-in 0.4s ease-out forwards;
+}

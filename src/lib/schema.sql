@@ -48,9 +48,12 @@ CREATE TABLE IF NOT EXISTS rankings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   author_handle TEXT NOT NULL,
   rank INTEGER NOT NULL,
+  prev_rank INTEGER,
   win_rate REAL,
   avg_pnl REAL,
   total_trades INTEGER,
+  total_pnl REAL,
+  streak INTEGER DEFAULT 0,
   computed_at TEXT DEFAULT (datetime('now')),
   timeframe TEXT DEFAULT '30d',
   FOREIGN KEY (author_handle) REFERENCES authors(handle)
@@ -149,3 +152,84 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_handle ON api_keys(handle);
+
+-- ─── Social Proof Wall ──────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS wall_posts (
+  id TEXT PRIMARY KEY,
+  author_handle TEXT NOT NULL,
+  author_display_name TEXT,
+  author_avatar_url TEXT,
+  content TEXT NOT NULL,
+  tweet_url TEXT,
+  posted_at TEXT NOT NULL,
+  likes INTEGER DEFAULT 0,
+  retweets INTEGER DEFAULT 0,
+  category TEXT DEFAULT 'reaction', -- reaction, testimonial, feature_request
+  featured INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_wall_posts_category ON wall_posts(category);
+CREATE INDEX IF NOT EXISTS idx_wall_posts_featured ON wall_posts(featured);
+CREATE INDEX IF NOT EXISTS idx_wall_posts_posted_at ON wall_posts(posted_at DESC);
+
+-- ─── Waitlist ─────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS waitlist (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  twitter_handle TEXT NOT NULL UNIQUE,
+  email TEXT,
+  referral_code TEXT UNIQUE,
+  referred_by TEXT,
+  position INTEGER,
+  status TEXT DEFAULT 'waiting', -- waiting, invited, active
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_waitlist_referral ON waitlist(referral_code);
+CREATE INDEX IF NOT EXISTS idx_waitlist_status ON waitlist(status);
+
+-- ─── Price Alert Notifications ──────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_handle TEXT NOT NULL,
+  alert_type TEXT NOT NULL,   -- 'caller', 'ticker', 'consensus'
+  target TEXT NOT NULL,        -- handle or ticker symbol
+  threshold_pnl REAL,         -- optional: only alert if P&L > X%
+  channel TEXT DEFAULT 'web',  -- web, email, telegram, webhook
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_handle);
+CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts(alert_type, target);
+
+-- ─── Caller Nominations ─────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  caller_handle TEXT NOT NULL,
+  submitted_by TEXT,
+  reason TEXT,
+  example_tweet_url TEXT,
+  upvotes INTEGER DEFAULT 1,
+  status TEXT DEFAULT 'pending', -- pending, approved, rejected, tracked
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_submissions_handle ON submissions(caller_handle);
+CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
+CREATE INDEX IF NOT EXISTS idx_submissions_upvotes ON submissions(upvotes DESC);
+
+-- ─── Telegram Bot Subscriptions ──────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS telegram_subs (
+  chat_id TEXT NOT NULL,
+  caller_handle TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (chat_id, caller_handle)
+);
+
+CREATE INDEX IF NOT EXISTS idx_telegram_subs_handle ON telegram_subs(caller_handle);
