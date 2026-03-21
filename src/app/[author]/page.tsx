@@ -17,6 +17,7 @@ import { BadgeShelf } from "@/components/badge-card";
 import { PredictionStats } from "@/components/prediction-stats";
 import { computeFadeScore } from "@/lib/metrics";
 import { VenueBreakdown, computeVenueStats } from "@/components/venue-breakdown";
+import { FollowCallerButton } from "@/components/follow-caller-button";
 
 const PASTE_TRADE_BASE = "https://paste.trade";
 
@@ -242,6 +243,7 @@ export default async function AuthorPage({ params }: PageProps) {
             >
               Follow on X
             </a>
+            <FollowCallerButton callerHandle={handle} />
           </div>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {repScore && repScore.tier !== "Unranked" && (
