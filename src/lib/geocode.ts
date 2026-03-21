@@ -107,7 +107,7 @@ add(["uk", "united kingdom", "england", "britain", "great britain"], { lat: 51.5
 add(["germany", "deutschland", "de"], { lat: 51.17, lng: 10.45, label: "Germany" });
 add(["france", "fr"], { lat: 46.60, lng: 1.89, label: "France" });
 add(["spain", "españa", "es"], { lat: 40.46, lng: -3.75, label: "Spain" });
-add(["italy", "italia", "it"], { lat: 41.87, lng: 12.57, label: "Italy" });
+add(["italy", "italia"], { lat: 41.87, lng: 12.57, label: "Italy" }); // "it" excluded — too common a word
 add(["netherlands", "holland", "nl", "the netherlands"], { lat: 52.13, lng: 5.29, label: "Netherlands" });
 add(["switzerland", "suisse", "schweiz", "ch"], { lat: 46.82, lng: 8.23, label: "Switzerland" });
 add(["portugal", "pt"], { lat: 39.40, lng: -8.22, label: "Portugal" });
@@ -140,7 +140,7 @@ add(["bangkok", "bangkok, thailand", "bkk", "thailand"], { lat: 13.76, lng: 100.
 add(["mumbai", "mumbai, india", "bombay"], { lat: 19.08, lng: 72.88, label: "Mumbai" });
 add(["bangalore", "bengaluru", "bangalore, india", "bengaluru, india"], { lat: 12.97, lng: 77.59, label: "Bangalore" });
 add(["new delhi", "delhi", "new delhi, india", "delhi, india"], { lat: 28.61, lng: 77.21, label: "Delhi" });
-add(["india", "in"], { lat: 20.59, lng: 78.96, label: "India" });
+add(["india"], { lat: 20.59, lng: 78.96, label: "India" }); // "in" excluded — too common a word
 add(["japan", "jp"], { lat: 36.20, lng: 138.25, label: "Japan" });
 add(["china", "cn"], { lat: 35.86, lng: 104.20, label: "China" });
 add(["philippines", "ph", "manila", "manila, philippines"], { lat: 14.60, lng: 120.98, label: "Manila" });
@@ -179,8 +179,16 @@ add(["accra", "accra, ghana", "ghana"], { lat: 5.60, lng: -0.19, label: "Accra" 
 
 // Crypto-specific / meme locations (common on CT)
 add(["the internet", "internet", "online", "worldwide", "global", "everywhere", "earth", "planet earth", "world"], { lat: 20.0, lng: 0.0, label: "Global" });
-add(["the cloud", "cloud", "metaverse", "web3", "on-chain", "onchain", "on chain", "decentralized"], { lat: 37.77, lng: -122.42, label: "San Francisco" }); // default to SF for crypto-native
-add(["gm", "gm ☀️", "wagmi"], { lat: 40.71, lng: -74.01, label: "New York" }); // default to NYC
+add(["the cloud", "cloud", "metaverse", "web3", "on-chain", "onchain", "on chain", "decentralized", "the blockchain", "blockchain", "etherscan/solscan"], { lat: 37.77, lng: -122.42, label: "San Francisco" }); // default to SF for crypto-native
+add(["gm", "gm ☀️", "wagmi", "polymarket"], { lat: 40.71, lng: -74.01, label: "New York" }); // default to NYC
+add(["this sceptred isle"], { lat: 51.51, lng: -0.13, label: "London" }); // Shakespeare → England
+
+// Additional cities
+add(["geneva", "geneva, switzerland", "genève"], { lat: 46.20, lng: 6.14, label: "Geneva" });
+add(["stanford", "stanford, ca", "palo alto", "palo alto, ca"], { lat: 37.43, lng: -122.17, label: "Stanford" });
+add(["granada", "granada, spain"], { lat: 37.18, lng: -3.60, label: "Granada" });
+add(["wall street"], { lat: 40.71, lng: -74.01, label: "New York" });
+add(["sf bay area, ca", "sf bay area"], { lat: 37.77, lng: -122.42, label: "San Francisco" });
 
 // Common CT shorthand
 add(["el salvador"], { lat: 13.79, lng: -88.90, label: "El Salvador" });

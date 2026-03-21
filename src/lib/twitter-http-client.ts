@@ -105,6 +105,32 @@ export class TwitterHttpClient {
     this._authenticated = true;
   }
 
+  /**
+   * Verify the X session is actually valid (tokens not expired/revoked).
+   * Returns status without exposing any token values.
+   */
+  async checkSession(): Promise<{
+    configured: boolean;
+    authenticated: boolean;
+    sessionValid: boolean;
+  }> {
+    const authToken = process.env["TWITTER_AUTH_TOKEN"];
+    const ct0 = process.env["TWITTER_CT0"];
+    const configured = !!(authToken && ct0);
+
+    if (!configured) {
+      return { configured: false, authenticated: false, sessionValid: false };
+    }
+
+    try {
+      await this.authenticate();
+      const loggedIn = await this.scraper.isLoggedIn();
+      return { configured: true, authenticated: this._authenticated, sessionValid: loggedIn };
+    } catch {
+      return { configured: true, authenticated: this._authenticated, sessionValid: false };
+    }
+  }
+
   async getUser(username: string): Promise<TwitterUser | null> {
     try {
       await this.authenticate();

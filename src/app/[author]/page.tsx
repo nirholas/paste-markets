@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getOrCreateAuthor, getAuthorMetrics, recordView, syncAuthor, isStale, getIntegrityStats, getTradesForReputation, updateXProfile, isXProfileStale } from "@/lib/data";
 import { fetchProfile } from "@/lib/twitter-fetch";
 import { IntegrityScoreBadge, IntegrityBreakdown } from "@/components/integrity-badge";
@@ -22,6 +23,13 @@ import { FollowCallerButton } from "@/components/follow-caller-button";
 
 const PASTE_TRADE_BASE = "https://paste.trade";
 
+// Slugs that should never be treated as author handles
+const BLOCKED_SLUGS = new Set([
+  "favicon.ico", "robots.txt", "sitemap.xml", "manifest.json",
+  "manifest.webmanifest", ".well-known", "apple-touch-icon.png",
+  "apple-icon.png", "icon.svg", "icon.png",
+]);
+
 interface PageProps {
   params: Promise<{ author: string }>;
 }
@@ -30,9 +38,17 @@ function cleanHandle(raw: string): string {
   return decodeURIComponent(raw).replace(/^@/, "").toLowerCase().trim();
 }
 
+function isValidHandle(handle: string): boolean {
+  if (BLOCKED_SLUGS.has(handle)) return false;
+  // X handles: 1-15 alphanumeric or underscore chars
+  return /^[a-z0-9_]{1,15}$/.test(handle);
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { author: rawHandle } = await params;
   const handle = cleanHandle(rawHandle);
+
+  if (!isValidHandle(handle)) return {};
 
   const metrics = await getAuthorMetrics(handle);
 
@@ -117,6 +133,8 @@ function winRateColor(pct: number): string {
 export default async function AuthorPage({ params }: PageProps) {
   const { author: rawHandle } = await params;
   const handle = cleanHandle(rawHandle);
+
+  if (!isValidHandle(handle)) notFound();
 
   // Ensure author exists
   const author = await getOrCreateAuthor(handle);
