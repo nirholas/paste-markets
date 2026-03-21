@@ -71,7 +71,10 @@ export async function GET(request: NextRequest) {
     let mostCalledTicker: RecapData["most_called_ticker"] = null;
     if (tickerCounts.size > 0) {
       const sorted = [...tickerCounts.entries()].sort((a, b) => b[1] - a[1]);
-      mostCalledTicker = { ticker: sorted[0][0], count: sorted[0][1] };
+      const top = sorted[0];
+      if (top) {
+        mostCalledTicker = { ticker: top[0], count: top[1] };
+      }
     }
 
     // Biggest win & biggest loss
@@ -96,8 +99,9 @@ export async function GET(request: NextRequest) {
          ORDER BY streak DESC LIMIT 1`,
       )
       .all() as Array<{ author_handle: string; streak: number }>;
-    if (streakRows.length > 0) {
-      hotStreak = { handle: streakRows[0].author_handle, streak: streakRows[0].streak };
+    const topStreak = streakRows[0];
+    if (topStreak) {
+      hotStreak = { handle: topStreak.author_handle, streak: topStreak.streak };
     }
 
     // New callers — authors whose first trade is on this date

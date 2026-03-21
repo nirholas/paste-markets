@@ -57,7 +57,14 @@ export async function GET(request: NextRequest) {
   const limitRaw = parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT), 10);
   const limit = isNaN(limitRaw) ? DEFAULT_LIMIT : Math.min(Math.max(1, limitRaw), MAX_LIMIT);
 
-  const platformRaw = (searchParams.get("platform") ?? "all").toLowerCase();
+  // Accept "venue" as an alias for "platform" (maps venue types to platform names)
+  const VENUE_TO_PLATFORM: Record<string, string> = {
+    stocks: "robinhood",
+    perps: "hyperliquid",
+    prediction: "polymarket",
+  };
+  const venueRaw = searchParams.get("venue")?.toLowerCase();
+  const platformRaw = (venueRaw ? (VENUE_TO_PLATFORM[venueRaw] ?? venueRaw) : searchParams.get("platform") ?? "all").toLowerCase();
   const platform = VALID_PLATFORMS.has(platformRaw) ? platformRaw : "all";
 
   const ticker = searchParams.get("ticker")?.toUpperCase() ?? null;

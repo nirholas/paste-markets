@@ -215,7 +215,16 @@ export async function GET(req: NextRequest) {
   const tf = req.nextUrl.searchParams.get("timeframe") ?? "7d";
   const timeframe: "24h" | "7d" | "30d" =
     tf === "24h" ? "24h" : tf === "30d" ? "30d" : "7d";
-  const platform = req.nextUrl.searchParams.get("platform") ?? "all";
+  // Accept "venue" as an alias for "platform"
+  const VENUE_TO_PLATFORM: Record<string, string> = {
+    stocks: "stocks",
+    perps: "perps",
+    prediction: "prediction-markets",
+  };
+  const venueRaw = req.nextUrl.searchParams.get("venue")?.toLowerCase();
+  const platform = venueRaw
+    ? (VENUE_TO_PLATFORM[venueRaw] ?? venueRaw)
+    : (req.nextUrl.searchParams.get("platform") ?? "all");
 
   try {
     const data = await buildHeatmap(timeframe, platform);

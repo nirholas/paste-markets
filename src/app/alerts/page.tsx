@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { Metadata } from "next";
 
 interface Alert {
   id: number;
