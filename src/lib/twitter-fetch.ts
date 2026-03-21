@@ -407,7 +407,15 @@ async function fetchViaBrowser(handle: string, maxTweets: number): Promise<Tweet
     );
   }
 
-  const { chromium } = await import("playwright");
+  let chromium: typeof import("playwright").chromium;
+  try {
+    const pw = await import("playwright");
+    chromium = pw.chromium;
+  } catch {
+    throw new Error(
+      "playwright is not available — install it or use HTTP/xactions fetch methods instead",
+    );
+  }
 
   const browser = await chromium.launch({
     headless: true,

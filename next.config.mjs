@@ -8,7 +8,7 @@ const nextConfig = {
   output: "standalone",
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
-  serverExternalPackages: ["xactions"],
+  serverExternalPackages: ["xactions", "playwright", "agent-twitter-client", "wrtc"],
   outputFileTracingRoot: __dirname,
   async headers() {
     return [

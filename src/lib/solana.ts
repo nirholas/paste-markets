@@ -74,6 +74,7 @@ export async function verifySolanaTransaction(
 
 /**
  * Derive a Program Derived Address (PDA) for a wager vault.
+ * Seeds: ["vault", trade_card_id] — matches on-chain paste_wager program.
  * Requires SOLANA_PROGRAM_ID to be set. Returns null if not configured.
  */
 export function deriveVaultPDA(
@@ -91,6 +92,32 @@ export function deriveVaultPDA(
     return { address: pda.toBase58(), bump };
   } catch (err) {
     console.error("[solana] PDA derivation error:", err);
+    return null;
+  }
+}
+
+/**
+ * Derive PDA for a wager entry (individual wagerer's position).
+ * Seeds: ["wager", vault_pubkey, wagerer_pubkey] — matches on-chain program.
+ */
+export function deriveWagerEntryPDA(
+  vaultAddress: string,
+  wagererAddress: string,
+): { address: string; bump: number } | null {
+  const programIdStr = process.env["SOLANA_PROGRAM_ID"];
+  if (!programIdStr) return null;
+
+  try {
+    const programId = new PublicKey(programIdStr);
+    const vaultPubkey = new PublicKey(vaultAddress);
+    const wagererPubkey = new PublicKey(wagererAddress);
+    const [pda, bump] = PublicKey.findProgramAddressSync(
+      [Buffer.from("wager"), vaultPubkey.toBuffer(), wagererPubkey.toBuffer()],
+      programId,
+    );
+    return { address: pda.toBase58(), bump };
+  } catch (err) {
+    console.error("[solana] WagerEntry PDA derivation error:", err);
     return null;
   }
 }

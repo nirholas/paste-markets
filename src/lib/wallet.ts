@@ -274,6 +274,117 @@ export async function signTypedData(
 }
 
 // ---------------------------------------------------------------------------
+// Solana SPL token transfer (USDC wager deposits via Phantom)
+// ---------------------------------------------------------------------------
+
+const USDC_MINT_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDC_DECIMALS = 6;
+
+export interface SolanaTransferParams {
+  recipientAddress: string;
+  amount: number; // in USDC (e.g. 50 = 50 USDC)
+  usdcMint?: string;
+}
+
+export interface SolanaTransferResult {
+  signature: string;
+  confirmed: boolean;
+}
+
+export async function sendSolanaTransaction(
+  params: SolanaTransferParams,
+): Promise<SolanaTransferResult> {
+  if (typeof window === "undefined") {
+    throw new Error("Transaction signing requires a browser environment");
+  }
+
+  const solana = (window as any).solana;
+  if (!solana?.isPhantom) {
+    throw new Error("Phantom wallet not available");
+  }
+
+  if (!solana.publicKey) {
+    throw new Error("Wallet not connected — connect Phantom first");
+  }
+
+  // Dynamic imports to avoid SSR bundling issues
+  const { Connection, PublicKey, Transaction } = await import("@solana/web3.js");
+  const {
+    getAssociatedTokenAddress,
+    createAssociatedTokenAccountInstruction,
+    createTransferInstruction,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  } = await import("@solana/spl-token");
+
+  const usdcMint = new PublicKey(params.usdcMint ?? USDC_MINT_ADDRESS);
+  const rpcUrl =
+    (typeof process !== "undefined" && process.env?.["NEXT_PUBLIC_SOLANA_RPC_URL"]) ||
+    "https://api.mainnet-beta.solana.com";
+  const connection = new Connection(rpcUrl, "confirmed");
+
+  const senderPubkey = solana.publicKey;
+  const recipientPubkey = new PublicKey(params.recipientAddress);
+
+  // Derive associated token accounts for sender and recipient
+  const senderAta = await getAssociatedTokenAddress(
+    usdcMint, senderPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+  const recipientAta = await getAssociatedTokenAddress(
+    usdcMint, recipientPubkey, true, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+
+  const transaction = new Transaction();
+
+  // Create recipient ATA if it doesn't exist
+  const recipientAccountInfo = await connection.getAccountInfo(recipientAta);
+  if (!recipientAccountInfo) {
+    transaction.add(
+      createAssociatedTokenAccountInstruction(
+        senderPubkey,
+        recipientAta,
+        recipientPubkey,
+        usdcMint,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      ),
+    );
+  }
+
+  // Build USDC transfer instruction
+  const amountLamports = BigInt(Math.round(params.amount * 10 ** USDC_DECIMALS));
+  transaction.add(
+    createTransferInstruction(
+      senderAta,
+      recipientAta,
+      senderPubkey,
+      amountLamports,
+      [],
+      TOKEN_PROGRAM_ID,
+    ),
+  );
+
+  // Set recent blockhash and fee payer
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = senderPubkey;
+
+  // Sign and send via Phantom
+  const { signature } = await solana.signAndSendTransaction(transaction);
+
+  // Wait for confirmation
+  const confirmation = await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
+
+  return {
+    signature,
+    confirmed: !confirmation.value.err,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Balance helpers
 // ---------------------------------------------------------------------------
 
@@ -429,12 +540,23 @@ export function useWallet() {
     };
   }, [state.connected, refreshBalances]);
 
+  const sendTransaction = useCallback(
+    async (recipientAddress: string, amount: number) => {
+      if (!state.connected || state.chain !== "solana") {
+        throw new Error("Solana wallet not connected");
+      }
+      return sendSolanaTransaction({ recipientAddress, amount });
+    },
+    [state.connected, state.chain],
+  );
+
   return {
     ...state,
     providers,
     connect,
     disconnect,
     sign,
+    sendTransaction,
     refreshBalances,
   };
 }
