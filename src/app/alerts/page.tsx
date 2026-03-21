@@ -1,132 +1,307 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
-interface Alert {
-  id: number;
-  user_handle: string;
-  alert_type: "caller" | "ticker" | "consensus";
-  target: string;
-  threshold_pnl: number | null;
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface AlertCondition {
+  type: "caller" | "ticker" | "direction" | "platform" | "confidence" | "tier";
+  operator: "eq" | "in" | "gte" | "lte";
+  value: string | string[] | number;
+}
+
+interface AlertChannel {
+  type: "browser" | "telegram" | "webhook";
+  config: Record<string, string>;
+}
+
+interface AlertRule {
+  id: string;
+  userId: string;
+  name: string;
+  enabled: boolean;
+  conditions: AlertCondition[];
+  channels: AlertChannel[];
+  matchCount: number;
+  lastMatchedAt: string | null;
+  createdAt: string;
+}
+
+interface AlertNotification {
+  id: string;
+  rule_id: string;
+  caller_handle: string | null;
+  ticker: string | null;
+  direction: string | null;
+  message: string;
   channel: string;
-  active: number;
+  read_at: string | null;
   created_at: string;
 }
 
-interface TriggeredAlert {
-  alert_id: number;
-  alert_type: string;
-  target: string;
-  trade_handle: string;
-  ticker: string;
-  direction: string;
-  pnl_pct: number | null;
-  posted_at: string | null;
-  reason: string;
+interface TestResult {
+  ruleName: string;
+  totalTested: number;
+  matchCount: number;
+  matches: Array<{
+    caller: string;
+    ticker: string;
+    direction: string;
+    platform?: string;
+    confidence?: number;
+    tier?: string;
+  }>;
 }
 
-const CHANNELS = [
-  { id: "web", label: "Web", icon: "globe", available: true },
-  { id: "email", label: "Email", icon: "envelope", available: false },
-  { id: "telegram", label: "Telegram", icon: "plane", available: false },
-  { id: "webhook", label: "Webhook", icon: "link", available: false },
+// ── Presets ───────────────────────────────────────────────────────────────────
+
+const PRESETS = [
+  {
+    id: "s-tier",
+    name: "S-Tier Callers Only",
+    description: "Any S or A tier caller makes a call",
+    conditions: [{ type: "tier" as const, operator: "in" as const, value: ["S", "A"] }],
+  },
+  {
+    id: "btc-signals",
+    name: "BTC Signals",
+    description: "Any caller mentions BTC",
+    conditions: [{ type: "ticker" as const, operator: "eq" as const, value: "BTC" }],
+  },
+  {
+    id: "high-confidence",
+    name: "High Confidence",
+    description: "Calls with 85%+ confidence",
+    conditions: [{ type: "confidence" as const, operator: "gte" as const, value: 0.85 }],
+  },
+  {
+    id: "polymarket",
+    name: "Polymarket Events",
+    description: "New prediction market calls",
+    conditions: [{ type: "platform" as const, operator: "eq" as const, value: "polymarket" }],
+  },
+  {
+    id: "sol-longs",
+    name: "SOL Longs",
+    description: "Any caller goes long on SOL",
+    conditions: [
+      { type: "ticker" as const, operator: "eq" as const, value: "SOL" },
+      { type: "direction" as const, operator: "eq" as const, value: "long" },
+    ],
+  },
+  {
+    id: "eth-signals",
+    name: "ETH Signals",
+    description: "Any caller mentions ETH",
+    conditions: [{ type: "ticker" as const, operator: "eq" as const, value: "ETH" }],
+  },
 ];
 
-function ChannelIcon({ type }: { type: string }) {
-  switch (type) {
-    case "globe":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-      );
-    case "envelope":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="4" width="20" height="16" rx="2" />
-          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-        </svg>
-      );
-    case "plane":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m22 2-7 20-4-9-9-4z" />
-          <path d="m22 2-11 11" />
-        </svg>
-      );
-    case "link":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-function AlertTypeIcon({ type }: { type: string }) {
-  switch (type) {
-    case "caller":
-      return (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-      );
-    case "ticker":
-      return (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-          <polyline points="16 7 22 7 22 13" />
-        </svg>
-      );
-    case "consensus":
-      return (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
+const CONDITION_TYPES = [
+  { value: "caller", label: "Caller" },
+  { value: "ticker", label: "Ticker" },
+  { value: "direction", label: "Direction" },
+  { value: "platform", label: "Platform" },
+  { value: "confidence", label: "Confidence" },
+  { value: "tier", label: "Tier" },
+];
+
+const OPERATORS: Record<string, Array<{ value: string; label: string }>> = {
+  caller: [{ value: "eq", label: "equals" }],
+  ticker: [{ value: "eq", label: "equals" }, { value: "in", label: "is one of" }],
+  direction: [{ value: "eq", label: "equals" }],
+  platform: [{ value: "eq", label: "equals" }],
+  confidence: [{ value: "gte", label: ">=" }, { value: "lte", label: "<=" }],
+  tier: [{ value: "eq", label: "equals" }, { value: "in", label: "is one of" }],
+};
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "--";
   const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function describeCondition(c: AlertCondition): string {
+  const val = Array.isArray(c.value) ? c.value.join(", ") : String(c.value);
+  switch (c.type) {
+    case "caller": return `@${val}`;
+    case "ticker": return `$${val.toUpperCase()}`;
+    case "direction": return val.toUpperCase();
+    case "platform": return `on ${val}`;
+    case "confidence": return `confidence ${c.operator === "gte" ? ">=" : "<="} ${typeof c.value === "number" ? Math.round(c.value * 100) : c.value}%`;
+    case "tier": return `${val} tier`;
+    default: return `${c.type} ${c.operator} ${val}`;
+  }
+}
+
+function describeRule(rule: AlertRule): string {
+  return rule.conditions.map(describeCondition).join(" + ");
+}
+
+// ── Components ───────────────────────────────────────────────────────────────
+
+function BellIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+function ConditionBuilder({
+  conditions,
+  onChange,
+}: {
+  conditions: AlertCondition[];
+  onChange: (conditions: AlertCondition[]) => void;
+}) {
+  function updateCondition(index: number, updates: Partial<AlertCondition>) {
+    const next = [...conditions];
+    next[index] = { ...next[index], ...updates };
+    // Reset value when type changes
+    if (updates.type) {
+      const newOps = OPERATORS[updates.type] ?? [];
+      next[index].operator = (newOps[0]?.value ?? "eq") as AlertCondition["operator"];
+      next[index].value = "";
+    }
+    onChange(next);
+  }
+
+  function removeCondition(index: number) {
+    onChange(conditions.filter((_, i) => i !== index));
+  }
+
+  function addCondition() {
+    onChange([...conditions, { type: "caller", operator: "eq", value: "" }]);
+  }
+
+  return (
+    <div className="space-y-3">
+      {conditions.map((c, i) => (
+        <div key={i}>
+          {i > 0 && (
+            <div className="text-text-muted text-xs uppercase tracking-widest mb-2 ml-1">AND</div>
+          )}
+          <div className="flex items-center gap-2 bg-[#0a0a1a] border border-border rounded-lg p-3">
+            <select
+              value={c.type}
+              onChange={(e) => updateCondition(i, { type: e.target.value as AlertCondition["type"] })}
+              className="bg-surface border border-border rounded px-3 py-1.5 text-text-primary text-sm focus:outline-none focus:border-accent"
+            >
+              {CONDITION_TYPES.map((ct) => (
+                <option key={ct.value} value={ct.value}>{ct.label}</option>
+              ))}
+            </select>
+
+            <select
+              value={c.operator}
+              onChange={(e) => updateCondition(i, { operator: e.target.value as AlertCondition["operator"] })}
+              className="bg-surface border border-border rounded px-3 py-1.5 text-text-primary text-sm focus:outline-none focus:border-accent"
+            >
+              {(OPERATORS[c.type] ?? []).map((op) => (
+                <option key={op.value} value={op.value}>{op.label}</option>
+              ))}
+            </select>
+
+            <input
+              type={c.type === "confidence" ? "number" : "text"}
+              value={Array.isArray(c.value) ? c.value.join(", ") : String(c.value)}
+              onChange={(e) => {
+                const raw = e.target.value;
+                let val: string | string[] | number = raw;
+                if (c.operator === "in") {
+                  val = raw.split(",").map((s) => s.trim()).filter(Boolean);
+                } else if (c.type === "confidence") {
+                  val = parseFloat(raw) || 0;
+                }
+                updateCondition(i, { value: val });
+              }}
+              placeholder={
+                c.type === "caller" ? "frankdegods" :
+                c.type === "ticker" ? "BTC" :
+                c.type === "direction" ? "long" :
+                c.type === "platform" ? "polymarket" :
+                c.type === "confidence" ? "0.85" :
+                "S, A"
+              }
+              step={c.type === "confidence" ? "0.01" : undefined}
+              className="flex-1 bg-surface border border-border rounded px-3 py-1.5 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent min-w-0"
+            />
+
+            {conditions.length > 1 && (
+              <button
+                onClick={() => removeCondition(i)}
+                className="text-text-muted hover:text-loss transition-colors flex-shrink-0 p-1"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <button
+        onClick={addCondition}
+        className="text-accent text-sm hover:text-accent/80 transition-colors"
+      >
+        + Add Condition
+      </button>
+    </div>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+
 export default function AlertsPage() {
   const [userHandle, setUserHandle] = useState("");
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [feed, setFeed] = useState<TriggeredAlert[]>([]);
+  const [rules, setRules] = useState<AlertRule[]>([]);
+  const [notifications, setNotifications] = useState<AlertNotification[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Form state
-  const [activeType, setActiveType] = useState<"caller" | "ticker" | "consensus" | null>(null);
-  const [target, setTarget] = useState("");
-  const [thresholdPnl, setThresholdPnl] = useState("");
-  const [channel, setChannel] = useState("web");
+  // Create form state
+  const [showCreate, setShowCreate] = useState(false);
+  const [ruleName, setRuleName] = useState("");
+  const [conditions, setConditions] = useState<AlertCondition[]>([
+    { type: "caller", operator: "eq", value: "" },
+  ]);
+  const [browserChannel, setBrowserChannel] = useState(true);
+  const [telegramChannel, setTelegramChannel] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState("");
+  const [webhookChannel, setWebhookChannel] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const loadAlerts = useCallback(async (handle: string) => {
+  // Test result
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+
+  const loadData = useCallback(async (handle: string) => {
     if (!handle) return;
     setLoading(true);
     try {
-      const [alertsRes, feedRes] = await Promise.all([
-        fetch(`/api/alerts?user=${encodeURIComponent(handle)}`),
-        fetch(`/api/alerts/feed?user=${encodeURIComponent(handle)}`),
+      const [rulesRes, notifsRes] = await Promise.all([
+        fetch(`/api/alerts/rules?user=${encodeURIComponent(handle)}`),
+        fetch(`/api/alerts/notifications?user=${encodeURIComponent(handle)}&all=1`),
       ]);
-      if (alertsRes.ok) setAlerts(await alertsRes.json());
-      if (feedRes.ok) setFeed(await feedRes.json());
+      if (rulesRes.ok) setRules(await rulesRes.json());
+      if (notifsRes.ok) {
+        const data = await notifsRes.json();
+        setNotifications(data.notifications ?? []);
+      }
     } finally {
       setLoading(false);
     }
@@ -136,89 +311,122 @@ export default function AlertsPage() {
     const stored = localStorage.getItem("paste_alerts_handle");
     if (stored) {
       setUserHandle(stored);
-      loadAlerts(stored);
+      loadData(stored);
     }
-  }, [loadAlerts]);
+  }, [loadData]);
 
   function saveHandle(handle: string) {
     setUserHandle(handle);
     localStorage.setItem("paste_alerts_handle", handle);
-    loadAlerts(handle);
+    loadData(handle);
+  }
+
+  function buildChannels(): AlertChannel[] {
+    const channels: AlertChannel[] = [];
+    if (browserChannel) channels.push({ type: "browser", config: {} });
+    if (telegramChannel && telegramChatId) channels.push({ type: "telegram", config: { chatId: telegramChatId } });
+    if (webhookChannel && webhookUrl) channels.push({ type: "webhook", config: { webhookUrl } });
+    if (channels.length === 0) channels.push({ type: "browser", config: {} });
+    return channels;
   }
 
   async function handleCreate() {
-    if (!activeType || !target || !userHandle) return;
+    if (!ruleName || !userHandle) return;
+    const validConditions = conditions.filter((c) => {
+      if (Array.isArray(c.value)) return c.value.length > 0;
+      return c.value !== "" && c.value !== 0;
+    });
+    if (validConditions.length === 0) return;
+
     setCreating(true);
     try {
-      const res = await fetch("/api/alerts", {
+      const res = await fetch("/api/alerts/rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_handle: userHandle,
-          alert_type: activeType,
-          target,
-          threshold_pnl: thresholdPnl ? parseFloat(thresholdPnl) : null,
-          channel,
+          userId: userHandle,
+          name: ruleName,
+          conditions: validConditions,
+          channels: buildChannels(),
         }),
       });
       if (res.ok) {
-        setTarget("");
-        setThresholdPnl("");
-        setActiveType(null);
-        loadAlerts(userHandle);
+        setRuleName("");
+        setConditions([{ type: "caller", operator: "eq", value: "" }]);
+        setBrowserChannel(true);
+        setTelegramChannel(false);
+        setTelegramChatId("");
+        setWebhookChannel(false);
+        setWebhookUrl("");
+        setShowCreate(false);
+        loadData(userHandle);
       }
     } finally {
       setCreating(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    await fetch(`/api/alerts?id=${id}&user=${encodeURIComponent(userHandle)}`, {
-      method: "DELETE",
-    });
-    loadAlerts(userHandle);
+  async function handlePreset(preset: typeof PRESETS[number]) {
+    if (!userHandle) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/alerts/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: userHandle,
+          name: preset.name,
+          conditions: preset.conditions,
+          channels: [{ type: "browser", config: {} }],
+        }),
+      });
+      if (res.ok) loadData(userHandle);
+    } finally {
+      setCreating(false);
+    }
   }
 
-  async function handleToggle(id: number) {
-    await fetch("/api/alerts", {
+  async function handleToggle(ruleId: string) {
+    await fetch(`/api/alerts/rules/${ruleId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, user_handle: userHandle }),
+      body: JSON.stringify({ userId: userHandle, action: "toggle" }),
     });
-    loadAlerts(userHandle);
+    loadData(userHandle);
   }
 
-  const alertTypes = [
-    {
-      type: "caller" as const,
-      title: "Caller Alert",
-      description: "Follow a caller",
-      placeholder: "e.g. frankdegods",
-      prefix: "@",
-    },
-    {
-      type: "ticker" as const,
-      title: "Ticker Alert",
-      description: "Watch a ticker",
-      placeholder: "e.g. SOL",
-      prefix: "$",
-    },
-    {
-      type: "consensus" as const,
-      title: "Consensus Alert",
-      description: "When X+ callers agree",
-      placeholder: "e.g. 3",
-      prefix: "",
-    },
-  ];
+  async function handleDelete(ruleId: string) {
+    await fetch(`/api/alerts/rules/${ruleId}?user=${encodeURIComponent(userHandle)}`, {
+      method: "DELETE",
+    });
+    loadData(userHandle);
+  }
+
+  async function handleTest(ruleId: string) {
+    setTesting(ruleId);
+    setTestResult(null);
+    try {
+      const res = await fetch(`/api/alerts/test/${ruleId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTestResult(data);
+      }
+    } finally {
+      setTesting(null);
+    }
+  }
 
   return (
     <main className="min-h-screen px-4 py-12 max-w-4xl mx-auto">
-      <h1 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">
-        Set up alerts
-      </h1>
+      <div className="flex items-center gap-3 mb-2">
+        <BellIcon />
+        <h1 className="text-3xl md:text-4xl font-bold text-text-primary">
+          Signal Alerts
+        </h1>
+      </div>
       <p className="text-text-secondary mb-8">
-        Get notified when your followed callers make trades or tickers move.
+        Set up personalized rules to get notified when matching trade signals appear.
+        Follow callers, tickers, or strategies.
       </p>
 
       {/* Handle input */}
@@ -256,8 +464,8 @@ export default function AlertsPage() {
           <button
             onClick={() => {
               setUserHandle("");
-              setAlerts([]);
-              setFeed([]);
+              setRules([]);
+              setNotifications([]);
               localStorage.removeItem("paste_alerts_handle");
             }}
             className="text-text-muted text-xs hover:text-loss transition-colors ml-2"
@@ -267,206 +475,282 @@ export default function AlertsPage() {
         </div>
       )}
 
-      {/* Alert type cards */}
       {userHandle && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {alertTypes.map((at) => (
+          {/* ── Your Signal Alerts ──────────────────────────────────── */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-text-primary">Your Signal Alerts</h2>
               <button
-                key={at.type}
-                onClick={() => setActiveType(activeType === at.type ? null : at.type)}
-                className={`bg-surface border rounded-lg p-6 text-left transition-colors ${
-                  activeType === at.type
-                    ? "border-accent"
-                    : "border-border hover:border-accent/50"
-                }`}
+                onClick={() => setShowCreate(!showCreate)}
+                className="px-4 py-2 bg-accent text-white rounded font-bold text-sm hover:bg-accent/80 transition-colors"
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <span className={activeType === at.type ? "text-accent" : "text-text-muted"}>
-                    <AlertTypeIcon type={at.type} />
-                  </span>
-                  <h3 className="text-text-primary font-bold">{at.title}</h3>
-                </div>
-                <p className="text-text-secondary text-sm">{at.description}</p>
-              </button>
-            ))}
-          </div>
-
-          {/* Create alert form */}
-          {activeType && (
-            <div className="bg-surface border border-accent/30 rounded-lg p-6 mb-8">
-              <h3 className="text-text-primary font-bold mb-4">
-                New {alertTypes.find((a) => a.type === activeType)?.title}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-text-muted text-xs uppercase tracking-widest block mb-2">
-                    {activeType === "consensus" ? "Minimum callers" : "Target"}
-                  </label>
-                  <div className="flex items-center bg-background border border-border rounded overflow-hidden focus-within:border-accent transition-colors">
-                    {alertTypes.find((a) => a.type === activeType)?.prefix && (
-                      <span className="text-text-muted pl-3">
-                        {alertTypes.find((a) => a.type === activeType)?.prefix}
-                      </span>
-                    )}
-                    <input
-                      type="text"
-                      value={target}
-                      onChange={(e) => setTarget(e.target.value)}
-                      placeholder={alertTypes.find((a) => a.type === activeType)?.placeholder}
-                      className="flex-1 bg-transparent px-3 py-2.5 text-text-primary placeholder:text-text-muted focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-text-muted text-xs uppercase tracking-widest block mb-2">
-                    Min P&L threshold (optional)
-                  </label>
-                  <div className="flex items-center bg-background border border-border rounded overflow-hidden focus-within:border-accent transition-colors">
-                    <input
-                      type="number"
-                      value={thresholdPnl}
-                      onChange={(e) => setThresholdPnl(e.target.value)}
-                      placeholder="e.g. 10"
-                      step="0.1"
-                      className="flex-1 bg-transparent px-3 py-2.5 text-text-primary placeholder:text-text-muted focus:outline-none"
-                    />
-                    <span className="text-text-muted pr-3">%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Channel selector */}
-              <div className="mb-4">
-                <label className="text-text-muted text-xs uppercase tracking-widest block mb-2">
-                  Channel
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {CHANNELS.map((ch) => (
-                    <button
-                      key={ch.id}
-                      onClick={() => ch.available && setChannel(ch.id)}
-                      disabled={!ch.available}
-                      className={`flex items-center gap-2 px-4 py-2 rounded border text-sm transition-colors ${
-                        channel === ch.id
-                          ? "border-accent text-accent"
-                          : ch.available
-                            ? "border-border text-text-secondary hover:border-accent/50"
-                            : "border-border/50 text-text-muted/50 cursor-not-allowed"
-                      }`}
-                    >
-                      <ChannelIcon type={ch.icon} />
-                      {ch.label}
-                      {!ch.available && (
-                        <span className="text-[10px] uppercase tracking-wider border border-amber rounded px-1.5 py-0.5 text-amber ml-1">
-                          Soon
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={handleCreate}
-                disabled={!target || creating}
-                className="px-6 py-2.5 bg-accent text-white rounded font-bold hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {creating ? "Creating..." : "Create Alert"}
+                + Create New Alert
               </button>
             </div>
-          )}
 
-          {/* Active alerts */}
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-text-primary mb-4">Your Alerts</h2>
             {loading ? (
               <p className="text-text-muted">Loading...</p>
-            ) : alerts.length === 0 ? (
+            ) : rules.length === 0 ? (
               <div className="bg-surface border border-border rounded-lg p-8 text-center">
-                <p className="text-text-muted">No alerts yet. Create one above to get started.</p>
+                <p className="text-text-muted mb-4">No signal alerts yet. Create one or pick a preset below.</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {alerts.map((alert) => (
+              <div className="space-y-3">
+                {rules.map((rule) => (
                   <div
-                    key={alert.id}
-                    className={`bg-surface border border-border rounded-lg px-5 py-4 flex items-center gap-4 transition-opacity ${
-                      alert.active ? "" : "opacity-50"
+                    key={rule.id}
+                    className={`bg-surface border border-border rounded-lg p-5 transition-opacity ${
+                      rule.enabled ? "" : "opacity-50"
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${alert.active ? "bg-win" : "bg-text-muted"}`} />
-                    <span className="text-text-muted flex-shrink-0">
-                      <AlertTypeIcon type={alert.alert_type} />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-text-primary font-bold">
-                        {alert.alert_type === "caller" && `@${alert.target}`}
-                        {alert.alert_type === "ticker" && `$${alert.target.toUpperCase()}`}
-                        {alert.alert_type === "consensus" && `${alert.target}+ callers agree`}
-                      </span>
-                      {alert.threshold_pnl != null && (
-                        <span className="text-text-muted text-sm ml-2">
-                          P&L &gt; {alert.threshold_pnl}%
-                        </span>
-                      )}
-                      <span className="text-text-muted text-xs ml-3">
-                        via {alert.channel}
-                      </span>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-text-primary font-bold">{rule.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${
+                            rule.enabled
+                              ? "bg-win/10 text-win border border-win/20"
+                              : "bg-text-muted/10 text-text-muted border border-text-muted/20"
+                          }`}>
+                            {rule.enabled ? "ON" : "OFF"}
+                          </span>
+                        </div>
+                        <p className="text-text-secondary text-sm mb-2">
+                          When {describeRule(rule)}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs text-text-muted">
+                          <span>Via: {rule.channels.map((c) => c.type).join(", ")}</span>
+                          <span>Matched {rule.matchCount} times</span>
+                          {rule.lastMatchedAt && (
+                            <span>Last: {formatDate(rule.lastMatchedAt)}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleTest(rule.id)}
+                          disabled={testing === rule.id}
+                          className="text-text-muted hover:text-accent text-xs transition-colors px-2 py-1 border border-border rounded hover:border-accent/50"
+                        >
+                          {testing === rule.id ? "Testing..." : "Test"}
+                        </button>
+                        <button
+                          onClick={() => handleToggle(rule.id)}
+                          className="text-text-muted hover:text-accent text-xs transition-colors px-2 py-1 border border-border rounded hover:border-accent/50"
+                        >
+                          {rule.enabled ? "Pause" : "Resume"}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rule.id)}
+                          className="text-text-muted hover:text-loss text-xs transition-colors px-2 py-1 border border-border rounded hover:border-loss/50"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-text-muted text-xs flex-shrink-0">
-                      {formatDate(alert.created_at)}
-                    </span>
-                    <button
-                      onClick={() => handleToggle(alert.id)}
-                      className="text-text-muted hover:text-accent text-xs transition-colors flex-shrink-0"
-                    >
-                      {alert.active ? "pause" : "resume"}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(alert.id)}
-                      className="text-text-muted hover:text-loss text-xs transition-colors flex-shrink-0"
-                    >
-                      delete
-                    </button>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Alert feed */}
-          {feed.length > 0 && (
+          {/* ── Test Result ─────────────────────────────────────────── */}
+          {testResult && (
+            <div className="bg-surface border border-accent/30 rounded-lg p-5 mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-text-primary font-bold">
+                  Test: &quot;{testResult.ruleName}&quot;
+                </h3>
+                <button
+                  onClick={() => setTestResult(null)}
+                  className="text-text-muted hover:text-text-primary text-xs"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <p className="text-text-secondary text-sm mb-3">
+                Tested against {testResult.totalTested} recent trades.{" "}
+                <span className="text-accent font-bold">{testResult.matchCount} matches</span> found.
+              </p>
+              {testResult.matches.length > 0 && (
+                <div className="space-y-1">
+                  {testResult.matches.slice(0, 10).map((m, i) => (
+                    <div key={i} className="text-sm text-text-secondary">
+                      <Link href={`/${m.caller}`} className="text-accent hover:underline">@{m.caller}</Link>
+                      {" "}{m.direction.toUpperCase()} ${m.ticker}
+                      {m.confidence != null && ` (${Math.round(m.confidence * 100)}%)`}
+                      {m.tier && ` [${m.tier}]`}
+                    </div>
+                  ))}
+                  {testResult.matchCount > 10 && (
+                    <p className="text-text-muted text-xs">...and {testResult.matchCount - 10} more</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Create Alert Form ──────────────────────────────────── */}
+          {showCreate && (
+            <div className="bg-surface border border-accent/30 rounded-lg p-6 mb-8">
+              <h3 className="text-text-primary font-bold text-lg mb-4">Create Alert</h3>
+
+              <div className="mb-4">
+                <label className="text-text-muted text-xs uppercase tracking-widest block mb-2">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={ruleName}
+                  onChange={(e) => setRuleName(e.target.value)}
+                  placeholder="e.g. Frank's BTC calls"
+                  className="w-full bg-background border border-border rounded px-4 py-2.5 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="text-text-muted text-xs uppercase tracking-widest block mb-2">
+                  When
+                </label>
+                <ConditionBuilder conditions={conditions} onChange={setConditions} />
+              </div>
+
+              <div className="mb-6">
+                <label className="text-text-muted text-xs uppercase tracking-widest block mb-2">
+                  Notify via
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={browserChannel}
+                      onChange={(e) => setBrowserChannel(e.target.checked)}
+                      className="accent-accent"
+                    />
+                    <span className="text-text-primary text-sm">Browser notifications</span>
+                  </label>
+
+                  <div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={telegramChannel}
+                        onChange={(e) => setTelegramChannel(e.target.checked)}
+                        className="accent-accent"
+                      />
+                      <span className="text-text-primary text-sm">Telegram (@paste_markets_bot)</span>
+                    </label>
+                    {telegramChannel && (
+                      <input
+                        type="text"
+                        value={telegramChatId}
+                        onChange={(e) => setTelegramChatId(e.target.value)}
+                        placeholder="Telegram Chat ID"
+                        className="mt-2 ml-7 bg-background border border-border rounded px-3 py-1.5 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={webhookChannel}
+                        onChange={(e) => setWebhookChannel(e.target.checked)}
+                        className="accent-accent"
+                      />
+                      <span className="text-text-primary text-sm">Webhook URL</span>
+                    </label>
+                    {webhookChannel && (
+                      <input
+                        type="url"
+                        value={webhookUrl}
+                        onChange={(e) => setWebhookUrl(e.target.value)}
+                        placeholder="https://your-server.com/webhook"
+                        className="mt-2 ml-7 w-80 bg-background border border-border rounded px-3 py-1.5 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCreate}
+                  disabled={!ruleName || creating}
+                  className="px-6 py-2.5 bg-accent text-white rounded font-bold hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating ? "Saving..." : "Save Alert"}
+                </button>
+                <button
+                  onClick={() => setShowCreate(false)}
+                  className="px-6 py-2.5 border border-border rounded text-text-secondary hover:border-accent/50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Popular Alert Templates ─────────────────────────────── */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-text-primary mb-4">Popular Alert Templates</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handlePreset(preset)}
+                  disabled={creating}
+                  className="bg-surface border border-border rounded-lg p-4 text-left hover:border-accent/50 transition-colors group"
+                >
+                  <h3 className="text-text-primary font-bold text-sm mb-1 group-hover:text-accent transition-colors">
+                    {preset.name}
+                  </h3>
+                  <p className="text-text-muted text-xs">{preset.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Recent Notifications ────────────────────────────────── */}
+          {notifications.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-text-primary mb-4">Recent Triggers</h2>
+              <h2 className="text-xl font-bold text-text-primary mb-4">Recent Notifications</h2>
               <div className="space-y-2">
-                {feed.map((item, i) => (
+                {notifications.slice(0, 20).map((notif) => (
                   <div
-                    key={`${item.alert_id}-${item.ticker}-${item.posted_at}-${i}`}
-                    className="bg-surface border border-border rounded-lg px-5 py-4 flex items-center gap-4"
+                    key={notif.id}
+                    className={`bg-surface border border-border rounded-lg px-5 py-4 flex items-center gap-4 ${
+                      notif.read_at ? "opacity-60" : ""
+                    }`}
                   >
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      notif.read_at ? "bg-text-muted" : "bg-loss"
+                    }`} />
                     <div className="flex-1 min-w-0">
-                      <span className="text-text-primary font-bold">
-                        @{item.trade_handle}
-                      </span>
-                      <span className="text-text-muted mx-2">called</span>
-                      <span className="text-text-primary">
-                        ${item.ticker}
-                      </span>
-                      <span className="text-text-muted ml-1">
-                        {item.direction}
-                      </span>
-                      {item.pnl_pct != null && (
-                        <span className={`ml-2 font-bold ${item.pnl_pct >= 0 ? "text-win" : "text-loss"}`}>
-                          {item.pnl_pct >= 0 ? "+" : ""}{item.pnl_pct.toFixed(1)}%
+                      {notif.caller_handle && (
+                        <Link
+                          href={`/${notif.caller_handle}`}
+                          className="text-accent font-bold hover:underline"
+                        >
+                          @{notif.caller_handle}
+                        </Link>
+                      )}
+                      {notif.ticker && (
+                        <span className="text-text-primary ml-2">
+                          {notif.direction?.toUpperCase()} ${notif.ticker}
                         </span>
                       )}
+                      <span className="text-text-secondary text-sm ml-2">
+                        {notif.message}
+                      </span>
                     </div>
                     <span className="text-text-muted text-xs flex-shrink-0">
-                      {item.reason}
+                      via {notif.channel}
                     </span>
                     <span className="text-text-muted text-xs flex-shrink-0">
-                      {formatDate(item.posted_at)}
+                      {formatDate(notif.created_at)}
                     </span>
                   </div>
                 ))}

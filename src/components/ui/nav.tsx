@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SearchTrigger } from "@/components/search-bar";
+import NotificationBell from "@/components/notification-bell";
 
 export default function Nav() {
   return (
@@ -16,6 +17,9 @@ export default function Nav() {
         </Link>
         <Link href="/predictions" className="text-amber hover:text-text-primary transition text-sm">
           Predictions
+        </Link>
+        <Link href="/events" className="text-win hover:text-text-primary transition text-sm font-bold">
+          Events
         </Link>
         <Link href="/alpha" className="text-[#2ecc71] hover:text-[#f0f0f0] transition text-sm font-bold">
           Alpha
@@ -69,6 +73,10 @@ export default function Nav() {
           Join
         </Link>
       </div>
+      <Link href="/alerts" className="text-text-muted hover:text-accent transition text-sm">
+        Alerts
+      </Link>
+      <NotificationBell />
       <SearchTrigger />
     </nav>
   );

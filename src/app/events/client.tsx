@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import type { EventItem } from "@/app/api/events/route";
 import { TradeCard } from "@/components/trade-card";
+import { WhatsTheBet } from "@/components/whats-the-bet";
 import {
   formatProbability,
   probabilityToAmericanOdds,
@@ -420,22 +421,9 @@ export function EventsClient({ initialItems, initialCategory, trendingItems = []
         )}
       </div>
 
-      {/* What's the Bet? CTA */}
+      {/* What's the Bet? */}
       <div className="max-w-3xl mx-auto px-4 mt-8 mb-4">
-        <div className="bg-surface border border-border rounded-lg p-6">
-          <h3 className="text-sm font-bold text-text-primary mb-1">
-            What&apos;s the Bet?
-          </h3>
-          <p className="text-text-muted text-xs mb-3">
-            Ask a question like &quot;Will Kentucky win March Madness?&quot; and we find the Polymarket event.
-          </p>
-          <Link
-            href="/trade?q="
-            className="inline-block border border-border rounded-lg px-4 py-2 text-xs font-bold text-text-primary hover:border-accent transition-colors"
-          >
-            Find a Market
-          </Link>
-        </div>
+        <WhatsTheBet />
       </div>
 
       <footer className="border-t border-border py-8 px-4 text-center text-xs text-text-muted mt-8">
