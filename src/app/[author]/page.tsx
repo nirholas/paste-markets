@@ -439,6 +439,37 @@ export default async function AuthorPage({ params }: PageProps) {
         </div>
       )}
 
+      {/* Worst call */}
+      {metrics.worstTrade && metrics.worstTrade.pnl < 0 && (
+        <div className="mt-6">
+          <h2 className="text-xs uppercase tracking-widest text-text-muted mb-3">
+            Worst Call
+          </h2>
+          <div className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-text-primary font-bold">{metrics.worstTrade.ticker}</span>
+              <span
+                className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                  metrics.worstTrade.direction === "long" || metrics.worstTrade.direction === "yes"
+                    ? "text-win bg-win/10"
+                    : "text-loss bg-loss/10"
+                }`}
+              >
+                {metrics.worstTrade.direction}
+              </span>
+              {metrics.worstTrade.date && (
+                <span className="text-[11px] text-text-muted">
+                  {new Date(metrics.worstTrade.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                </span>
+              )}
+            </div>
+            <span className="text-loss font-bold text-lg">
+              {formatPnl(metrics.worstTrade.pnl)}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Asset breakdown */}
       {metrics.topAssets.length > 0 && (
         <div className="mt-10">
@@ -470,7 +501,9 @@ export default async function AuthorPage({ params }: PageProps) {
                   return (
                     <tr key={asset.ticker} className="border-b border-border last:border-0">
                       <td className="px-4 py-2 font-bold text-text-primary">
-                        {asset.ticker}
+                        <Link href={`/leaderboard/${encodeURIComponent(asset.ticker)}`} className="hover:text-accent transition-colors">
+                          {asset.ticker}
+                        </Link>
                       </td>
                       <td className="px-4 py-2 text-right text-text-secondary">
                         {asset.callCount}
