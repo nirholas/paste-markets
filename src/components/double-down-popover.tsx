@@ -32,6 +32,7 @@ export function DoubleDownButton({
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [walletAddress, setWalletAddress] = useState("");
   const [handle, setHandle] = useState("");
+  const [txSignature, setTxSignature] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -62,12 +63,18 @@ export function DoubleDownButton({
   function resetState() {
     setStep("select");
     setSelectedAmount(null);
+    setTxSignature("");
     setError(null);
     setSuccess(false);
   }
 
   async function handleQuickWager() {
     if (!selectedAmount || !walletAddress) return;
+    const trimmedSig = txSignature.trim();
+    if (!trimmedSig) {
+      setError("Paste your Solana transaction signature");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -79,6 +86,7 @@ export function DoubleDownButton({
           tradeId,
           amount: selectedAmount,
           walletAddress,
+          txSignature: trimmedSig,
           handle: handle ? handle.replace(/^@/, "") : undefined,
         }),
       });
@@ -227,6 +235,17 @@ export function DoubleDownButton({
                   Caller tip: <span className="text-[#c8c8d0]">10% of profit</span>
                 </p>
               </div>
+
+              <input
+                type="text"
+                value={txSignature}
+                onChange={(e) => setTxSignature(e.target.value.trim())}
+                placeholder="Paste Solana tx signature"
+                className="w-full border border-[#1a1a2e] bg-[#0a0a1a] text-[#f0f0f0] text-xs px-3 py-2 rounded focus:outline-none focus:border-[#3b82f6] transition-colors placeholder:text-[#555568] font-mono"
+              />
+              <p className="text-[9px] text-[#555568]">
+                Transfer {selectedAmount} USDC first, then paste the tx signature
+              </p>
 
               {error && (
                 <p className="text-[10px] text-[#e74c3c] border border-[#e74c3c]/30 rounded px-2 py-1">

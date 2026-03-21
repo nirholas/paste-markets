@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTradeById, searchFullTrades, PasteTradeFullTrade } from "@/lib/paste-trade";
 import { ShareButton } from "./share-button";
-import { WagerSection } from "./wager-section";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -332,11 +331,6 @@ export default async function TradeDetailPage({ params, searchParams }: PageProp
           </Link>
         )}
       </div>
-
-      {/* Wager / Back This Call */}
-      {trade.trade_id && (
-        <WagerSection tradeId={trade.trade_id} authorHandle={handle} />
-      )}
 
       {/* More from @handle */}
       {moreTrades.length > 0 && (

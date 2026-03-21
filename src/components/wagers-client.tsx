@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { DoubleDownButton } from "@/components/double-down-popover";
 import { BackerStrip } from "@/components/backer-strip";
 
 type Tab = "active" | "settled" | "my";
@@ -136,19 +135,6 @@ function ActiveWagerCard({ config }: { config: WagerConfig }) {
         />
       )}
 
-      {/* CTA */}
-      {timeLeft(config.wager_deadline) !== "closed" && (
-        <div className="pt-2">
-          <DoubleDownButton
-            tradeId={config.trade_card_id}
-            ticker={config.ticker}
-            direction={config.direction}
-            authorHandle={config.author_handle}
-            totalWagered={config.total_wagered}
-            backerCount={config.wager_count}
-          />
-        </div>
-      )}
     </div>
   );
 }

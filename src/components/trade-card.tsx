@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { WinRateBar } from "@/components/ui/win-rate-bar";
 import { IntegrityBadge } from "@/components/integrity-badge";
-import { WagerWidget } from "@/components/wager-widget";
-import { DoubleDownButton } from "@/components/double-down-popover";
-import { BackerStrip } from "@/components/backer-strip";
 import { ExecuteButton } from "@/components/execution/execute-button";
 import type { IntegrityClass } from "@/lib/integrity";
 import {
@@ -352,31 +349,9 @@ export function TradeCard({
         </div>
       )}
 
-      {/* Wager widget */}
-      {tradeId && handle && (
-        <WagerWidget
-          tradeId={tradeId}
-          authorHandle={handle}
-          ticker={ticker}
-          direction={direction}
-          entryPrice={entryPrice}
-          pnlPct={pnlPct}
-        />
-      )}
-
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-text-muted pt-2 border-t border-border">
         <div className="flex items-center gap-3">
-          {tradeId && handle && (
-            <DoubleDownButton
-              tradeId={tradeId}
-              ticker={ticker}
-              direction={direction}
-              authorHandle={handle}
-              totalWagered={0}
-              backerCount={0}
-            />
-          )}
           <ExecuteButton
             tradeId={tradeId ?? undefined}
             ticker={ticker}
