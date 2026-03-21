@@ -52,9 +52,8 @@ export async function POST(req: NextRequest) {
     // Pre-execution: validate instrument and get routing via paste.trade /api/skill/route
     const dir = (["long", "short"].includes(direction) ? direction : "long") as "long" | "short";
     const routeInfo = await skillRoute({
-      ticker: asset.replace(/^\$/, "").toUpperCase(),
+      tickers: [asset.replace(/^\$/, "").toUpperCase()],
       direction: dir,
-      platform: venue,
     });
 
     // Risk check (server-side)

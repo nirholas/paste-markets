@@ -11,16 +11,22 @@ export async function GET(
   const originalUrl = req.nextUrl.searchParams.get("url") ?? "";
 
   // Primary: fetch source directly from paste.trade /api/sources/{id}
-  const source = await fetchSource(id);
-  if (source) {
+  const result = await fetchSource(id);
+  if (result) {
     return NextResponse.json({
-      source_id: source.source_id,
-      source_url: source.source_url,
-      status: source.status,
-      handle: handle || null,
-      original_url: originalUrl || null,
-      trades: source.trades ?? [],
-      processing: source.status === "processing",
+      // Backward-compatible fields
+      source_id: result.source.id,
+      source_url: result.source.url,
+      status: result.source.status,
+      handle: result.author?.handle ?? handle || null,
+      original_url: originalUrl || result.source.url || null,
+      trades: result.trades ?? [],
+      processing: result.source.status === "processing",
+      // Richer data from nested response
+      title: result.source.title ?? null,
+      summary: result.source.summary ?? null,
+      source_theses: result.source.source_theses ?? [],
+      author: result.author ?? null,
     });
   }
 
@@ -38,13 +44,13 @@ export async function GET(
     return false;
   });
 
-  const result = matched.length > 0 ? matched : [];
+  const fallback = matched.length > 0 ? matched : [];
 
   return NextResponse.json({
     source_id: id,
     handle,
     original_url: originalUrl,
-    trades: result,
-    processing: result.length === 0,
+    trades: fallback,
+    processing: fallback.length === 0,
   });
 }

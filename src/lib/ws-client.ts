@@ -30,17 +30,18 @@ export interface WSNewTrade {
   [key: string]: unknown;
 }
 
-export interface WSPriceUpdate {
-  trade_id: string;
+export interface WSPriceEntry {
   price: number;
-  timestamp: number;
-  pnl_pct?: number;
-  [key: string]: unknown;
+  ts: number;
+}
+
+export interface WSPriceUpdate {
+  prices: Record<string, WSPriceEntry>;
 }
 
 type WSEvent =
-  | { type: "new_trade"; data: WSNewTrade }
-  | { type: "price_update"; data: WSPriceUpdate };
+  | { type: "new_trade"; data?: WSNewTrade; [key: string]: unknown }
+  | { type: "price_update"; prices?: Record<string, WSPriceEntry>; data?: WSPriceUpdate; [key: string]: unknown };
 
 type EventHandler<T> = (data: T) => void;
 
@@ -106,9 +107,15 @@ export function createPasteTradeWS(): PasteTradeWS {
 
       ws.onmessage = (event) => {
         try {
-          const parsed = JSON.parse(event.data) as WSEvent;
-          if (parsed.type && parsed.data) {
-            dispatch(parsed);
+          const parsed = JSON.parse(event.data);
+          if (parsed.type === "new_trade") {
+            dispatch({ type: "new_trade", data: parsed.data ?? parsed });
+          } else if (parsed.type === "price_update") {
+            // Real shape has prices at top level, not in data
+            const priceData: WSPriceUpdate = {
+              prices: parsed.prices ?? parsed.data?.prices ?? {},
+            };
+            dispatch({ type: "price_update", data: priceData });
           }
         } catch {
           // Ignore non-JSON messages

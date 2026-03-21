@@ -17,6 +17,7 @@ import {
   createPasteTradeWS,
   type WSNewTrade,
   type WSPriceUpdate,
+  type WSPriceEntry,
 } from "./ws-client";
 
 const MAX_TRADES = 50;

@@ -120,11 +120,26 @@ export interface PriceData {
 // ── Source types ─────────────────────────────────────────────────────────────
 
 export interface SourceResult {
-  source_id: string;
-  source_url: string;
-  status: string;
+  source: {
+    id: string;
+    url: string;
+    title?: string;
+    platform?: string;
+    status: string;
+    summary?: string;
+    source_summary?: string;
+    source_theses?: string[];
+    [key: string]: unknown;
+  };
+  author: {
+    id?: string;
+    handle?: string;
+    name?: string;
+    avatar_url?: string;
+    platform?: string;
+    [key: string]: unknown;
+  };
   trades: Record<string, unknown>[];
-  [key: string]: unknown;
 }
 
 export interface CreateSourceParams {

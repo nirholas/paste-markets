@@ -35,9 +35,8 @@ export async function GET(req: NextRequest) {
       )),
       // Route through paste.trade to validate instrument + get pricing
       skillRoute({
-        ticker: asset.replace(/^\$/, "").toUpperCase(),
+        tickers: [asset.replace(/^\$/, "").toUpperCase()],
         direction: direction as "long" | "short",
-        platform: venue,
       }),
       // Discover available instruments for this ticker
       skillDiscover({
