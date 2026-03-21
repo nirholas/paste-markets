@@ -77,6 +77,25 @@ async function fetchLiveEnrichmentMap(): Promise<Map<string, LiveTradeData>> {
   return map;
 }
 
+/**
+ * Generate a readable prediction title from ticker + direction when
+ * market_question is not available from the paste.trade API.
+ */
+function generatePredictionTitle(ticker: string, direction: string): string {
+  const formatted = ticker
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Polymarket slugs are often descriptive (e.g. "WILL-BTC-HIT-150K")
+  if (formatted.includes(" ") && formatted.length > 8) {
+    return formatted + "?";
+  }
+
+  // Short ticker: build a label from direction
+  const dirLabel = direction === "no" || direction === "short" ? "NO" : "YES";
+  return `${formatted.toUpperCase()} \u2014 ${dirLabel} Position`;
+}
+
 function rowToPredictionTrade(
   row: PredictionRow,
   liveData?: LiveTradeData,
@@ -107,8 +126,8 @@ function rowToPredictionTrade(
   // Normalize direction: paste.trade uses long/short for polymarket
   const dir = row.direction === "short" || row.direction === "no" ? "no" : "yes";
 
-  // Use market_question for event title, fall back to ticker
-  const eventTitle = liveData?.market_question || row.ticker;
+  // Use market_question for event title, fall back to generated title
+  const eventTitle = liveData?.market_question || generatePredictionTitle(row.ticker, row.direction);
 
   // Best available URL
   const marketUrl =

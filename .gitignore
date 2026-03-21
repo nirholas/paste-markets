@@ -13,3 +13,6 @@ dist/
 .vercel/
 .tls/
 .env*.local
+
+# Rust / Anchor build artifacts
+target/

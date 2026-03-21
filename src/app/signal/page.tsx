@@ -68,6 +68,14 @@ function formatUpdatedAt(): string {
 
 // ---------- Sentiment styles ----------
 
+function computeSentiment(directionSplit: number): HeatmapTicker["sentiment"] {
+  if (directionSplit >= 75) return "strong-bullish";
+  if (directionSplit >= 60) return "lean-bullish";
+  if (directionSplit >= 40) return "neutral";
+  if (directionSplit >= 25) return "lean-bearish";
+  return "strong-bearish";
+}
+
 const SENTIMENT_STYLES: Record<
   HeatmapTicker["sentiment"],
   { label: string; color: string }
@@ -110,8 +118,26 @@ async function fetchHeatmap(): Promise<HeatmapTicker[]> {
   try {
     const res = await fetch(`${BASE_URL}/api/heatmap?timeframe=7d`, FETCH_OPTS);
     if (!res.ok) return [];
-    const data = (await res.json()) as { tickers?: HeatmapTicker[] };
-    return data.tickers ?? [];
+    const data = (await res.json()) as {
+      tickers?: Array<{
+        ticker: string;
+        call_count: number;
+        avg_pnl: number | null;
+        direction_split: number;
+        longs: number;
+        shorts: number;
+        topCaller: string;
+      }>;
+    };
+    return (data.tickers ?? []).map((t) => ({
+      ticker: t.ticker,
+      calls: t.call_count,
+      longs: t.longs,
+      shorts: t.shorts,
+      avgPnl: t.avg_pnl,
+      sentiment: computeSentiment(t.direction_split),
+      topCaller: t.topCaller,
+    }));
   } catch {
     return [];
   }
