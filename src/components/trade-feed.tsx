@@ -3,16 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
-
-function timeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
+import { TimeAgo } from "@/components/time-ago";
 
 function directionColor(direction: string): string {
   return direction === "long" || direction === "yes" ? "#2ecc71" : "#e74c3c";
@@ -84,9 +75,7 @@ function TradeRow({ trade, isNew }: { trade: FeedItem; isNew: boolean }) {
       </div>
 
       {/* Time ago */}
-      <div className="text-xs text-[#555568] w-[56px] text-right shrink-0 ml-2">
-        {timeAgo(trade.created_at)}
-      </div>
+      <TimeAgo date={trade.created_at} className="text-xs text-[#555568] w-[56px] text-right shrink-0 ml-2" />
     </a>
   );
 }

@@ -384,7 +384,7 @@ function SlideFinal({ data }: { data: WrappedData }) {
 
       {/* Personality badge */}
       <div
-        className="px-4 py-2 rounded-full border mb-6 text-sm font-bold"
+        className="px-4 py-2 rounded-lg border mb-6 text-sm font-bold"
         style={{
           borderColor: data.personality.color,
           color: data.personality.color,

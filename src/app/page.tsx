@@ -132,19 +132,19 @@ export default async function HomePage() {
           {/* Stats pills */}
           {stats && (
             <div className="mt-8 flex flex-wrap justify-center items-center gap-3">
-              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-full px-4 py-2 text-sm">
+              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-lg px-4 py-2 text-sm">
                 <span className="text-[#f5f5f7] font-semibold font-mono">
                   {stats.total_trades.toLocaleString()}
                 </span>
                 <span className="text-[#52525b]">trades</span>
               </div>
-              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-full px-4 py-2 text-sm">
+              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-lg px-4 py-2 text-sm">
                 <span className="text-[#f5f5f7] font-semibold font-mono">
                   {stats.total_callers.toLocaleString()}
                 </span>
                 <span className="text-[#52525b]">callers</span>
               </div>
-              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-full px-4 py-2 text-sm">
+              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-lg px-4 py-2 text-sm">
                 <span
                   className="font-semibold font-mono"
                   style={{ color: stats.avg_win_rate >= 50 ? "#22c55e" : "#ef4444" }}

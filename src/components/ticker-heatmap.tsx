@@ -366,7 +366,21 @@ function SVGTreemap({
         height={dimensions.height}
         style={{ display: "block", borderRadius: "8px", backgroundColor: "#0a0a1a" }}
       >
-        {positioned.map((item) => {
+        <defs>
+          {positioned.map((item, i) => {
+            const { rect } = item;
+            const innerX = rect.x + 1;
+            const innerY = rect.y + 1;
+            const innerW = rect.w - 2;
+            const innerH = rect.h - 2;
+            return (
+              <clipPath key={i} id={`clip-${i}`}>
+                <rect x={innerX} y={innerY} width={innerW} height={innerH} rx={3} />
+              </clipPath>
+            );
+          })}
+        </defs>
+        {positioned.map((item, i) => {
           const { rect } = item;
           if (rect.w < 2 || rect.h < 2) return null;
 
@@ -380,10 +394,18 @@ function SVGTreemap({
           const fontSize = Math.max(10, Math.min(18, innerW / 5, innerH / 3));
           const pnlFontSize = Math.max(9, fontSize * 0.7);
 
+          // Truncate ticker label to fit box width (monospace ~0.6em per char)
+          const charWidth = fontSize * 0.62;
+          const maxChars = Math.max(1, Math.floor((innerW - 8) / charWidth));
+          const label = item.data.ticker.length > maxChars
+            ? item.data.ticker.slice(0, maxChars - 1) + "\u2026"
+            : item.data.ticker;
+
           return (
             <g
               key={item.data.ticker}
               style={{ cursor: "pointer" }}
+              clipPath={`url(#clip-${i})`}
               onClick={() => onSelect(item.data)}
               onMouseMove={(e) => setTooltip({ ticker: item.data, x: e.clientX, y: e.clientY })}
               onMouseLeave={() => setTooltip(null)}
@@ -423,7 +445,7 @@ function SVGTreemap({
                   fontFamily="var(--font-jetbrains), JetBrains Mono, monospace"
                   style={{ textShadow: "0 1px 3px rgba(0,0,0,0.7)", pointerEvents: "none" }}
                 >
-                  {item.data.ticker}
+                  {label}
                 </text>
               )}
               {showPnl && (

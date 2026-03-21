@@ -3,17 +3,7 @@
 import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
 import { tierColor } from "@/lib/alpha";
-
-function timeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
+import { TimeAgo } from "@/components/time-ago";
 
 function formatPrice(price: number): string {
   if (price >= 1000) return `$${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -72,7 +62,7 @@ export function FeedCard({ item }: FeedCardProps) {
               <span className="text-[#52525b] text-xs">{Math.round(item.win_rate)}% WR</span>
             )}
           </div>
-          <span className="text-[#52525b] text-xs">{timeAgo(item.created_at)}</span>
+          <TimeAgo date={item.created_at} className="text-[#52525b] text-xs" />
         </div>
 
         {/* P&L badge */}
