@@ -11,6 +11,7 @@
 
 import { addSSEListener, removeSSEListener, startPollingLoop, isPollingActive } from "@/lib/tweet-poller";
 import { getEnabledWatched, autoPopulateFromLeaderboard, getWatchlistStats } from "@/lib/watchlist";
+import { startWSBridge, isWSBridgeConnected } from "@/lib/ws-bridge";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,6 +29,9 @@ export async function GET(): Promise<Response> {
       console.error("[api/stream] Failed to start polling:", err);
     });
   }
+
+  // Start WebSocket bridge for real-time paste.trade events
+  startWSBridge();
 
   const encoder = new TextEncoder();
 
@@ -70,6 +74,7 @@ export async function GET(): Promise<Response> {
                 activeCallers: currentStats.activeCallers,
                 tradesFoundToday: currentStats.tradesFoundToday,
                 lastSignalAt: currentStats.lastSignalAt,
+                wsConnected: isWSBridgeConnected(),
               })}\n\n`,
             ),
           );

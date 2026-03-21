@@ -83,31 +83,34 @@ export async function GET(
     const yesCallers = callers.filter((c) => c.direction === "yes");
     const noCallers = callers.filter((c) => c.direction === "no");
 
+    const rawAny = raw as Record<string, unknown>;
+    const avatarUrl = raw.author_avatar_url
+      ? (raw.author_avatar_url.startsWith("/")
+        ? `https://paste.trade${raw.author_avatar_url}`
+        : raw.author_avatar_url)
+      : null;
+
     const detail: MarketDetail = {
       market: {
-        id: String(raw.id ?? id),
-        ticker: String(raw.ticker ?? ""),
-        direction: String(raw.direction ?? "yes"),
-        author_handle: String(raw.author_handle ?? ""),
-        author_avatar_url: raw.author_avatar_url
-          ? (raw.author_avatar_url.startsWith("/")
-            ? `https://paste.trade${raw.author_avatar_url}`
-            : String(raw.author_avatar_url))
-          : null,
-        headline_quote: raw.headline_quote ? String(raw.headline_quote) : null,
-        thesis: raw.thesis ? String(raw.thesis) : null,
+        id: raw.trade_id ?? id,
+        ticker: raw.ticker ?? "",
+        direction: raw.direction ?? "yes",
+        author_handle: raw.author_handle ?? "",
+        author_avatar_url: avatarUrl,
+        headline_quote: raw.headline_quote ?? null,
+        thesis: raw.thesis ?? null,
         platform: "polymarket",
-        instrument: raw.instrument ? String(raw.instrument) : null,
-        source_url: raw.source_url ? String(raw.source_url) : null,
-        created_at: String(raw.created_at ?? new Date().toISOString()),
-        entry_price: raw.entry_price != null ? Number(raw.entry_price) : null,
-        current_price: raw.current_price != null ? Number(raw.current_price) : null,
-        pnl_pct: raw.pnl_pct != null ? Number(raw.pnl_pct) : null,
-        win_rate: raw.win_rate != null ? Number(raw.win_rate) : null,
-        market_question: raw.market_question ? String(raw.market_question) : null,
-        market_volume: raw.market_volume != null ? Number(raw.market_volume) : null,
-        expires_at: raw.expires_at ? String(raw.expires_at) : null,
-        polymarket_url: raw.polymarket_url ? String(raw.polymarket_url) : null,
+        instrument: raw.platform ?? null,
+        source_url: raw.source_url ?? null,
+        created_at: raw.posted_at ?? new Date().toISOString(),
+        entry_price: raw.entryPrice ?? null,
+        current_price: raw.currentPrice ?? null,
+        pnl_pct: raw.pnlPct ?? null,
+        win_rate: null,
+        market_question: raw.market_question ?? null,
+        market_volume: rawAny["market_volume"] != null ? Number(rawAny["market_volume"]) : null,
+        expires_at: rawAny["expires_at"] ? String(rawAny["expires_at"]) : null,
+        polymarket_url: rawAny["polymarket_url"] ? String(rawAny["polymarket_url"]) : null,
         category: "prediction",
       },
       callers,

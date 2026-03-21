@@ -136,7 +136,7 @@ function parseCommand(text: string): { cmd: string; args: string } {
   // Handle /command@botname format
   const match = trimmed.match(/^\/(\w+)(?:@\w+)?\s*(.*)/s);
   if (!match) return { cmd: "", args: "" };
-  return { cmd: match[1].toLowerCase(), args: match[2].trim() };
+  return { cmd: match[1]!.toLowerCase(), args: match[2]!.trim() };
 }
 
 async function handleUpdate(update: TelegramUpdate) {

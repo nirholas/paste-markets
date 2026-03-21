@@ -194,37 +194,23 @@ async function submitToPasteTrade(
   detection: TradeDetection & { ticker: string },
   handle: string,
 ): Promise<PasteTradeCard | null> {
-  const apiKey = process.env["PASTE_TRADE_KEY"];
-  if (!apiKey) return null;
+  const { submitTrade } = await import("@/lib/paste-trade");
 
-  const direction = (["long", "short", "yes", "no"].includes(detection.direction)
+  const direction = (["long", "short"].includes(detection.direction)
     ? detection.direction
-    : "long") as "long" | "short" | "yes" | "no";
+    : "long") as "long" | "short";
 
-  try {
-    const res = await fetch("https://paste.trade/api/trades", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        ticker: detection.ticker.toUpperCase(),
-        direction,
-        platform: PLATFORM_MAP[detection.market] ?? "hyperliquid",
-        instrument: INSTRUMENT_MAP[detection.market] ?? "perps",
-        thesis: tweet.text.slice(0, 500),
-        source_url: tweet.url,
-        author_handle: handle,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
+  const result = await submitTrade({
+    ticker: detection.ticker.toUpperCase(),
+    direction,
+    platform: PLATFORM_MAP[detection.market] ?? "hyperliquid",
+    instrument: INSTRUMENT_MAP[detection.market] ?? "perps",
+    thesis: tweet.text.slice(0, 500),
+    source_url: tweet.url,
+    author_handle: handle,
+  });
 
-    if (!res.ok) return null;
-    return (await res.json()) as PasteTradeCard;
-  } catch {
-    return null;
-  }
+  return result as unknown as PasteTradeCard | null;
 }
 
 // ---------------------------------------------------------------------------

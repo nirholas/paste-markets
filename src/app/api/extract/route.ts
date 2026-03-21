@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractTrades, type SourceType } from "@/lib/trade-extractor";
 import { saveExtraction, trackThesis } from "@/lib/db";
-import { submitTrade, skillRoute } from "@/lib/paste-trade";
+import { submitTrade, skillRoute, skillDiscover } from "@/lib/paste-trade";
 
 interface SubmitResult {
   thesisId: string;
@@ -164,10 +164,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Discover instruments for each thesis via paste.trade /api/skill/discover
+    const discovery: Record<string, unknown>[] = [];
+    if (extraction.theses.length > 0) {
+      const discoverResults = await Promise.allSettled(
+        extraction.theses.map(async (thesis) => {
+          const result = await skillDiscover({
+            query: thesis.ticker,
+            platforms: thesis.platform ? [thesis.platform] : undefined,
+          });
+          return result ? { ticker: thesis.ticker, ...result } : null;
+        }),
+      );
+
+      for (const result of discoverResults) {
+        if (result.status === "fulfilled" && result.value) {
+          discovery.push(result.value);
+        }
+      }
+    }
+
     return NextResponse.json({
       extraction,
       tracked,
       routing,
+      discovery,
       sourceUrl: `/source/${extraction.id}`,
     });
   } catch (err) {

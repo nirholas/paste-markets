@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createSource } from "@/lib/paste-trade";
 
 export const dynamic = "force-dynamic";
-
-const PASTE_TRADE_URL = process.env["PASTE_TRADE_URL"] ?? "https://paste.trade";
-const PASTE_TRADE_KEY = process.env["PASTE_TRADE_KEY"] ?? "";
 
 function detectPlatform(url: string): string {
   if (/https?:\/\/(twitter\.com|x\.com)\//i.test(url)) return "twitter";
@@ -45,45 +43,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!PASTE_TRADE_KEY) {
-      return NextResponse.json(
-        { ok: false, error: "Service unavailable" },
-        { status: 503 },
-      );
-    }
-
     const platform = detectPlatform(url);
     const author_handle = extractHandle(url);
     const source_date = new Date().toISOString();
 
-    const payload: Record<string, string> = { url, platform, source_date };
-    if (author_handle) payload.author_handle = author_handle;
-
-    const res = await fetch(`${PASTE_TRADE_URL}/api/sources`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PASTE_TRADE_KEY}`,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(15000),
+    const result = await createSource({
+      url,
+      platform,
+      source_date,
+      author_handle,
     });
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error("[api/submit] paste.trade error:", res.status, data);
+    if (!result) {
       return NextResponse.json(
-        { ok: false, error: data?.error ?? "Submission failed" },
-        { status: res.status },
+        { ok: false, error: "Submission failed" },
+        { status: 502 },
       );
     }
 
     return NextResponse.json({
       ok: true,
-      source_id: data.source_id,
-      source_url: data.source_url,
-      status: data.status ?? "processing",
+      source_id: result.source_id,
+      source_url: result.source_url,
+      status: result.status ?? "processing",
     });
   } catch (err) {
     console.error("[api/submit] Unexpected error:", err);
