@@ -11,10 +11,14 @@ export const maxDuration = 300; // 5 minutes for batch processing
  * Designed to be called by a cron job (e.g. Vercel Cron).
  * Fetches top callers from the rankings table and audits each one.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const cronSecret = process.env["CRON_SECRET"];
-  // Optional: verify cron secret if set
-  // (Vercel cron sets this automatically)
+  if (cronSecret) {
+    const auth = req.headers.get("authorization");
+    if (auth !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
 
   try {
     const sql = neon(process.env.DATABASE_URL!);

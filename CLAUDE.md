@@ -110,75 +110,99 @@ Stored in `.env` as `PASTE_TRADE_KEY`. Never commit this.
 
 ## Folder Structure
 ```
-paste-dashboard/
+paste-markets/
 ├── CLAUDE.md                    ← you are here
 ├── .env.example                 ← env var template (no secrets)
-├── .gitignore
 ├── package.json
 ├── tsconfig.json
 ├── next.config.ts
 ├── tailwind.config.ts
-├── postcss.config.js
 ├── src/
-│   ├── app/
+│   ├── app/                     ← 55 page routes
 │   │   ├── layout.tsx           ← root layout, fonts, metadata
-│   │   ├── page.tsx             ← landing page
-│   │   ├── globals.css          ← tailwind imports + custom styles
-│   │   ├── leaderboard/
-│   │   │   └── page.tsx
-│   │   ├── [author]/
-│   │   │   └── page.tsx         ← author profile/scorecard
-│   │   ├── vs/
-│   │   │   └── [a]/
-│   │   │       └── [b]/
-│   │   │           └── page.tsx ← head-to-head
-│   │   ├── wrapped/
-│   │   │   └── [author]/
-│   │   │       └── page.tsx     ← CT wrapped report card
-│   │   ├── trade/
-│   │   │   └── page.tsx         ← "What's The Trade?" tool
-│   │   └── api/
-│   │       ├── author/
-│   │       │   └── [handle]/
-│   │       │       └── route.ts
-│   │       ├── leaderboard/
-│   │       │   └── route.ts
-│   │       ├── vs/
-│   │       │   └── route.ts
-│   │       ├── wrapped/
-│   │       │   └── [author]/
-│   │       │       └── route.ts
-│   │       ├── trade/
-│   │       │   └── route.ts
-│   │       └── og/
-│   │           └── [...slug]/
-│   │               └── route.tsx  ← dynamic OG image generation
-│   ├── lib/
-│   │   ├── paste-trade.ts       ← API client
+│   │   ├── page.tsx             ← landing / home feed
+│   │   ├── globals.css
+│   │   ├── leaderboard/         ← main leaderboard
+│   │   ├── [author]/            ← author profile/scorecard
+│   │   ├── caller/[handle]/     ← alternate caller profile
+│   │   ├── callers/             ← caller directory
+│   │   ├── vs/[a]/[b]/          ← head-to-head
+│   │   ├── wrapped/[author]/    ← CT wrapped report card
+│   │   ├── trade/               ← "What's The Trade?" tool
+│   │   ├── asset/[ticker]/      ← per-asset pages
+│   │   ├── alerts/              ← notification rules
+│   │   ├── backtest/            ← historical simulation
+│   │   ├── wagers/              ← wagering system
+│   │   ├── positions/           ← live positions
+│   │   ├── wall/                ← public trade feed
+│   │   ├── fade/                ← contrarian signals
+│   │   ├── circle/              ← caller circle generator
+│   │   ├── signals/             ← live signals
+│   │   ├── simulate/            ← paper trading
+│   │   ├── predictions/         ← prediction markets
+│   │   ├── consensus/           ← aggregated signals
+│   │   ├── events/              ← market events
+│   │   ├── audit/[handle]/      ← integrity verification
+│   │   ├── scan/                ← AI trade scanner
+│   │   ├── heatmap/             ← ticker heatmap
+│   │   ├── feed/                ← trade feed
+│   │   ├── discover/            ← discovery page
+│   │   ├── developer/           ← API docs
+│   │   ├── v1/                  ← public API v1
+│   │   ├── v2/                  ← public API v2
+│   │   └── api/                 ← 56 internal API routes
+│   │       ├── author/[handle]/ ← author data
+│   │       ├── leaderboard/     ← rankings
+│   │       ├── vs/              ← head-to-head data
+│   │       ├── wrapped/[author]/← wrapped data
+│   │       ├── extract/         ← AI trade extraction
+│   │       ├── trade/           ← trade submission
+│   │       ├── asset/[ticker]/  ← asset data
+│   │       ├── og/              ← 11+ OG image routes
+│   │       ├── execute/         ← trade execution
+│   │       ├── alerts/          ← alert management
+│   │       ├── wager/           ← wager endpoints
+│   │       └── ...              ← many more
+│   ├── lib/                     ← 30+ modules
+│   │   ├── paste-trade.ts       ← paste.trade API client
 │   │   ├── db.ts                ← Neon Postgres connection + queries
 │   │   ├── schema.sql           ← database schema
-│   │   ├── metrics.ts           ← shared P&L / win-rate calculations
-│   │   └── constants.ts         ← colors, labels, config
-│   ├── components/
-│   │   ├── ui/                  ← shared UI primitives
-│   │   │   ├── card.tsx
-│   │   │   ├── badge.tsx
-│   │   │   ├── win-rate-bar.tsx
-│   │   │   ├── pnl-display.tsx
-│   │   │   ├── search-input.tsx
-│   │   │   └── nav.tsx
-│   │   ├── leaderboard-table.tsx
-│   │   ├── scorecard.tsx
-│   │   ├── trade-history.tsx
-│   │   ├── head-to-head-card.tsx
-│   │   ├── wrapped-card.tsx
-│   │   └── trade-finder.tsx
-│   └── data/
-│       └── (database is remote Neon Postgres)
+│   │   ├── metrics.ts           ← P&L / win-rate calculations
+│   │   ├── badges.ts            ← achievement system
+│   │   ├── reputation.ts        ← reputation scoring
+│   │   ├── integrity.ts         ← call timing verification
+│   │   ├── personalities.ts     ← wrapped personality types
+│   │   ├── consensus.ts         ← aggregated signals
+│   │   ├── alpha.ts             ← alpha detection
+│   │   ├── api-auth.ts          ← API authentication
+│   │   ├── execution/           ← execution engine
+│   │   ├── backtest-processor.ts
+│   │   ├── scan-processor.ts
+│   │   ├── alert-matcher.ts
+│   │   └── ...
+│   └── components/              ← 53 components
+│       ├── ui/                  ← shared primitives (card, nav, pnl-display, etc.)
+│       ├── leaderboard-table.tsx
+│       ├── scorecard.tsx
+│       ├── trade-history.tsx
+│       ├── head-to-head-card.tsx
+│       ├── wrapped-card.tsx
+│       ├── wrapped-story.tsx
+│       ├── trade-finder.tsx
+│       ├── pnl-chart.tsx
+│       ├── reputation-badge.tsx
+│       ├── integrity-badge.tsx
+│       ├── prediction-stats.tsx
+│       ├── venue-filter.tsx
+│       ├── consensus-plays.tsx
+│       ├── live-signal-card.tsx
+│       ├── ticker-heatmap.tsx
+│       ├── wall-grid.tsx
+│       ├── wager-widget.tsx
+│       └── ...
 ├── public/
 │   └── fonts/
-│       └── JetBrainsMono-*.woff2
-└── tasks/                       ← agent task prompts (this folder)
+└── tasks/                       ← agent task prompts
 ```
 
 ## Key Conventions
@@ -209,10 +233,10 @@ npm run db:seed      # seed database with initial tracked authors
 ```
 
 ## Important Notes for Agents
-1. **Build everything inside `/workspaces/agent-payments-sdk/paste-dashboard/`** — this will be pushed as a standalone repo
+1. **Working directory is `/workspaces/paste-markets/`**
 2. **Read this CLAUDE.md first** before starting your task
-3. **Follow the folder structure above exactly** — multiple agents are building in parallel
+3. **This is a mature codebase** — most features are already built. Check what exists before creating new files
 4. **Use the design system colors/fonts** — consistency matters for the viral/shareable aspect
 5. **Every public page needs OG metadata** — twitter cards are how this spreads
-6. If your task depends on another task's output (like the API client), write your code to import from the expected path — the other agent will create it
-7. Reference `/workspaces/agent-payments-sdk/xactions/src/scorecard.ts` for visual inspiration — that's the existing Bloomberg-style scorecard HTML
+6. **Follow existing patterns** — look at similar existing pages/components before building new ones
+7. **Forked from [rohunvora/paste-trade](https://github.com/rohunvora/paste-trade)** — the upstream repo is the data/API layer by Rohun Vora, launched by @frankdegods

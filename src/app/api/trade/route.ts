@@ -23,12 +23,65 @@ function detectSourceType(input: string): string {
   return "text";
 }
 
+function isUrlSafe(urlStr: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(urlStr);
+  } catch {
+    return false;
+  }
+  // Only allow http(s)
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+  const hostname = parsed.hostname.toLowerCase();
+  // Block localhost, loopback, link-local, and private ranges
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    /^127\./.test(hostname) ||
+    /^10\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^0\./.test(hostname) ||
+    hostname === "0.0.0.0" ||
+    hostname === "[::1]" ||
+    hostname === "::1" ||
+    hostname === "169.254.169.254" || // cloud metadata
+    hostname.endsWith(".amazonaws.com") && hostname.startsWith("169.254") ||
+    hostname === "metadata.google.internal"
+  ) {
+    return false;
+  }
+  return true;
+}
+
 async function fetchContent(url: string): Promise<string> {
+  if (!isUrlSafe(url)) return `[Blocked: URL points to a private/internal address]`;
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "paste.markets/1.0" },
       signal: AbortSignal.timeout(10000),
+      redirect: "manual", // don't follow redirects to internal IPs
     });
+    // If redirect, validate the target before following
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location || !isUrlSafe(location)) return `[Blocked: redirect to private/internal address]`;
+      const redirectRes = await fetch(location, {
+        headers: { "User-Agent": "paste.markets/1.0" },
+        signal: AbortSignal.timeout(10000),
+        redirect: "manual",
+      });
+      if (!redirectRes.ok) return `[Failed to fetch: ${redirectRes.status}]`;
+      const text = await redirectRes.text();
+      const stripped = text
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return stripped.slice(0, 4000);
+    }
     if (!res.ok) return `[Failed to fetch: ${res.status}]`;
     const text = await res.text();
     // Strip HTML tags for a rough text extraction
