@@ -1380,6 +1380,7 @@ export async function GET(
         }
       }
 
+      case "caller":
       case "author": {
         const handle = rest[0];
         if (!handle) {
