@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -10,15 +10,6 @@ function isAdmin(request: NextRequest): boolean {
   const auth = request.headers.get("x-admin-key");
   return auth === ADMIN_KEY;
 }
-
-const stmts = {
-  updateStatus: db.prepare(
-    "UPDATE submissions SET status = ? WHERE id = ?",
-  ),
-  getById: db.prepare<[number], { id: number; caller_handle: string; status: string }>(
-    "SELECT id, caller_handle, status FROM submissions WHERE id = ?",
-  ),
-};
 
 export async function POST(request: NextRequest) {
   if (!isAdmin(request)) {
@@ -41,7 +32,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existing = stmts.getById.get(body.id);
+    const existingRows = await sql`SELECT id, caller_handle, status FROM submissions WHERE id = ${body.id}`;
+    const existing = existingRows[0] as { id: number; caller_handle: string; status: string } | undefined;
     if (!existing) {
       return NextResponse.json(
         { ok: false, error: "Submission not found" },
@@ -49,7 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    stmts.updateStatus.run(body.status, body.id);
+    await sql`UPDATE submissions SET status = ${body.status} WHERE id = ${body.id}`;
 
     return NextResponse.json({
       ok: true,
