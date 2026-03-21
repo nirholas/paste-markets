@@ -43,7 +43,7 @@ export function FeedCard({ item }: FeedCardProps) {
     item.pnl_pct == null ? "#a1a1aa" : item.pnl_pct >= 0 ? "#22c55e" : "#ef4444";
 
   return (
-    <div className="bg-[#12121a] border border-[#ffffff0d] rounded-2xl p-4 sm:p-5 hover:border-[#ffffff14] transition-colors">
+    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-4 sm:p-5 hover:border-[#ffffff14] transition-colors">
       {/* Author row */}
       <div className="flex items-center gap-3 mb-3">
         <Link href={`/${handle}`} className="shrink-0">

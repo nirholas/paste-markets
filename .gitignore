@@ -15,4 +15,9 @@ dist/
 .env*.local
 
 # Rust / Anchor build artifacts
-target/
+**/target/
+
+# Solana keypair files (never commit wallets)
+*.keypair
+*-keypair.json
+test-ledger/
