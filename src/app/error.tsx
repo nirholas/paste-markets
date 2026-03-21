@@ -8,7 +8,7 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
         <p className="text-text-muted mb-6">{error.message || "An unexpected error occurred."}</p>
         <button
           onClick={reset}
-          className="border border-border hover:border-accent px-4 py-2 rounded transition"
+          className="border border-border hover:border-accent px-4 py-2 rounded-lg transition"
         >
           Try again
         </button>

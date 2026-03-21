@@ -411,6 +411,14 @@ export function SearchOverlay() {
 }
 
 export function SearchTrigger() {
+  const [modifier, setModifier] = useState("Ctrl+");
+
+  useEffect(() => {
+    if (navigator.platform?.includes("Mac")) {
+      setModifier("\u2318");
+    }
+  }, []);
+
   return (
     <button
       onClick={() => {
@@ -435,11 +443,7 @@ export function SearchTrigger() {
         <line x1="21" y1="21" x2="16.65" y2="16.65" />
       </svg>
       <kbd className="text-xs opacity-60 hidden sm:inline">
-        {typeof navigator !== "undefined" &&
-        navigator.platform?.includes("Mac")
-          ? "\u2318"
-          : "Ctrl+"}
-        K
+        {modifier}K
       </kbd>
     </button>
   );
