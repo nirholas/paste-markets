@@ -8,7 +8,7 @@ const nextConfig = {
   output: "standalone",
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
-  serverExternalPackages: ["better-sqlite3"],
+  serverExternalPackages: ["better-sqlite3", "xactions"],
   outputFileTracingRoot: __dirname,
   async headers() {
     return [
