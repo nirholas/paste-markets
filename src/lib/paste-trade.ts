@@ -1,9 +1,19 @@
 /**
  * paste.trade API client.
- * Wraps the search endpoint with caching and error handling.
+ * Comprehensive wrapper for all paste.trade endpoints.
  */
 
 const BASE_URL = "https://paste.trade";
+
+function getApiKey(): string | undefined {
+  return process.env["PASTE_TRADE_KEY"];
+}
+
+function authHeaders(key: string) {
+  return { Authorization: `Bearer ${key}`, Accept: "application/json" };
+}
+
+// ── Core types ──────────────────────────────────────────────────────────────
 
 export interface PasteTradeTrade {
   ticker: string;
@@ -21,8 +31,172 @@ export interface PasteTradeTrade {
 export interface SearchParams {
   author?: string;
   ticker?: string;
-  top?: "7d" | "30d" | "90d" | "all";
+  q?: string;
+  top?: "24h" | "7d" | "30d" | "90d" | "all";
+  direction?: "long" | "short";
+  platform?: "hyperliquid" | "robinhood" | "polymarket";
   limit?: number;
+  cursor?: string;
+}
+
+export interface SearchResult {
+  trades: PasteTradeFullTrade[];
+  total: number;
+  next_cursor: string | null;
+}
+
+// ── Feed types ──────────────────────────────────────────────────────────────
+
+export interface FeedParams {
+  sort: "new" | "top";
+  limit?: number;
+  window?: "24h" | "7d" | "30d" | "all";
+  lens?: "author" | "ticker" | "source";
+  author?: string;
+  platform?: "polymarket" | "hyperliquid" | "robinhood";
+  direction?: "long" | "short";
+  cursor?: string;
+}
+
+export interface FeedItemRaw {
+  source: Record<string, unknown>;
+  author: Record<string, unknown>;
+  trades: Record<string, unknown>[];
+  tradeCount: number;
+  submitter: Record<string, unknown> | null;
+}
+
+export interface FeedResult {
+  items: FeedItemRaw[];
+  next_cursor: string | null;
+  total: number;
+  prices?: Record<string, { price: number; timestamp: number }>;
+  pnls?: Record<string, number>;
+}
+
+// ── Leaderboard types ───────────────────────────────────────────────────────
+
+export interface LeaderboardAuthor {
+  rank: number;
+  author: {
+    id?: string;
+    handle: string;
+    name: string | null;
+    avatar_url: string;
+    platform: string;
+  };
+  stats: {
+    trade_count: number;
+    avg_pnl: number;
+    win_rate: number;
+    best_pnl: number;
+    best_ticker: string;
+    total_pnl: number;
+  };
+}
+
+export interface LeaderboardResult {
+  authors: LeaderboardAuthor[];
+  window: string;
+  sort: string;
+  computed_at: string;
+}
+
+// ── Stats types ─────────────────────────────────────────────────────────────
+
+export interface PlatformStats {
+  users: number;
+  total_trades: number;
+  profitable_trades: number;
+}
+
+// ── Prices types ────────────────────────────────────────────────────────────
+
+export interface PriceData {
+  price: number;
+  timestamp: number;
+}
+
+// ── Source types ─────────────────────────────────────────────────────────────
+
+export interface SourceResult {
+  source_id: string;
+  source_url: string;
+  status: string;
+  trades: Record<string, unknown>[];
+  [key: string]: unknown;
+}
+
+export interface CreateSourceParams {
+  url: string;
+  platform: string;
+  author_handle?: string;
+  author_avatar_url?: string;
+  source_date?: string;
+  source_images?: string[];
+  body_text?: string;
+}
+
+export interface CreateSourceResult {
+  source_id: string;
+  source_url: string;
+  status: string;
+  run_id?: string;
+}
+
+// ── Trade submission types ──────────────────────────────────────────────────
+
+export interface SubmitTradeParams {
+  ticker: string;
+  direction: "long" | "short";
+  platform: string;
+  instrument?: string;
+  thesis?: string;
+  source_url?: string;
+  author_handle?: string;
+  headline_quote?: string;
+  chain_steps?: string[];
+  explanation?: string;
+  source_id?: string;
+  author_avatar_url?: string;
+  author_date?: string;
+  horizon?: string;
+  // Polymarket-specific
+  outcome?: "yes" | "no";
+  pm_side?: string;
+  pm_yes_no_price?: number;
+  condition_id?: string;
+  market_slug?: string;
+  market_question?: string;
+  end_date?: string;
+}
+
+export interface SubmitTradeResult {
+  id: string;
+  trade_id: string;
+  url: string;
+  [key: string]: unknown;
+}
+
+// ── Skill types ─────────────────────────────────────────────────────────────
+
+export interface SkillRouteParams {
+  ticker: string;
+  direction: "long" | "short";
+  platform?: string;
+}
+
+export interface SkillRouteResult {
+  [key: string]: unknown;
+}
+
+export interface SkillDiscoverParams {
+  query: string;
+  platforms?: string[];
+}
+
+export interface SkillDiscoverResult {
+  [key: string]: unknown;
 }
 
 const KNOWN_FIELDS = new Set([

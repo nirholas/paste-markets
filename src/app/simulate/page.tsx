@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Nav from "@/components/ui/nav";
+
 import CallerSelector from "@/components/caller-selector";
 import PortfolioChart from "@/components/portfolio-chart";
 
@@ -172,7 +172,6 @@ function SimulatePageInner() {
 
   return (
     <>
-      <Nav />
       <main className="min-h-screen bg-bg p-6 font-mono">
         <div className="max-w-5xl mx-auto space-y-8">
           {/* Header */}

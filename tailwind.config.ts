@@ -16,8 +16,8 @@ const config: Config = {
         win: "#22c55e",
         loss: "#ef4444",
         amber: "#f59e0b",
-        accent: "#6366f1",
-        "accent-2": "#8b5cf6",
+        accent: "#0066FF",
+        "accent-2": "#3385FF",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],

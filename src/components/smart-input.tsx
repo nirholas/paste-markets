@@ -61,18 +61,18 @@ export function SmartInput() {
 
   const ringColor =
     type === "url"
-      ? "ring-[#6366f1]"
+      ? "ring-[#0066FF]"
       : type === "handle"
         ? "ring-[#22c55e]"
         : type === "ticker"
           ? "ring-[#f59e0b]"
-          : "ring-transparent focus-within:ring-[#6366f1]/50";
+          : "ring-transparent focus-within:ring-[#0066FF]/50";
 
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit}>
         <div
-          className={`flex items-center bg-[#12121a] border border-[#ffffff14] rounded-2xl px-5 py-4 transition-all ring-2 ${ringColor}`}
+          className={`flex items-center bg-[#111111] border border-[#ffffff14] rounded-2xl px-5 py-4 transition-all ring-2 ${ringColor}`}
         >
           <svg className="w-5 h-5 text-[#52525b] mr-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="8" />
@@ -103,7 +103,7 @@ export function SmartInput() {
 
         {/* Type label */}
         {type === "url" && (
-          <p className="text-xs text-[#6366f1] mt-2 ml-1 font-medium">
+          <p className="text-xs text-[#0066FF] mt-2 ml-1 font-medium">
             URL detected — we&apos;ll extract the trade
           </p>
         )}
@@ -123,7 +123,7 @@ export function SmartInput() {
           {type === "url" && (
             <button
               type="submit"
-              className="flex-1 bg-[#6366f1] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#5558e6] transition-colors"
+              className="flex-1 bg-[#0066FF] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#0052CC] transition-colors"
             >
               Find The Trade
             </button>
@@ -155,7 +155,7 @@ export function SmartInput() {
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-[#6366f1] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#5558e6] transition-colors"
+                className="flex-1 bg-[#0066FF] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#0052CC] transition-colors"
               >
                 Find The Trade
               </button>

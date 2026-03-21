@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useWallet } from "@/lib/wallet";
 
 interface DoubleDownPopoverProps {
   tradeId: string;
@@ -13,6 +14,7 @@ interface DoubleDownPopoverProps {
 }
 
 const PRESETS = [5, 10, 25, 50, 100] as const;
+const VAULT_ADDRESS = process.env["NEXT_PUBLIC_WAGER_VAULT_ADDRESS"] ?? "";
 
 function formatUSDC(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -27,6 +29,9 @@ export function DoubleDownButton({
   backerCount,
   onSuccess,
 }: DoubleDownPopoverProps) {
+  const wallet = useWallet();
+  const isWalletConnected = wallet.connected && wallet.chain === "solana";
+
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"select" | "wallet" | "confirm">("select");
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
@@ -46,6 +51,13 @@ export function DoubleDownButton({
     setDisplayCount(backerCount);
     setDisplayTotal(totalWagered);
   }, [backerCount, totalWagered]);
+
+  // Auto-populate wallet when Phantom connected
+  useEffect(() => {
+    if (isWalletConnected && wallet.address) {
+      setWalletAddress(wallet.address);
+    }
+  }, [isWalletConnected, wallet.address]);
 
   // Close popover on outside click
   useEffect(() => {
@@ -68,7 +80,59 @@ export function DoubleDownButton({
     setSuccess(false);
   }
 
-  async function handleQuickWager() {
+  function handleWagerSuccess(data: any) {
+    setSuccess(true);
+    setDisplayCount(data.backerCount ?? backerCount + 1);
+    setDisplayTotal(data.totalWagered ?? totalWagered + (selectedAmount ?? 0));
+    setTimeout(() => {
+      setOpen(false);
+      resetState();
+      onSuccess?.();
+    }, 1500);
+  }
+
+  // Auto-transfer via Phantom wallet
+  async function handleAutoWager() {
+    if (!selectedAmount) return;
+    if (!VAULT_ADDRESS) {
+      setError("Vault address not configured");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const result = await wallet.sendTransaction(VAULT_ADDRESS, selectedAmount);
+      if (!result.confirmed) throw new Error("Transaction not confirmed");
+
+      const res = await fetch("/api/wagers/quick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tradeId,
+          amount: selectedAmount,
+          walletAddress: wallet.address,
+          txSignature: result.signature,
+          handle: handle ? handle.replace(/^@/, "") : undefined,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Failed to place wager");
+        return;
+      }
+
+      handleWagerSuccess(data);
+    } catch (err: any) {
+      setError(err.message || "Transaction failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Manual flow with pasted tx signature
+  async function handleManualWager() {
     if (!selectedAmount || !walletAddress) return;
     const trimmedSig = txSignature.trim();
     if (!trimmedSig) {
@@ -97,15 +161,7 @@ export function DoubleDownButton({
         return;
       }
 
-      setSuccess(true);
-      setDisplayCount(data.backerCount ?? backerCount + 1);
-      setDisplayTotal(data.totalWagered ?? totalWagered + selectedAmount);
-
-      setTimeout(() => {
-        setOpen(false);
-        resetState();
-        onSuccess?.();
-      }, 1500);
+      handleWagerSuccess(data);
     } catch {
       setError("Network error");
     } finally {
@@ -115,6 +171,12 @@ export function DoubleDownButton({
 
   const isLong = direction === "long" || direction === "yes";
   const accentColor = isLong ? "#2ecc71" : "#e74c3c";
+
+  function handleSelectAmount(amt: number) {
+    setSelectedAmount(amt);
+    // Skip wallet step when Phantom is connected
+    setStep(isWalletConnected ? "confirm" : "wallet");
+  }
 
   return (
     <div className="relative inline-block" ref={popoverRef}>
@@ -175,7 +237,7 @@ export function DoubleDownButton({
                 {PRESETS.map((amt) => (
                   <button
                     key={amt}
-                    onClick={() => { setSelectedAmount(amt); setStep("wallet"); }}
+                    onClick={() => handleSelectAmount(amt)}
                     className={`text-xs font-mono py-2 rounded border transition-all ${
                       selectedAmount === amt
                         ? "border-[#3b82f6] bg-[#3b82f6]/20 text-[#3b82f6]"
@@ -189,6 +251,7 @@ export function DoubleDownButton({
               <p className="text-[10px] text-[#555568] text-center">Select USDC amount</p>
             </>
           ) : step === "wallet" ? (
+            /* Manual wallet input (only shown when Phantom is NOT connected) */
             <div className="space-y-2">
               <p className="text-xs text-[#c8c8d0]">
                 Wager <span className="text-[#f0f0f0] font-bold">{selectedAmount} USDC</span>
@@ -223,29 +286,41 @@ export function DoubleDownButton({
               </div>
             </div>
           ) : (
+            /* Confirm step */
             <div className="space-y-2">
               <div className="bg-[#0a0a1a] border border-[#1a1a2e] rounded p-2 text-xs font-mono space-y-1">
                 <p className="text-[#555568]">
                   Amount: <span className="text-[#f0f0f0]">{selectedAmount} USDC</span>
                 </p>
                 <p className="text-[#555568]">
-                  Wallet: <span className="text-[#c8c8d0] break-all">{walletAddress.slice(0, 8)}...{walletAddress.slice(-4)}</span>
+                  Wallet:{" "}
+                  <span className="text-[#c8c8d0] break-all">
+                    {walletAddress.slice(0, 8)}...{walletAddress.slice(-4)}
+                  </span>
+                  {isWalletConnected && (
+                    <span className="ml-1 text-[#2ecc71]">(Phantom)</span>
+                  )}
                 </p>
                 <p className="text-[#555568]">
                   Caller tip: <span className="text-[#c8c8d0]">10% of profit</span>
                 </p>
               </div>
 
-              <input
-                type="text"
-                value={txSignature}
-                onChange={(e) => setTxSignature(e.target.value.trim())}
-                placeholder="Paste Solana tx signature"
-                className="w-full border border-[#1a1a2e] bg-[#0a0a1a] text-[#f0f0f0] text-xs px-3 py-2 rounded focus:outline-none focus:border-[#3b82f6] transition-colors placeholder:text-[#555568] font-mono"
-              />
-              <p className="text-[9px] text-[#555568]">
-                Transfer {selectedAmount} USDC first, then paste the tx signature
-              </p>
+              {/* Manual tx signature input (only when wallet NOT connected) */}
+              {!isWalletConnected && (
+                <>
+                  <input
+                    type="text"
+                    value={txSignature}
+                    onChange={(e) => setTxSignature(e.target.value.trim())}
+                    placeholder="Paste Solana tx signature"
+                    className="w-full border border-[#1a1a2e] bg-[#0a0a1a] text-[#f0f0f0] text-xs px-3 py-2 rounded focus:outline-none focus:border-[#3b82f6] transition-colors placeholder:text-[#555568] font-mono"
+                  />
+                  <p className="text-[9px] text-[#555568]">
+                    Transfer {selectedAmount} USDC first, then paste the tx signature
+                  </p>
+                </>
+              )}
 
               {error && (
                 <p className="text-[10px] text-[#e74c3c] border border-[#e74c3c]/30 rounded px-2 py-1">
@@ -255,17 +330,21 @@ export function DoubleDownButton({
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setStep("wallet")}
+                  onClick={() => setStep(isWalletConnected ? "select" : "wallet")}
                   className="flex-1 text-xs font-mono text-[#555568] hover:text-[#c8c8d0] border border-[#1a1a2e] py-1.5 rounded transition-colors"
                 >
                   Back
                 </button>
                 <button
-                  onClick={handleQuickWager}
+                  onClick={isWalletConnected ? handleAutoWager : handleManualWager}
                   disabled={submitting}
                   className="flex-1 text-xs font-mono border border-[#2ecc71] text-[#2ecc71] hover:bg-[#2ecc71] hover:text-[#0a0a1a] py-1.5 rounded transition-colors disabled:opacity-40"
                 >
-                  {submitting ? "Placing..." : "Confirm Wager"}
+                  {submitting
+                    ? "Sending..."
+                    : isWalletConnected
+                      ? `Send ${selectedAmount} USDC`
+                      : "Confirm Wager"}
                 </button>
               </div>
             </div>

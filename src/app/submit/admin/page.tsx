@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Nav from "@/components/ui/nav";
+
 
 interface Submission {
   id: number;
@@ -90,7 +90,6 @@ export default function AdminPage() {
   if (!authenticated) {
     return (
       <main className="min-h-screen">
-        <Nav />
         <section className="flex flex-col items-center px-4 pt-32">
           <h1 className="text-2xl font-bold text-text-primary mb-8 font-mono">
             Admin Access
@@ -124,7 +123,6 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen">
-      <Nav />
 
       <section className="max-w-4xl mx-auto px-4 pt-12 pb-20">
         <h1 className="text-2xl font-bold text-text-primary mb-2 font-mono">

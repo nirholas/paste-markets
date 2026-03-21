@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-import Nav from "@/components/ui/nav";
+
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -397,7 +397,6 @@ export default function PortfolioPage() {
 
   return (
     <main className="min-h-screen">
-      <Nav />
 
       <div className="max-w-5xl mx-auto px-4 pt-10 pb-20">
         {/* Header */}
