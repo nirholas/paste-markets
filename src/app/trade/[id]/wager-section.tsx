@@ -42,8 +42,8 @@ function PnlTag({ pct }: { pct: number }) {
   );
 }
 
-export function WagerSection({ tradeId, authorHandle }: WagerSectionProps) {
-  const stats = getWagerStats(tradeId);
+export async function WagerSection({ tradeId, authorHandle }: WagerSectionProps) {
+  const stats = await getWagerStats(tradeId);
 
   // Wagering not enabled for this trade
   if (!stats) return null;
@@ -52,7 +52,7 @@ export function WagerSection({ tradeId, authorHandle }: WagerSectionProps) {
   const isWindowOpen = now < new Date(stats.wager_deadline);
   const isSettled = stats.is_settled;
 
-  const wagers = getWagersByTrade(tradeId);
+  const wagers = await getWagersByTrade(tradeId);
   const avatarHandles = wagers
     .filter((w) => w.handle)
     .slice(0, 5)

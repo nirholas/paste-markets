@@ -24,10 +24,10 @@ function formatUSDC(n: number) {
 
 export const dynamic = "force-dynamic";
 
-export default function WagerLeaderboardPage() {
+export default async function WagerLeaderboardPage() {
   let leaderboard: CallerEarnings[] = [];
   try {
-    leaderboard = getCallerEarningsLeaderboard();
+    leaderboard = await getCallerEarningsLeaderboard();
   } catch {
     // db not ready
   }

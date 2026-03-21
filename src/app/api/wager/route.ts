@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const config = enableWager({
+    const config = await enableWager({
       tradeCardId,
       authorHandle: authorHandle.replace(/^@/, "").toLowerCase(),
       ticker,
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid Solana wallet address" }, { status: 400 });
     }
 
-    const result = submitWager({
+    const result = await submitWager({
       id: randomUUID(),
       tradeCardId,
       walletAddress,

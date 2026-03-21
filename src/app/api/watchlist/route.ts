@@ -16,13 +16,13 @@ import { callerTier, computeAlphaScore, type CallerTier } from "@/lib/alpha";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const callers = getAllWatched();
+  const callers = await getAllWatched();
 
   // Auto-populate if empty
   if (callers.length === 0) {
     const added = await autoPopulateFromLeaderboard();
     if (added > 0) {
-      const refreshed = getAllWatched();
+      const refreshed = await getAllWatched();
       return NextResponse.json({
         callers: refreshed,
         total: refreshed.length,
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       ? body.tier
       : "C";
 
-    const added = addToWatchlist(handle, tier, body.displayName);
+    const added = await addToWatchlist(handle, tier, body.displayName);
 
     if (!added) {
       return NextResponse.json(

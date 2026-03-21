@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const config = getWagerConfig(tradeId);
+  const config = await getWagerConfig(tradeId);
   if (!config) {
     return NextResponse.json({ error: "Trade wager config not found" }, { status: 404 });
   }
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const result = settleWagers({
+  const result = await settleWagers({
     tradeCardId: tradeId,
     exitPrice: typeof exitPrice === "number" ? exitPrice : parseFloat(String(exitPrice ?? 0)),
     pnlPctOverride:

@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 
 export async function GET(): Promise<Response> {
   // Auto-populate watchlist on first connection if empty
-  const callers = getEnabledWatched();
+  const callers = await getEnabledWatched();
   if (callers.length === 0) {
     await autoPopulateFromLeaderboard();
   }
@@ -32,9 +32,9 @@ export async function GET(): Promise<Response> {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
-    start(controller) {
+    async start(controller) {
       // Send initial connection event
-      const stats = getWatchlistStats();
+      const stats = await getWatchlistStats();
       controller.enqueue(
         encoder.encode(
           `event: connected\ndata: ${JSON.stringify({
@@ -60,9 +60,9 @@ export async function GET(): Promise<Response> {
       addSSEListener(listener);
 
       // Heartbeat every 30 seconds
-      const heartbeat = setInterval(() => {
+      const heartbeat = setInterval(async () => {
         try {
-          const currentStats = getWatchlistStats();
+          const currentStats = await getWatchlistStats();
           controller.enqueue(
             encoder.encode(
               `event: heartbeat\ndata: ${JSON.stringify({

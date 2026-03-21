@@ -242,7 +242,7 @@ export async function pollCaller(caller: WatchedCaller): Promise<NewTradeEvent[]
       const entryPrice = card?.entryPrice ?? card?.entry_price ?? null;
 
       // Store in local DB
-      insertSignal({
+      await insertSignal({
         handle: caller.handle,
         tweetId: tweet.id,
         tweetText: tweet.text,
@@ -282,7 +282,7 @@ export async function pollCaller(caller: WatchedCaller): Promise<NewTradeEvent[]
 
     // Update last checked + last tweet ID
     const newestId = tweets[0]?.id;
-    updateLastChecked(caller.handle, newestId);
+    await updateLastChecked(caller.handle, newestId);
 
     // Emit caller checked event
     emit("caller_checked", {
@@ -319,7 +319,7 @@ export async function startPollingLoop(): Promise<void> {
     if (!pollingActive) return;
 
     try {
-      const callers = getEnabledWatched();
+      const callers = await getEnabledWatched();
 
       if (callers.length === 0) {
         // No callers — wait 60s and retry

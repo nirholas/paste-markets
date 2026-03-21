@@ -11,7 +11,7 @@ export async function GET(
   const { handle } = await params;
   const normalized = handle.toLowerCase().replace(/^@/, "");
 
-  const job = getCachedBacktestReport(normalized);
+  const job = await getCachedBacktestReport(normalized);
   if (!job || !job.result_json) {
     return NextResponse.json(
       { error: "No cached backtest report found", handle: normalized },

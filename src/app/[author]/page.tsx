@@ -170,8 +170,8 @@ export default async function AuthorPage({ params }: PageProps) {
   const integrityStats = await getIntegrityStats(handle);
 
   // Wager tips earned
-  const tipsEarned = getCallerTipsEarned(handle);
-  const wagerHistory = getCallerWagerHistory(handle).filter(
+  const tipsEarned = await getCallerTipsEarned(handle);
+  const wagerHistory = (await getCallerWagerHistory(handle)).filter(
     (w) => w.wager_count > 0,
   );
 

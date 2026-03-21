@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
 
   // Share rate limit with scan (3/hour per IP)
-  const { allowed, count } = checkRateLimit(ip);
+  const { allowed, count } = await checkRateLimit(ip);
   if (!allowed) {
     return NextResponse.json(
       {
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   const handle = raw.toLowerCase();
 
   // Return cached result if a backtest ran in the last 24 hours
-  const cached = getCachedBacktestForHandle(handle);
+  const cached = await getCachedBacktestForHandle(handle);
   if (cached) {
     return NextResponse.json(
       { jobId: cached.id, status: cached.status, cached: true },
@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
       ? Math.min(body.maxTweets, 1000)
       : 800;
 
-  recordScanRequest(ip);
-  const jobId = createBacktestJob(handle);
+  await recordScanRequest(ip);
+  const jobId = await createBacktestJob(handle);
 
   // Fire-and-forget
   processBacktestJob(jobId, handle, maxTweets).catch((err) => {

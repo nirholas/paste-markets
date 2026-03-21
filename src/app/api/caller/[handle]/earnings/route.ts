@@ -21,8 +21,8 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const totalTips = getCallerTipsEarned(handle);
-    const history = getCallerWagerHistory(handle);
+    const totalTips = await getCallerTipsEarned(handle);
+    const history = await getCallerWagerHistory(handle);
 
     const tradesWithBacking = history.filter((c) => c.wager_count > 0);
     const settledWithTips = history.filter(

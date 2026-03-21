@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const { jobId } = await params;
 
-  const job = getScanJob(jobId);
+  const job = await getScanJob(jobId);
   if (!job) {
     return NextResponse.json({ error: "Scan job not found" }, { status: 404 });
   }

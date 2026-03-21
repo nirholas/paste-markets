@@ -33,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Toggle shortcut
     if (action === "toggle") {
-      const toggled = toggleAlertRule(id, userId);
+      const toggled = await toggleAlertRule(id, userId);
       if (!toggled) {
         return NextResponse.json({ error: "Rule not found" }, { status: 404 });
       }
@@ -41,7 +41,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // Full update
-    const existing = getAlertRuleById(id);
+    const existing = await getAlertRuleById(id);
     if (!existing || existing.userId !== userId) {
       return NextResponse.json({ error: "Rule not found" }, { status: 404 });
     }
@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       enabled: enabled !== undefined ? enabled : existing.enabled,
     };
 
-    const success = updateAlertRule(updated);
+    const success = await updateAlertRule(updated);
     if (!success) {
       return NextResponse.json({ error: "Update failed" }, { status: 500 });
     }
@@ -74,7 +74,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "user parameter required" }, { status: 400 });
   }
 
-  const deleted = deleteAlertRule(id, user);
+  const deleted = await deleteAlertRule(id, user);
   if (!deleted) {
     return NextResponse.json({ error: "Rule not found" }, { status: 404 });
   }
