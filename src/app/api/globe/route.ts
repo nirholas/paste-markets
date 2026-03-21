@@ -56,23 +56,36 @@ export async function GET(request: NextRequest) {
 
       if (!handle) continue;
 
+      // Try to get P&L from the prices map returned by paste.trade
+      const pricesMap = (raw["prices"] ?? {}) as Record<string, Record<string, unknown>>;
+
       for (const trade of tradeList) {
         const ticker = String(trade["ticker"] ?? "");
-        const pnlRaw = trade["pnl_pct"] ?? trade["pnlPct"];
-        const pnl = pnlRaw != null ? Number(pnlRaw) : null;
+        if (!ticker) continue;
 
-        if (ticker && pnl != null && !isNaN(pnl)) {
-          trades.push({ author: handle, ticker, pnl, direction: String(trade["direction"] ?? "") });
+        const pnlRaw = trade["pnl_pct"] ?? trade["pnlPct"];
+        let pnl = pnlRaw != null ? Number(pnlRaw) : 0;
+
+        // Try prices map for live P&L
+        if (pnl === 0) {
+          const tradeId = String(trade["id"] ?? "");
+          const priceEntry = pricesMap[tradeId];
+          if (priceEntry) {
+            const livePnl = priceEntry["pnl_pct"] ?? priceEntry["pnlPct"];
+            if (livePnl != null) pnl = Number(livePnl);
+          }
         }
+
+        if (isNaN(pnl)) pnl = 0;
+        trades.push({ author: handle, ticker, pnl, direction: String(trade["direction"] ?? "") });
       }
 
       // Fallback: if no nested trades, try flat structure
       if (tradeList.length === 0) {
         const ticker = String(raw["ticker"] ?? "");
-        const pnlRaw = raw["pnl_pct"] ?? raw["pnlPct"];
-        const pnl = pnlRaw != null ? Number(pnlRaw) : null;
-
-        if (ticker && pnl != null && !isNaN(pnl)) {
+        if (ticker) {
+          const pnlRaw = raw["pnl_pct"] ?? raw["pnlPct"];
+          const pnl = pnlRaw != null && !isNaN(Number(pnlRaw)) ? Number(pnlRaw) : 0;
           trades.push({ author: handle, ticker, pnl, direction: String(raw["direction"] ?? "") });
         }
       }
