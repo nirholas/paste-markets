@@ -3,4 +3,5 @@
  *
  * Canonical plural route per spec. Re-exports handler from /api/asset/[ticker].
  */
-export { GET, dynamic } from "@/app/api/asset/[ticker]/route";
+export const dynamic = "force-dynamic";
+export { GET } from "@/app/api/asset/[ticker]/route";

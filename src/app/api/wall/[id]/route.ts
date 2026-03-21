@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getWallPostById } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

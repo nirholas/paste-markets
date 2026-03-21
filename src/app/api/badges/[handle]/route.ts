@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
 import { getAuthorMetrics } from "@/lib/data";
 import { getAuthorTrades } from "@/lib/paste-trade";
 import { computeBadges } from "@/lib/compute-badges";
