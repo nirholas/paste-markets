@@ -6,6 +6,7 @@ import type { FeedItem } from "@/app/api/feed/route";
 import { TradeCard } from "@/components/trade-card";
 import { LiveSignalCard } from "@/components/live-signal-card";
 import { useEventStream } from "@/lib/use-event-stream";
+import { usePasteTradeWS } from "@/lib/use-paste-ws";
 
 const PAGE_SIZE = 20;
 
@@ -135,6 +136,7 @@ export function FeedClient() {
   const offsetRef = useRef(0);
 
   const stream = useEventStream(liveMode);
+  const { newTrades: wsTrades, isConnected: wsConnected } = usePasteTradeWS({ enabled: liveMode });
   const showCategoryFilter = platform === "polymarket" || platform === "";
 
   const fetchTrades = useCallback(
@@ -235,7 +237,7 @@ export function FeedClient() {
         </h1>
         <p className="text-text-secondary text-sm mt-2">
           {liveMode
-            ? `Monitoring ${stream.activeCallers} callers | Last signal: ${timeAgoShort(stream.lastSignalAt)}`
+            ? `Monitoring ${stream.activeCallers} callers${wsConnected ? " | WS connected" : ""} | Last signal: ${timeAgoShort(stream.lastSignalAt)}`
             : "All trades being posted to paste.trade. Refreshes every 60 seconds."}
         </p>
       </div>
@@ -317,6 +319,35 @@ export function FeedClient() {
               {o.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* WebSocket real-time trades (from paste.trade /ws) */}
+      {liveMode && wsTrades.length > 0 && (
+        <div className="space-y-3 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] uppercase tracking-widest text-[#2ecc71] font-mono">
+              Real-time via WebSocket
+            </span>
+            {wsConnected && (
+              <span className="text-[10px] text-[#555568] font-mono">
+                {wsTrades.length} new
+              </span>
+            )}
+          </div>
+          {wsTrades.slice(0, 5).map((wt, i) => (
+            <TradeCard
+              key={`ws-${wt.trade_id}-${i}`}
+              tradeId={wt.trade_id}
+              ticker={wt.ticker}
+              direction={wt.direction as "long" | "short" | "yes" | "no"}
+              platform={wt.platform}
+              headlineQuote={wt.thesis}
+              authorHandle={wt.author_handle}
+              postedAt={wt.created_at}
+            />
+          ))}
+          <div className="border-b border-[#1a1a2e] my-4" />
         </div>
       )}
 

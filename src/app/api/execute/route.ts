@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { insertExecutedTrade, updateTradeStatus } from "@/lib/execution-db";
 import { ensureExecutedTradesTable } from "@/lib/execution-db-init";
 import { checkRisk } from "@/lib/execution/risk";
+import { skillRoute } from "@/lib/paste-trade";
 
 // POST /api/execute — execute a trade
 export async function POST(req: NextRequest) {
@@ -47,6 +48,14 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Pre-execution: validate instrument and get routing via paste.trade /api/skill/route
+    const dir = (["long", "short"].includes(direction) ? direction : "long") as "long" | "short";
+    const routeInfo = await skillRoute({
+      ticker: asset.replace(/^\$/, "").toUpperCase(),
+      direction: dir,
+      platform: venue,
+    });
 
     // Risk check (server-side)
     const riskCheck = checkRisk(
@@ -111,6 +120,7 @@ export async function POST(req: NextRequest) {
       executionId,
       status: "filled",
       warnings: riskCheck.warnings,
+      routing: routeInfo ?? undefined,
     });
   } catch (err: any) {
     console.error("[/api/execute] Error:", err);

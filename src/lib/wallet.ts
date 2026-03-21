@@ -32,6 +32,37 @@ const INITIAL_STATE: WalletState = {
 const WALLET_STORAGE_KEY = "paste_wallet_state";
 
 // ---------------------------------------------------------------------------
+// Browser wallet provider interfaces
+// ---------------------------------------------------------------------------
+
+interface EthereumProvider {
+  isMetaMask?: boolean;
+  isRabby?: boolean;
+  isCoinbaseWallet?: boolean;
+  request<T = unknown>(args: { method: string; params?: unknown[] }): Promise<T>;
+  on?(event: string, handler: (...args: never[]) => void): void;
+  removeListener?(event: string, handler: (...args: never[]) => void): void;
+}
+
+interface SolanaProvider {
+  isPhantom?: boolean;
+  isConnected?: boolean;
+  publicKey?: { toString(): string };
+  connect(): Promise<{ publicKey: { toString(): string } }>;
+  disconnect(): Promise<void>;
+  signMessage(message: Uint8Array, encoding: string): Promise<{ signature: Uint8Array }>;
+  signAndSendTransaction(transaction: unknown): Promise<{ signature: string }>;
+}
+
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider;
+    solana?: SolanaProvider;
+    coinbaseWalletExtension?: unknown;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Provider detection
 // ---------------------------------------------------------------------------
 
@@ -49,8 +80,8 @@ export function detectProviders(): DetectedProvider[] {
 
   // MetaMask — check isMetaMask and not Rabby
   if (
-    (window as any).ethereum?.isMetaMask &&
-    !(window as any).ethereum?.isRabby
+    window.ethereum?.isMetaMask &&
+    !window.ethereum?.isRabby
   ) {
     providers.push({
       id: "metamask",
@@ -61,7 +92,7 @@ export function detectProviders(): DetectedProvider[] {
   }
 
   // Rabby
-  if ((window as any).ethereum?.isRabby) {
+  if (window.ethereum?.isRabby) {
     providers.push({
       id: "rabby",
       name: "Rabby",
@@ -72,8 +103,8 @@ export function detectProviders(): DetectedProvider[] {
 
   // Coinbase Wallet
   if (
-    (window as any).ethereum?.isCoinbaseWallet ||
-    (window as any).coinbaseWalletExtension
+    window.ethereum?.isCoinbaseWallet ||
+    window.coinbaseWalletExtension
   ) {
     providers.push({
       id: "coinbase",
@@ -84,7 +115,7 @@ export function detectProviders(): DetectedProvider[] {
   }
 
   // Phantom (Solana)
-  if ((window as any).solana?.isPhantom) {
+  if (window.solana?.isPhantom) {
     providers.push({
       id: "phantom",
       name: "Phantom",
@@ -115,11 +146,11 @@ export async function connectWallet(
 }
 
 async function connectEVM(providerId: WalletProvider): Promise<WalletState> {
-  const ethereum = (window as any).ethereum;
+  const ethereum = window.ethereum;
   if (!ethereum) throw new Error("No EVM wallet detected");
 
   try {
-    const accounts: string[] = await ethereum.request({
+    const accounts = await ethereum.request<string[]>({
       method: "eth_requestAccounts",
     });
 
@@ -127,10 +158,10 @@ async function connectEVM(providerId: WalletProvider): Promise<WalletState> {
       throw new Error("No accounts returned");
     }
 
-    const address = accounts[0];
+    const address = accounts[0]!;
 
     // Get chain ID
-    const chainIdHex: string = await ethereum.request({
+    const chainIdHex = await ethereum.request<string>({
       method: "eth_chainId",
     });
     const chainId = parseInt(chainIdHex, 16);
@@ -148,8 +179,8 @@ async function connectEVM(providerId: WalletProvider): Promise<WalletState> {
 
     persistWalletState(state);
     return state;
-  } catch (err: any) {
-    if (err.code === 4001) {
+  } catch (err: unknown) {
+    if (err instanceof Object && "code" in err && (err as { code: number }).code === 4001) {
       throw new Error("User rejected wallet connection");
     }
     throw err;
@@ -157,7 +188,7 @@ async function connectEVM(providerId: WalletProvider): Promise<WalletState> {
 }
 
 async function connectPhantom(): Promise<WalletState> {
-  const solana = (window as any).solana;
+  const solana = window.solana;
   if (!solana?.isPhantom) throw new Error("Phantom wallet not detected");
 
   try {
@@ -174,8 +205,8 @@ async function connectPhantom(): Promise<WalletState> {
 
     persistWalletState(state);
     return state;
-  } catch (err: any) {
-    if (err.code === 4001) {
+  } catch (err: unknown) {
+    if (err instanceof Object && "code" in err && (err as { code: number }).code === 4001) {
       throw new Error("User rejected wallet connection");
     }
     throw err;
@@ -186,7 +217,7 @@ export async function disconnectWallet(): Promise<void> {
   if (typeof window === "undefined") return;
 
   // Disconnect Phantom if connected
-  const solana = (window as any).solana;
+  const solana = window.solana;
   if (solana?.isPhantom && solana.isConnected) {
     try {
       await solana.disconnect();
@@ -211,25 +242,25 @@ export async function signMessage(
   }
 
   if (provider === "phantom") {
-    const solana = (window as any).solana;
+    const solana = window.solana;
     if (!solana) throw new Error("Phantom not available");
     const encoded = new TextEncoder().encode(message);
     const { signature } = await solana.signMessage(encoded, "utf8");
-    return Array.from(signature as Uint8Array)
+    return Array.from(signature)
       .map((b: number) => b.toString(16).padStart(2, "0"))
       .join("");
   }
 
   // EVM signing
-  const ethereum = (window as any).ethereum;
+  const ethereum = window.ethereum;
   if (!ethereum) throw new Error("No EVM wallet available");
 
-  const accounts: string[] = await ethereum.request({
+  const accounts = await ethereum.request<string[]>({
     method: "eth_accounts",
   });
   if (!accounts.length) throw new Error("No connected account");
 
-  const signature: string = await ethereum.request({
+  const signature = await ethereum.request<string>({
     method: "personal_sign",
     params: [message, accounts[0]],
   });
@@ -242,12 +273,12 @@ export async function signMessage(
 // ---------------------------------------------------------------------------
 
 export async function signTypedData(
-  domain: Record<string, any>,
-  types: Record<string, any>,
-  value: Record<string, any>,
+  domain: Record<string, unknown>,
+  types: Record<string, unknown>,
+  value: Record<string, unknown>,
   address: string
 ): Promise<string> {
-  const ethereum = (window as any).ethereum;
+  const ethereum = window.ethereum;
   if (!ethereum) throw new Error("No EVM wallet available");
 
   const msgParams = JSON.stringify({
@@ -265,7 +296,7 @@ export async function signTypedData(
     },
   });
 
-  const signature: string = await ethereum.request({
+  const signature = await ethereum.request<string>({
     method: "eth_signTypedData_v4",
     params: [address, msgParams],
   });
@@ -298,7 +329,7 @@ export async function sendSolanaTransaction(
     throw new Error("Transaction signing requires a browser environment");
   }
 
-  const solana = (window as any).solana;
+  const solana = window.solana;
   if (!solana?.isPhantom) {
     throw new Error("Phantom wallet not available");
   }
@@ -323,7 +354,7 @@ export async function sendSolanaTransaction(
     "https://api.mainnet-beta.solana.com";
   const connection = new Connection(rpcUrl, "confirmed");
 
-  const senderPubkey = solana.publicKey;
+  const senderPubkey = new PublicKey(solana.publicKey.toString());
   const recipientPubkey = new PublicKey(params.recipientAddress);
 
   // Derive associated token accounts for sender and recipient
@@ -393,10 +424,11 @@ async function fetchEVMBalances(
   chainId: number
 ): Promise<{ usdc: number; native: number }> {
   try {
-    const ethereum = (window as any).ethereum;
+    const ethereum = window.ethereum;
+    if (!ethereum) return { usdc: 0, native: 0 };
 
     // Native balance (ETH)
-    const balHex: string = await ethereum.request({
+    const balHex = await ethereum.request<string>({
       method: "eth_getBalance",
       params: [address, "latest"],
     });
@@ -414,7 +446,7 @@ async function fetchEVMBalances(
     if (usdcAddr) {
       // ERC-20 balanceOf(address)
       const data = `0x70a08231000000000000000000000000${address.slice(2).toLowerCase()}`;
-      const result: string = await ethereum.request({
+      const result = await ethereum.request<string>({
         method: "eth_call",
         params: [{ to: usdcAddr, data }, "latest"],
       });
@@ -457,8 +489,9 @@ export function useWallet() {
   const [state, setState] = useState<WalletState>(INITIAL_STATE);
   const [providers, setProviders] = useState<DetectedProvider[]>([]);
 
-  // Detect providers on mount
+  // Detect providers and restore persisted state on mount (browser-only init required for SSR hydration)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProviders(detectProviders());
 
     // Restore persisted state
@@ -491,9 +524,9 @@ export function useWallet() {
     if (!state.connected || !state.address) return;
 
     if (state.chain === "evm") {
-      const ethereum = (window as any).ethereum;
+      const ethereum = window.ethereum;
       if (!ethereum) return;
-      const chainIdHex: string = await ethereum.request({
+      const chainIdHex = await ethereum.request<string>({
         method: "eth_chainId",
       });
       const chainId = parseInt(chainIdHex, 16);
@@ -508,7 +541,7 @@ export function useWallet() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const ethereum = (window as any).ethereum;
+    const ethereum = window.ethereum;
     if (!ethereum) return;
 
     const handleAccountsChanged = (accounts: string[]) => {
@@ -517,7 +550,7 @@ export function useWallet() {
         setState(INITIAL_STATE);
       } else {
         setState((prev) => {
-          const updated = { ...prev, address: accounts[0] };
+          const updated = { ...prev, address: accounts[0] ?? null };
           persistWalletState(updated);
           return updated;
         });
@@ -531,12 +564,12 @@ export function useWallet() {
       }
     };
 
-    ethereum.on?.("accountsChanged", handleAccountsChanged);
-    ethereum.on?.("chainChanged", handleChainChanged);
+    ethereum.on?.("accountsChanged", handleAccountsChanged as never);
+    ethereum.on?.("chainChanged", handleChainChanged as never);
 
     return () => {
-      ethereum.removeListener?.("accountsChanged", handleAccountsChanged);
-      ethereum.removeListener?.("chainChanged", handleChainChanged);
+      ethereum.removeListener?.("accountsChanged", handleAccountsChanged as never);
+      ethereum.removeListener?.("chainChanged", handleChainChanged as never);
     };
   }, [state.connected, refreshBalances]);
 
@@ -566,18 +599,18 @@ export function useWallet() {
 // ---------------------------------------------------------------------------
 
 export async function switchToArbitrum(): Promise<void> {
-  const ethereum = (window as any).ethereum;
+  const ethereum = window.ethereum;
   if (!ethereum) throw new Error("No EVM wallet");
 
   try {
-    await ethereum.request({
+    await ethereum.request<void>({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: "0xa4b1" }], // 42161
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Chain not added — add it
-    if (err.code === 4902) {
-      await ethereum.request({
+    if (err instanceof Object && "code" in err && (err as { code: number }).code === 4902) {
+      await ethereum.request<void>({
         method: "wallet_addEthereumChain",
         params: [
           {
