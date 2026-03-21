@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { fetchTrades } from "@/lib/upstream";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,14 @@ export async function GET(request: NextRequest) {
   const limit = isNaN(limitRaw) ? DEFAULT_LIMIT : Math.min(Math.max(1, limitRaw), MAX_LIMIT);
 
   try {
-    const { getRecentTrades } = await import("@/lib/db");
-    const trades = await getRecentTrades(limit);
+    const data = await fetchTrades(limit);
+    const trades = (data.items as Record<string, unknown>[]).map((raw) => ({
+      handle: String(raw["author_handle"] ?? ""),
+      ticker: String(raw["ticker"] ?? ""),
+      direction: String(raw["direction"] ?? "long"),
+      pnl_pct: raw["pnl_pct"] != null ? Number(raw["pnl_pct"]) : raw["pnlPct"] != null ? Number(raw["pnlPct"]) : null,
+      posted_at: String(raw["created_at"] ?? raw["posted_at"] ?? new Date().toISOString()),
+    }));
 
     return NextResponse.json(
       { trades, updatedAt: new Date().toISOString() },

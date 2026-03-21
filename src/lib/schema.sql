@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS wagers (
   settled_at TEXT,
   pnl_amount REAL,
   tx_signature TEXT NOT NULL,
+  payout_tx_signature TEXT,
   display_on_feed INTEGER DEFAULT 1,
   backer_handle TEXT,
   backer_avatar_url TEXT,

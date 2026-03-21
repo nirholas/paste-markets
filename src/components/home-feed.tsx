@@ -425,6 +425,61 @@ export function HomeFeed({ initialAssets = [], initialCallers = [] }: HomeFeedPr
     return () => observer.disconnect();
   }, [hasMore, loadingMore, loadMore]);
 
+  // ── Live price polling (every 10s) ────────────────────────────────────────
+  useEffect(() => {
+    if (loading || trades.length === 0) return;
+
+    const tradeIds = trades
+      .map((t) => t.id)
+      .filter((id): id is string => !!id && id !== "");
+    if (tradeIds.length === 0) return;
+
+    let cancelled = false;
+
+    const pollPrices = async () => {
+      try {
+        // Batch in groups of 50 (API limit)
+        const batch = tradeIds.slice(0, 50);
+        const res = await fetch(`/api/prices?ids=${batch.join(",")}`);
+        if (!res.ok || cancelled) return;
+
+        const prices = await res.json() as Record<string, { price: number; timestamp: number }>;
+        if (cancelled || Object.keys(prices).length === 0) return;
+
+        setTrades((prev) =>
+          prev.map((item) => {
+            const priceData = prices[item.id];
+            if (!priceData || !item.entry_price) return item;
+
+            const currentPrice = priceData.price;
+            const isShort = item.direction === "short" || item.direction === "no";
+            const pnl = isShort
+              ? ((item.entry_price - currentPrice) / item.entry_price) * 100
+              : ((currentPrice - item.entry_price) / item.entry_price) * 100;
+
+            return {
+              ...item,
+              current_price: currentPrice,
+              pnl_pct: Math.round(pnl * 100) / 100,
+            };
+          }),
+        );
+      } catch {
+        // ignore polling errors
+      }
+    };
+
+    // Initial poll after short delay, then every 10s
+    const initialTimeout = setTimeout(pollPrices, 2000);
+    const interval = setInterval(pollPrices, 10_000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [loading, trades.length]); // re-bind when trade list changes
+
   const lastTopTradeRef = useRef<string | null>(null);
   useEffect(() => {
     if (tab !== "new") return;

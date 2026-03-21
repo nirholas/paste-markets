@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkRisk, estimateLiquidationPrice, estimateFees } from "@/lib/execution/risk";
+import { checkRisk, estimateFees } from "@/lib/execution/risk";
+import { skillRoute, skillDiscover } from "@/lib/paste-trade";
 
-// GET /api/execution/preflight — risk check before execution
+// GET /api/execution/preflight — risk check + venue routing before execution
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
 
@@ -20,41 +21,55 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const riskCheck = checkRisk(
-      { venue, asset, direction, size, leverage },
-      {
-        connected: true,
-        address: wallet,
-        chain: "evm",
-        provider: null,
-        balances: { usdc: 0, native: 0 },
-      }
-    );
+    // Run risk check, venue routing, and instrument discovery in parallel
+    const [riskCheck, routeResult, discoverResult] = await Promise.all([
+      Promise.resolve(checkRisk(
+        { venue, asset, direction, size, leverage },
+        {
+          connected: true,
+          address: wallet,
+          chain: "evm",
+          provider: null,
+          balances: { usdc: 0, native: 0 },
+        }
+      )),
+      // Route through paste.trade to validate instrument + get pricing
+      skillRoute({
+        ticker: asset.replace(/^\$/, "").toUpperCase(),
+        direction: direction as "long" | "short",
+        platform: venue,
+      }),
+      // Discover available instruments for this ticker
+      skillDiscover({
+        query: asset.replace(/^\$/, "").toUpperCase(),
+        platforms: venue ? [venue] : undefined,
+      }),
+    ]);
 
-    // Estimate fees
     const fees = estimateFees(
       size,
       venue as "hyperliquid" | "polymarket"
     );
 
-    // Estimate liquidation (for perps)
     let estimatedLiquidation: number | undefined;
     if (venue === "hyperliquid" && leverage > 1) {
-      // We'd need current price from HL API in production
-      // For preflight, return the formula-based estimate
-      estimatedLiquidation = undefined; // needs currentPrice
+      estimatedLiquidation = undefined;
     }
 
     return NextResponse.json({
       riskCheck,
       estimatedFees: Math.round(fees * 100) / 100,
       estimatedLiquidation,
-      availableBalance: 0, // populated by client from wallet state
+      availableBalance: 0,
+      // Upstream routing data from paste.trade
+      routing: routeResult,
+      instruments: discoverResult,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Preflight check failed";
     console.error("[/api/execution/preflight] Error:", err);
     return NextResponse.json(
-      { error: err.message || "Preflight check failed" },
+      { error: message },
       { status: 500 }
     );
   }

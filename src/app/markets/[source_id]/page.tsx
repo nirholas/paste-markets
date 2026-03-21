@@ -65,16 +65,9 @@ interface SourceData {
 }
 
 async function fetchSourceData(source_id: string): Promise<SourceData | null> {
-  try {
-    const res = await fetch(`https://paste.trade/api/sources/${source_id}`, {
-      headers: { Authorization: `Bearer ${process.env.PASTE_TRADE_KEY}` },
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
+  const { fetchSource } = await import("@/lib/paste-trade");
+  const data = await fetchSource(source_id);
+  return data as unknown as SourceData | null;
 }
 
 function computePnl(trade: Trade): number | null {

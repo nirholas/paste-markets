@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getExpiredUnsettledConfigs, settleWagers, getWagerConfig } from "@/lib/wager-db";
 import { getTradeById } from "@/lib/paste-trade";
+import { sendUsdcPayout } from "@/lib/solana";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -79,10 +81,42 @@ export async function GET(req: NextRequest) {
         });
       } else {
         settledCount++;
+
+        // Send USDC payouts to winners (only when TREASURY_PRIVATE_KEY is set)
+        const payoutErrors: string[] = [];
+        if (process.env["TREASURY_PRIVATE_KEY"]) {
+          for (const w of result.wagererResults) {
+            if (w.status !== "won" || w.pnl <= 0) continue;
+
+            const payoutAmount = w.principal + w.pnl;
+            const payout = await sendUsdcPayout(w.walletAddress, payoutAmount);
+
+            if (payout.signature) {
+              // Record payout tx signature in DB
+              try {
+                await sql`
+                  UPDATE wagers
+                  SET payout_tx_signature = ${payout.signature}
+                  WHERE trade_card_id = ${config.trade_card_id}
+                    AND wallet_address = ${w.walletAddress}
+                `;
+              } catch {
+                // Non-critical: payout succeeded even if DB update fails
+              }
+            } else {
+              payoutErrors.push(`${w.walletAddress}: ${payout.error}`);
+            }
+          }
+        }
+
+        const payoutSuffix = payoutErrors.length > 0
+          ? `, payout_errors: ${payoutErrors.length}`
+          : "";
+
         results.push({
           tradeCardId: config.trade_card_id,
           ticker: config.ticker,
-          outcome: `settled — callerTip: $${result.callerTip.toFixed(2)}, wagerers: ${result.wagererResults.length}`,
+          outcome: `settled — callerTip: $${result.callerTip.toFixed(2)}, wagerers: ${result.wagererResults.length}${payoutSuffix}`,
         });
       }
     } catch (err) {
