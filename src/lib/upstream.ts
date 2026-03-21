@@ -483,18 +483,120 @@ export interface UpstreamAuthorProfile {
 
 /**
  * Fetch an author's profile directly from paste.trade public endpoints.
+ * Uses /api/feed (public, no auth) + /api/prices to compute live P&L.
+ * Falls back to /api/search (auth required) if feed returns nothing.
  * Returns null if the author has no trades on paste.trade.
  */
 export async function fetchAuthorProfile(
   handle: string,
 ): Promise<UpstreamAuthorProfile | null> {
-  // Fetch trades where this person is the actual caller (author_handle matches)
-  const allTrades = await searchFullTrades({ author: handle, top: "all", limit: 100 });
+  // Primary: use public /api/feed?author=X (no auth required)
+  // Fetch both new (recent) and top (best P&L, all time) for a complete picture
+  let authorTrades: PasteTradeFullTrade[] = [];
+  let avatarUrl: string | null = null;
 
-  // Filter to only trades where this handle is the actual author
-  const authorTrades = allTrades.filter(
-    (t) => t.author_handle?.toLowerCase() === handle.toLowerCase(),
-  );
+  try {
+    const [newFeed, topFeed] = await Promise.all([
+      fetchPasteTradeFeed({ sort: "new", limit: 100, author: handle }),
+      fetchPasteTradeFeed({ sort: "top", limit: 100, window: "all", author: handle }),
+    ]);
+
+    // Merge prices from both feeds and pnls from top feed
+    const prices: Record<string, { price: number; timestamp: number }> = {
+      ...newFeed.prices,
+      ...topFeed.prices,
+    };
+    const sourcePnls = topFeed.pnls ?? {};
+
+    // Merge items, dedup by trade ID
+    const seenIds = new Set<string>();
+    const allItems = [...newFeed.items, ...topFeed.items];
+    const rawTrades: Array<{ trade: Record<string, unknown>; authorHandle: string; authorAvatar: string; sourceId: string }> = [];
+
+    for (const item of allItems) {
+      const itemAuthor = String(item.author?.["handle"] ?? "");
+      const itemAvatar = String(item.author?.["avatar_url"] ?? "");
+      const sourceId = String(item.source?.["id"] ?? "");
+
+      for (const t of item.trades) {
+        const tObj = t as Record<string, unknown>;
+        const id = String(tObj["id"] ?? "");
+        if (id && seenIds.has(id)) continue;
+        if (id) seenIds.add(id);
+        rawTrades.push({ trade: tObj, authorHandle: itemAuthor, authorAvatar: itemAvatar, sourceId });
+      }
+    }
+
+    if (rawTrades.length > 0) {
+      for (const { trade: t, authorHandle, authorAvatar, sourceId } of rawTrades) {
+        const id = String(t["id"] ?? "");
+        const entryPrice = Number(t["author_price"] ?? t["posted_price"] ?? 0);
+        const priceEntry = prices[id];
+        const currentPrice = priceEntry?.price ?? null;
+        const direction = String(t["direction"] ?? "long") as "long" | "short" | "yes" | "no";
+
+        // Use source-level P&L from top feed if available, otherwise compute from prices
+        let pnlPct: number | undefined;
+        if (sourcePnls[sourceId] != null) {
+          // Source-level P&L — use for single-trade sources, compute for multi-trade
+          const sourceTradeCount = rawTrades.filter((r) => r.sourceId === sourceId).length;
+          if (sourceTradeCount === 1) {
+            pnlPct = sourcePnls[sourceId];
+          }
+        }
+        if (pnlPct == null && currentPrice != null && entryPrice > 0) {
+          const raw = ((currentPrice - entryPrice) / entryPrice) * 100;
+          pnlPct = direction === "short" || direction === "no" ? -raw : raw;
+        }
+
+        const avatarRaw = authorAvatar || null;
+        if (!avatarUrl && avatarRaw) {
+          avatarUrl = avatarRaw.startsWith("/") ? `${BASE}${avatarRaw}` : avatarRaw;
+        }
+
+        authorTrades.push({
+          ticker: String(t["ticker"] ?? ""),
+          direction,
+          platform: t["platform"] != null ? String(t["platform"]) : undefined,
+          pnlPct: pnlPct != null ? parseFloat(pnlPct.toFixed(2)) : undefined,
+          entryPrice: entryPrice > 0 ? entryPrice : undefined,
+          currentPrice: currentPrice ?? undefined,
+          posted_at: String(t["created_at"] ?? new Date().toISOString()),
+          source_url: undefined,
+          author_handle: authorHandle || handle,
+          trade_id: id || undefined,
+          thesis: t["thesis_card"] != null ? String(t["thesis_card"]) : undefined,
+          headline_quote: t["headline_quote"] != null ? String(t["headline_quote"]) : undefined,
+          ticker_context: t["ticker_context"] != null ? String(t["ticker_context"]) : undefined,
+          chain_steps: Array.isArray(t["chain_steps"]) ? (t["chain_steps"] as string[]) : undefined,
+          market_question: t["market_question"] != null ? String(t["market_question"]) : undefined,
+          author_avatar_url: avatarRaw ?? undefined,
+        });
+      }
+    }
+  } catch (err) {
+    console.error(`[upstream] Feed fetch failed for ${handle}:`, err);
+  }
+
+  // Fallback: /api/search (auth required) if feed returned nothing
+  if (authorTrades.length === 0) {
+    try {
+      const allTrades = await searchFullTrades({ author: handle, top: "all", limit: 100 });
+      authorTrades = allTrades.filter(
+        (t) => t.author_handle?.toLowerCase() === handle.toLowerCase(),
+      );
+
+      for (const t of authorTrades) {
+        if (t.author_avatar_url && !avatarUrl) {
+          const raw = t.author_avatar_url;
+          avatarUrl = raw.startsWith("/") ? `${BASE}${raw}` : raw;
+          break;
+        }
+      }
+    } catch {
+      // search also failed
+    }
+  }
 
   if (authorTrades.length === 0) return null;
 
@@ -511,16 +613,6 @@ export async function fetchAuthorProfile(
     if (entry) rank = entry.rank;
   } catch {
     // rank is optional
-  }
-
-  // Extract avatar
-  let avatarUrl: string | null = null;
-  for (const t of authorTrades) {
-    if (t.author_avatar_url) {
-      const raw = t.author_avatar_url;
-      avatarUrl = raw.startsWith("/") ? `${BASE}${raw}` : raw;
-      break;
-    }
   }
 
   return { handle, metrics, rank, avatarUrl, trades: authorTrades };

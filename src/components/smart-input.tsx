@@ -17,6 +17,8 @@ function detectType(val: string): "url" | "handle" | "ticker" | "text" | "empty"
   if (v.startsWith("http://") || v.startsWith("https://")) return "url";
   if (v.startsWith("@")) return "handle";
   if (/^\$[A-Za-z]{1,10}$/.test(v) || /^[A-Z]{2,8}$/.test(v)) return "ticker";
+  // Bare X handle: 1-15 lowercase alphanumeric/underscore, no spaces
+  if (/^[a-z0-9_]{1,15}$/i.test(v) && !v.includes(" ")) return "handle";
   return "text";
 }
 

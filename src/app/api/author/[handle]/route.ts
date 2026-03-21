@@ -6,6 +6,7 @@ import {
   getAuthorMetrics,
   recordView,
 } from "@/lib/data";
+import { fetchAuthorProfile } from "@/lib/upstream";
 import type { TradeSummary } from "@/lib/metrics";
 import type { Author } from "@/lib/data";
 
@@ -30,20 +31,54 @@ export async function GET(
       );
     }
 
-    // Ensure author exists in DB
+    // Primary: try upstream paste.trade API (no DB dependency)
+    try {
+      const upstream = await fetchAuthorProfile(handle);
+      if (upstream && upstream.metrics.totalTrades > 0) {
+        const metrics = upstream.metrics;
+        const trades = metrics.recentTrades.map((t: TradeSummary) => ({
+          ticker: t.ticker,
+          direction: t.direction,
+          pnl_pct: t.pnl_pct,
+          platform: t.platform,
+          entry_date: t.entry_date ?? t.posted_at ?? "",
+        }));
+
+        // Record the view (fire-and-forget)
+        recordView(handle, "profile").catch(() => {});
+
+        return NextResponse.json({
+          handle,
+          metrics: {
+            totalTrades: metrics.totalTrades,
+            winRate: metrics.winRate,
+            avgPnl: metrics.avgPnl,
+            winCount: metrics.winCount,
+            lossCount: metrics.lossCount,
+            bestTrade: metrics.bestTrade,
+            worstTrade: metrics.worstTrade,
+            streak: metrics.streak,
+          },
+          trades,
+          rank: upstream.rank,
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error(`[api/author] Upstream fetch failed for ${handle}:`, err);
+    }
+
+    // Fallback: local DB
     const author = await getOrCreateAuthor(handle);
 
-    // Sync from paste.trade if data is stale
     if (isStale(author.last_fetched)) {
       try {
         await syncAuthor(handle);
       } catch (err) {
         console.error(`[api/author] Failed to sync ${handle}:`, err);
-        // Continue with cached data if sync fails
       }
     }
 
-    // Get metrics from DB
     const metrics = await getAuthorMetrics(handle);
     if (!metrics) {
       return NextResponse.json(
@@ -52,17 +87,9 @@ export async function GET(
       );
     }
 
-    // Record the view for trending
-    await recordView(handle, "profile");
+    recordView(handle, "profile").catch(() => {});
 
-    // Build response
-    const trades: Array<{
-      ticker: string;
-      direction: string;
-      pnl_pct: number;
-      platform?: string;
-      entry_date: string;
-    }> = metrics.recentTrades.map((t: TradeSummary) => ({
+    const trades = metrics.recentTrades.map((t: TradeSummary) => ({
       ticker: t.ticker,
       direction: t.direction,
       pnl_pct: t.pnl_pct,
@@ -70,7 +97,6 @@ export async function GET(
       entry_date: t.entry_date ?? t.posted_at ?? "",
     }));
 
-    // Re-read the author for rank + last_fetched after potential sync
     const refreshed: Author = await getOrCreateAuthor(handle);
 
     return NextResponse.json({

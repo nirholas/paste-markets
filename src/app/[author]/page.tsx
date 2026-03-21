@@ -51,7 +51,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!isValidHandle(handle)) return {};
 
-  const metrics = await getAuthorMetrics(handle);
+  let metrics: import("@/lib/metrics").AuthorMetrics | null = null;
+  try {
+    metrics = await getAuthorMetrics(handle);
+  } catch {
+    // DB unavailable — fall through to default description
+  }
 
   const description = metrics
     ? `@${handle}'s real trading performance: ${Math.round(metrics.winRate)}% win rate, ${metrics.avgPnl >= 0 ? "+" : ""}${metrics.avgPnl.toFixed(1)}% avg P&L across ${metrics.totalTrades} trades.`
