@@ -43,17 +43,25 @@ export interface TradeCardProps {
 
 
 function DirectionBadge({ direction, platform }: { direction: TradeCardProps["direction"]; platform?: string | null }) {
+  const isLong = direction === "long" || direction === "yes";
   const styles: Record<string, string> = {
-    long: "text-win border-win",
-    yes: "text-accent border-accent",
-    short: "text-loss border-loss",
-    no: "text-loss border-loss",
+    long: "text-win bg-win/10",
+    yes: "text-accent bg-accent/10",
+    short: "text-loss bg-loss/10",
+    no: "text-loss bg-loss/10",
   };
   const label = getDirectionLabel(direction, platform);
   return (
     <span
-      className={`border px-2 py-0.5 text-xs uppercase tracking-widest font-bold ${styles[direction]}`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs uppercase tracking-widest font-bold rounded-lg ${styles[direction]}`}
     >
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+        {isLong ? (
+          <path d="M5 1L9 6H1L5 1Z" />
+        ) : (
+          <path d="M5 9L1 4H9L5 9Z" />
+        )}
+      </svg>
       {label}
     </span>
   );
@@ -108,7 +116,7 @@ function PnlSection({
         </div>
       )}
       <div className="flex items-center gap-3">
-        <span className={`text-lg font-bold ${pnlColor}`}>{pnlLabel}</span>
+        <span className={`text-2xl font-bold font-mono tracking-tight ${pnlColor}`}>{pnlLabel}</span>
         {hasPnl ? (
           <WinRateBar pct={barPct} length={12} />
         ) : (
@@ -216,7 +224,7 @@ export function TradeCard({
   const displayTitle = isPolymarket && contractTitle ? contractTitle : null;
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-5 space-y-4 hover:border-accent/30 transition-colors">
+    <div className="bg-surface border border-border rounded-lg p-6 space-y-4 hover:border-accent/30 transition-all shadow-lg shadow-black/20">
       {/* Header: ticker + direction + platform + category + time */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
@@ -229,7 +237,7 @@ export function TradeCard({
               {venueConfig.icon}
             </span>
           )}
-          <span className="text-xl font-bold text-text-primary tracking-tight">
+          <span className="text-xl font-bold text-text-primary tracking-tight font-mono">
             {isPolymarket ? ticker.toUpperCase() : `$${ticker.toUpperCase()}`}
           </span>
           <DirectionBadge direction={direction} platform={platform} />
@@ -240,10 +248,10 @@ export function TradeCard({
           )}
           {platform && (
             <span
-              className="text-xs uppercase tracking-widest border px-2 py-0.5"
+              className="text-[11px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-lg"
               style={{
                 color: venueConfig?.color ?? "#555568",
-                borderColor: venueConfig ? `${venueConfig.color}40` : "#1a1a2e",
+                backgroundColor: venueConfig ? `${venueConfig.color}14` : "#ffffff08",
               }}
             >
               {venueConfig?.name ?? platform}
