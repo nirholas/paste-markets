@@ -203,8 +203,19 @@ export default async function SignalPage() {
   // Section 3: top 6 tickers by call count
   const hotTickers = heatmapTickers.slice(0, 6);
 
-  // Section 1: top 5 consensus plays
-  const topPlays = consensusPlays.slice(0, 5);
+  // Section 1: top 5 consensus plays — derive display fields from ConsensusPlay
+  const topPlays = consensusPlays.slice(0, 5).map((play) => {
+    const callerCount = play.long_count + play.short_count;
+    const avgWinRate =
+      play.callers.length > 0
+        ? play.callers.reduce((s, c) => s + c.winRate, 0) / play.callers.length
+        : 0;
+    const isLong =
+      play.consensus === "strong_long" || play.long_count > play.short_count;
+    const direction: "long" | "short" = isLong ? "long" : "short";
+    const currentPnl = isLong ? play.avg_pnl_long : play.avg_pnl_short;
+    return { ...play, callerCount, avgWinRate, direction, currentPnl };
+  });
 
   const updatedTime = formatUpdatedAt();
 
@@ -601,7 +612,7 @@ export default async function SignalPage() {
                   @{entry.handle}
                 </Link>
                 <span style={{ color: "#f0f0f0" }}>
-                  {entry.winRate.toFixed(0)}%
+                  {(entry.winRate ?? 0).toFixed(0)}%
                 </span>
                 <span>
                   <PnlDisplay value={entry.avgPnl} />

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWallPosts, getFeaturedWallPosts } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://paste.markets";
 
 export async function GET(request: NextRequest) {
