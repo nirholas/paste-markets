@@ -85,9 +85,15 @@ export function buildGlobeData(
   const callerMap = new Map<string, {
     loc: { lat: number; lng: number; cityName: string };
     tradeCount: number;
+    pnls: number[];
     isReal: boolean;
   }>();
-  const tickerMap = new Map<string, { loc: ReturnType<typeof getTickerLocation>; tradeCount: number }>();
+  const tickerMap = new Map<string, {
+    loc: ReturnType<typeof getTickerLocation>;
+    tradeCount: number;
+    pnls: number[];
+    directions: string[];
+  }>();
 
   // Collect caller and ticker locations
   for (const trade of trades) {
@@ -101,27 +107,37 @@ export function buildGlobeData(
         callerMap.set(trade.author, {
           loc: { lat: real.lat + jitterLat, lng: real.lng + jitterLng, cityName: real.label ?? "Unknown" },
           tradeCount: 0,
+          pnls: [],
           isReal: true,
         });
       } else {
         callerMap.set(trade.author, {
           loc: getFallbackCallerLocation(trade.author),
           tradeCount: 0,
+          pnls: [],
           isReal: false,
         });
       }
     }
-    callerMap.get(trade.author)!.tradeCount++;
+    const caller = callerMap.get(trade.author)!;
+    caller.tradeCount++;
+    caller.pnls.push(trade.pnl);
 
     if (!tickerMap.has(trade.ticker)) {
-      tickerMap.set(trade.ticker, { loc: getTickerLocation(trade.ticker), tradeCount: 0 });
+      tickerMap.set(trade.ticker, { loc: getTickerLocation(trade.ticker), tradeCount: 0, pnls: [], directions: [] });
     }
-    tickerMap.get(trade.ticker)!.tradeCount++;
+    const ticker = tickerMap.get(trade.ticker)!;
+    ticker.tradeCount++;
+    ticker.pnls.push(trade.pnl);
+    if (trade.direction) ticker.directions.push(trade.direction);
   }
 
   // Build points for callers
   const points: TradePoint[] = [];
   for (const [handle, data] of callerMap) {
+    const wins = data.pnls.filter((p) => p > 0).length;
+    const winRate = data.pnls.length > 0 ? (wins / data.pnls.length) * 100 : 0;
+    const avgPnl = data.pnls.length > 0 ? data.pnls.reduce((s, p) => s + p, 0) / data.pnls.length : 0;
     points.push({
       id: handle,
       label: `@${handle}${data.isReal ? ` (${data.loc.cityName})` : ""}`,
@@ -129,11 +145,19 @@ export function buildGlobeData(
       lng: data.loc.lng,
       size: Math.min(0.3 + data.tradeCount * 0.05, 1.2),
       color: data.isReal ? "#3b82f6" : "#555568", // blue if real, grey if fallback
+      type: "caller",
+      tradeCount: data.tradeCount,
+      winRate: parseFloat(winRate.toFixed(1)),
+      avgPnl: parseFloat(avgPnl.toFixed(1)),
+      locationLabel: data.isReal ? data.loc.cityName : undefined,
     });
   }
 
   // Build points for tickers
   for (const [ticker, data] of tickerMap) {
+    const longs = data.directions.filter((d) => d.toLowerCase() === "long").length;
+    const bullRatio = data.directions.length > 0 ? (longs / data.directions.length) * 100 : 50;
+    const avgPnl = data.pnls.length > 0 ? data.pnls.reduce((s, p) => s + p, 0) / data.pnls.length : 0;
     points.push({
       id: `ticker-${ticker}`,
       label: `$${ticker}`,
@@ -141,6 +165,10 @@ export function buildGlobeData(
       lng: data.loc.lng,
       size: Math.min(0.2 + data.tradeCount * 0.08, 1.5),
       color: "#f39c12", // amber
+      type: "ticker",
+      tradeCount: data.tradeCount,
+      winRate: parseFloat(bullRatio.toFixed(1)),
+      avgPnl: parseFloat(avgPnl.toFixed(1)),
     });
   }
 
@@ -161,6 +189,7 @@ export function buildGlobeData(
       ticker: trade.ticker,
       pnl: trade.pnl,
       author: trade.author,
+      direction: trade.direction,
       dashGap: 0.5 + Math.random(),
       dashAnimateTime: 1500 + Math.random() * 3000,
     };

@@ -6,6 +6,16 @@ export interface TradePoint {
   size: number;
   color: string;
   altitude?: number;
+  /** "caller" or "ticker" — determines click navigation */
+  type: "caller" | "ticker";
+  /** Number of trades for this point */
+  tradeCount: number;
+  /** Win rate (0-100) for callers, bull ratio for tickers */
+  winRate?: number;
+  /** Average P&L % */
+  avgPnl?: number;
+  /** Location label (city name) for callers */
+  locationLabel?: string;
 }
 
 export interface TradeArc {
@@ -19,6 +29,7 @@ export interface TradeArc {
   ticker: string;
   pnl: number;
   author: string;
+  direction?: string;
   dashGap?: number;
   dashAnimateTime?: number;
 }
