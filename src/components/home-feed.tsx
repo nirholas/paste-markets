@@ -83,7 +83,7 @@ function NewTradeToast({
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-[#1a1a1a] border border-[#ffffff14] rounded-2xl px-4 py-3 shadow-2xl animate-slide-up text-sm">
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-[#1a1a1a] border border-[#ffffff14] rounded-2xl px-5 py-3.5 shadow-2xl shadow-black/40 animate-slide-up text-sm">
       <span className="w-2 h-2 rounded-full animate-live" style={{ backgroundColor: isLong ? "#22c55e" : "#ef4444" }} />
       <span className="font-semibold" style={{ color: isLong ? "#22c55e" : "#ef4444" }}>
         {toast.direction.toUpperCase()}
@@ -119,8 +119,8 @@ function TrendingAssets({
   onSelect: (ticker: string) => void;
 }) {
   return (
-    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-4">
-      <p className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider mb-3 flex items-center gap-2">
+    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-5 shadow-lg shadow-black/20">
+      <p className="text-[11px] font-semibold text-[#a1a1aa] uppercase tracking-widest mb-4 flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] animate-live" />
         Trending
       </p>
@@ -169,8 +169,8 @@ function TrendingAssets({
 
 function TopCallers({ callers }: { callers: TopCaller[] }) {
   return (
-    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-4">
-      <p className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider mb-3 flex items-center gap-2">
+    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-5 shadow-lg shadow-black/20">
+      <p className="text-[11px] font-semibold text-[#a1a1aa] uppercase tracking-widest mb-4 flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-live" />
         Top Callers
       </p>
@@ -302,18 +302,23 @@ function FilterPanel({
 
 function SkeletonCard() {
   return (
-    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-5 space-y-3 animate-pulse">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#1a1a1a]" />
-        <div className="flex-1 space-y-2">
-          <div className="h-4 w-28 rounded-full bg-[#1a1a1a]" />
-          <div className="h-3 w-16 rounded-full bg-[#1a1a1a]" />
+    <div className="bg-[#111111] border border-[#ffffff0d] rounded-2xl p-5 sm:p-6 space-y-4 animate-pulse shadow-lg shadow-black/20">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-6 w-16 rounded-lg bg-[#1a1a1a]" />
+          <div className="h-6 w-20 rounded-lg bg-[#1a1a1a]" />
         </div>
-        <div className="h-7 w-16 rounded-full bg-[#1a1a1a]" />
+        <div className="h-8 w-24 rounded-lg bg-[#1a1a1a]" />
       </div>
-      <div className="h-4 w-40 rounded-full bg-[#1a1a1a]" />
-      <div className="h-3 w-full rounded-full bg-[#1a1a1a]" />
-      <div className="h-3 w-3/4 rounded-full bg-[#1a1a1a]" />
+      <div className="h-4 w-full rounded-lg bg-[#1a1a1a]" />
+      <div className="h-4 w-3/4 rounded-lg bg-[#1a1a1a]" />
+      <div className="flex items-center gap-3 pt-4 border-t border-[#ffffff0d]">
+        <div className="w-8 h-8 rounded-full bg-[#1a1a1a]" />
+        <div className="space-y-1.5">
+          <div className="h-3 w-24 rounded-lg bg-[#1a1a1a]" />
+          <div className="h-2.5 w-14 rounded-lg bg-[#1a1a1a]" />
+        </div>
+      </div>
     </div>
   );
 }

@@ -174,9 +174,9 @@ export default function Nav() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-[13px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              className={`text-[13px] font-medium px-3 py-1.5 rounded-lg transition-all ${
                 pathname === link.href
-                  ? "text-[#f5f5f7] bg-[#ffffff14]"
+                  ? "text-[#f5f5f7] bg-[#ffffff14] shadow-[0_0_12px_rgba(0,102,255,0.15)]"
                   : "text-[#a1a1aa] hover:text-[#f5f5f7] hover:bg-[#ffffff0a]"
               }`}
             >

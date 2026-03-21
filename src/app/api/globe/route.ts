@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const trades: TradeInput[] = [];
 
     for (const item of feedResult.items) {
-      const raw = item as Record<string, unknown>;
+      const raw = item as unknown as Record<string, unknown>;
       const tradeList = Array.isArray(raw["trades"]) ? (raw["trades"] as Record<string, unknown>[]) : [];
       const author = (raw["author"] ?? {}) as Record<string, unknown>;
       const handle = String(author["handle"] ?? raw["author_handle"] ?? "");

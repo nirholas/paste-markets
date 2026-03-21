@@ -41,7 +41,7 @@ function hashString(s: string): number {
 
 function getCallerLocation(handle: string): { lat: number; lng: number; cityName: string } {
   const hash = hashString(handle);
-  const city = CALLER_CITIES[hash % CALLER_CITIES.length];
+  const city = CALLER_CITIES[hash % CALLER_CITIES.length]!;
   // Add jitter so callers in the same city don't overlap
   const jitterLat = ((hash % 100) / 100) * 2 - 1;
   const jitterLng = (((hash >> 8) % 100) / 100) * 2 - 1;
@@ -50,7 +50,7 @@ function getCallerLocation(handle: string): { lat: number; lng: number; cityName
 
 function getTickerLocation(ticker: string): { lat: number; lng: number } {
   const hash = hashString(ticker);
-  const city = TICKER_CITIES[hash % TICKER_CITIES.length];
+  const city = TICKER_CITIES[hash % TICKER_CITIES.length]!;
   const jitterLat = ((hash % 50) / 50) * 0.5 - 0.25;
   const jitterLng = (((hash >> 4) % 50) / 50) * 0.5 - 0.25;
   return { lat: city.lat + jitterLat, lng: city.lng + jitterLng };
