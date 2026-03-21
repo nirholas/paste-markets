@@ -72,7 +72,7 @@ export function SmartInput() {
     <div className="w-full">
       <form onSubmit={handleSubmit}>
         <div
-          className={`flex items-center bg-[#111111] border border-[#ffffff14] rounded-2xl px-5 py-4 transition-all ring-2 ${ringColor}`}
+          className={`flex items-center bg-[#111111] border border-[#ffffff14] rounded-lg px-5 py-4 transition-all ring-2 ${ringColor}`}
         >
           <svg className="w-5 h-5 text-[#52525b] mr-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="8" />
@@ -91,7 +91,7 @@ export function SmartInput() {
             <button
               type="button"
               onClick={() => setValue("")}
-              className="text-[#52525b] hover:text-[#a1a1aa] transition-colors ml-2 p-1 rounded-full hover:bg-[#ffffff0a]"
+              className="text-[#52525b] hover:text-[#a1a1aa] transition-colors ml-2 p-1 rounded-lg hover:bg-[#ffffff0a]"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -123,7 +123,7 @@ export function SmartInput() {
           {type === "url" && (
             <button
               type="submit"
-              className="flex-1 bg-[#0066FF] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#0052CC] transition-colors"
+              className="flex-1 bg-[#0066FF] text-white font-semibold text-sm py-2.5 px-4 rounded-lg hover:bg-[#0052CC] transition-colors"
             >
               Find The Trade
             </button>
@@ -131,7 +131,7 @@ export function SmartInput() {
           {type === "handle" && (
             <button
               type="submit"
-              className="flex-1 bg-[#22c55e] text-black font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#16a34a] transition-colors"
+              className="flex-1 bg-[#22c55e] text-black font-semibold text-sm py-2.5 px-4 rounded-lg hover:bg-[#16a34a] transition-colors"
             >
               View Profile
             </button>
@@ -139,7 +139,7 @@ export function SmartInput() {
           {type === "ticker" && (
             <button
               type="submit"
-              className="flex-1 bg-[#f59e0b] text-black font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#d97706] transition-colors"
+              className="flex-1 bg-[#f59e0b] text-black font-semibold text-sm py-2.5 px-4 rounded-lg hover:bg-[#d97706] transition-colors"
             >
               View Asset
             </button>
@@ -149,13 +149,13 @@ export function SmartInput() {
               <button
                 type="button"
                 onClick={() => handleViewProfile()}
-                className="flex-1 bg-[#ffffff08] border border-[#ffffff14] text-[#a1a1aa] font-medium text-sm py-2.5 px-4 rounded-xl hover:bg-[#ffffff14] hover:text-[#f5f5f7] transition-colors"
+                className="flex-1 bg-[#ffffff08] border border-[#ffffff14] text-[#a1a1aa] font-medium text-sm py-2.5 px-4 rounded-lg hover:bg-[#ffffff14] hover:text-[#f5f5f7] transition-colors"
               >
                 Search Traders
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-[#0066FF] text-white font-semibold text-sm py-2.5 px-4 rounded-xl hover:bg-[#0052CC] transition-colors"
+                className="flex-1 bg-[#0066FF] text-white font-semibold text-sm py-2.5 px-4 rounded-lg hover:bg-[#0052CC] transition-colors"
               >
                 Find The Trade
               </button>
@@ -165,7 +165,7 @@ export function SmartInput() {
             <button
               type="submit"
               disabled
-              className="flex-1 bg-[#ffffff08] text-[#52525b] font-medium text-sm py-2.5 px-4 rounded-xl cursor-not-allowed"
+              className="flex-1 bg-[#ffffff08] text-[#52525b] font-medium text-sm py-2.5 px-4 rounded-lg cursor-not-allowed"
             >
               Search or paste a URL
             </button>

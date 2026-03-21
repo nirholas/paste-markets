@@ -55,7 +55,7 @@ function MoreDropdown({ pathname }: { pathname: string }) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1 text-[13px] font-medium px-3 py-1.5 rounded-full transition-colors ${
+        className={`flex items-center gap-1 text-[13px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
           isMoreActive
             ? "text-[#f5f5f7] bg-[#ffffff14]"
             : "text-[#a1a1aa] hover:text-[#f5f5f7] hover:bg-[#ffffff0a]"
@@ -74,7 +74,7 @@ function MoreDropdown({ pathname }: { pathname: string }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-52 bg-[#1a1a1a] border border-[#ffffff14] rounded-2xl shadow-2xl z-50 py-2 max-h-80 overflow-y-auto">
+        <div className="absolute left-0 top-full mt-2 w-52 bg-[#1a1a1a] border border-[#ffffff14] rounded-lg shadow-2xl z-50 py-2 max-h-80 overflow-y-auto">
           {MORE_LINKS.map((link) => (
             <Link
               key={link.href}
@@ -142,7 +142,7 @@ function MobileMenu({ pathname }: { pathname: string }) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className={`px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+                className={`px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
                   pathname === link.href
                     ? "text-[#f5f5f7] bg-[#ffffff0a]"
                     : "text-[#a1a1aa] hover:text-[#f5f5f7] hover:bg-[#ffffff0a]"
@@ -175,7 +175,7 @@ export default function Nav() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-[13px] font-medium px-3 py-1.5 rounded-full transition-colors ${
+              className={`text-[13px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
                 pathname === link.href
                   ? "text-[#f5f5f7] bg-[#ffffff14]"
                   : "text-[#a1a1aa] hover:text-[#f5f5f7] hover:bg-[#ffffff0a]"
@@ -191,7 +191,7 @@ export default function Nav() {
         <div className="flex items-center gap-2 ml-auto">
           <Link
             href="/submit"
-            className="hidden sm:flex items-center gap-1.5 text-[13px] font-semibold px-4 py-1.5 rounded-full bg-[#0066FF] text-white hover:bg-[#0052CC] transition-colors"
+            className="hidden sm:flex items-center gap-1.5 text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#0066FF] text-white hover:bg-[#0052CC] transition-colors"
           >
             Submit Call
           </Link>

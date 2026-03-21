@@ -21,7 +21,7 @@ export function VenueFilter({ value, onChange, counts }: VenueFilterProps) {
           <button
             key={opt.value}
             onClick={() => onChange(opt.value as VenueFilterValue)}
-            className="relative px-3 py-1.5 text-xs font-mono rounded-full border transition-all duration-150"
+            className="relative px-3 py-1.5 text-xs font-mono rounded-lg border transition-all duration-150"
             style={{
               borderColor: isActive ? opt.color : "#1a1a2e",
               color: isActive ? opt.color : "#555568",
@@ -33,7 +33,7 @@ export function VenueFilter({ value, onChange, counts }: VenueFilterProps) {
               <span>{opt.label}</span>
               {count != null && count > 0 && (
                 <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
                   style={{
                     backgroundColor: isActive ? `${opt.color}20` : "#1a1a2e",
                     color: isActive ? opt.color : "#555568",

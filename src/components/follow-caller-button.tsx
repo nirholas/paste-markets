@@ -87,7 +87,7 @@ export function FollowCallerButton({ callerHandle }: FollowCallerButtonProps) {
     <button
       onClick={handleFollow}
       disabled={loading}
-      className={`inline-flex items-center gap-2 px-4 py-2 rounded border text-sm font-bold transition-colors ${
+      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-bold transition-colors ${
         following
           ? "border-accent/50 text-accent bg-accent/5 hover:border-loss hover:text-loss hover:bg-loss/5"
           : "border-border text-text-primary hover:border-accent hover:text-accent"

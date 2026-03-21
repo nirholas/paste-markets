@@ -368,21 +368,53 @@ export default async function MarketPage({ params }: PageProps) {
 
       {/* Trades section */}
       <div className="mb-8">
-        <h2 className="text-[20px] font-bold mb-4" style={{ color: "#f0f0f0" }}>
-          {trades.length} Trade{trades.length !== 1 ? "s" : ""} Extracted
-        </h2>
-
-        {trades.length === 0 ? (
-          <div
-            className="rounded-lg p-6 text-center"
-            style={{ backgroundColor: "#0f0f22", border: "1px solid #1a1a2e" }}
-          >
-            <p className="text-sm" style={{ color: "#555568" }}>
-              No trades extracted from this source.
-            </p>
-          </div>
+        {source.status === "processing" || source.status === "pending" ? (
+          <>
+            <h2 className="text-[20px] font-bold mb-4" style={{ color: "#f0f0f0" }}>
+              Processing...
+            </h2>
+            <div
+              className="rounded-lg p-6 text-center"
+              style={{ backgroundColor: "#0f0f22", border: "1px solid #1a1a2e" }}
+            >
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <span
+                  className="inline-block w-2 h-2 rounded-full animate-pulse"
+                  style={{ backgroundColor: "#f39c12" }}
+                />
+                <p className="text-sm" style={{ color: "#f39c12" }}>
+                  Analyzing source for trade calls...
+                </p>
+              </div>
+              <p className="text-xs" style={{ color: "#555568" }}>
+                This usually takes a few seconds. Refresh to check for updates.
+              </p>
+            </div>
+          </>
         ) : (
-          trades.map((trade) => <TradeCard key={trade.id} trade={trade} />)
+          <>
+            <h2 className="text-[20px] font-bold mb-4" style={{ color: "#f0f0f0" }}>
+              {trades.length} Trade{trades.length !== 1 ? "s" : ""} Extracted
+            </h2>
+
+            {trades.length === 0 ? (
+              <div
+                className="rounded-lg p-6 text-center"
+                style={{ backgroundColor: "#0f0f22", border: "1px solid #1a1a2e" }}
+              >
+                <p className="text-sm mb-3" style={{ color: "#555568" }}>
+                  No trades extracted from this source.
+                </p>
+                <p className="text-xs leading-relaxed max-w-md mx-auto" style={{ color: "#555568" }}>
+                  paste.trade extracts forward-looking trade calls with a ticker and direction
+                  (e.g. &ldquo;LONG $BTC&rdquo;, &ldquo;SHORT $SPY&rdquo;). Retrospective commentary or
+                  general market discussion may not produce extractable trades.
+                </p>
+              </div>
+            ) : (
+              trades.map((trade) => <TradeCard key={trade.id} trade={trade} />)
+            )}
+          </>
         )}
       </div>
 

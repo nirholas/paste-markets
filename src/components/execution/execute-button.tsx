@@ -70,8 +70,8 @@ export function ExecuteButton({
 
   const buttonClass =
     variant === "compact"
-      ? `text-xs border border-accent text-accent px-2 py-1 hover:bg-accent/10 transition-colors font-bold ${className ?? ""}`
-      : `border border-accent text-accent px-4 py-2 text-sm font-bold hover:bg-accent/10 transition-colors ${className ?? ""}`;
+      ? `text-xs border border-accent text-accent px-2 py-1 rounded-lg hover:bg-accent/10 transition-colors font-bold ${className ?? ""}`
+      : `border border-accent text-accent px-4 py-2 text-sm font-bold rounded-lg hover:bg-accent/10 transition-colors ${className ?? ""}`;
 
   return (
     <>

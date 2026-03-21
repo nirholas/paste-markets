@@ -61,7 +61,7 @@ export function WalletButton() {
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setShowProviders(!showProviders)}
-          className="border border-accent text-accent px-3 py-1.5 text-xs font-bold hover:bg-accent/10 transition-colors"
+          className="border border-accent text-accent px-3 py-1.5 text-xs font-bold rounded-lg hover:bg-accent/10 transition-colors"
         >
           Connect Wallet
         </button>
@@ -114,7 +114,7 @@ export function WalletButton() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="border border-win/40 text-win px-3 py-1.5 text-xs font-mono hover:border-win transition-colors flex items-center gap-2"
+        className="border border-win/40 text-win px-3 py-1.5 text-xs font-mono rounded-lg hover:border-win transition-colors flex items-center gap-2"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-win" />
         {shortenAddress(wallet.address!)}
