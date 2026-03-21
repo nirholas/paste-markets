@@ -1,9 +1,7 @@
 /**
  * Batch backfill X profile data for all authors in the database.
  *
- * Fetches avatar, banner, bio, location, website, verified status,
- * follower/following/tweet counts, and join date from X via the
- * agent-twitter-client GraphQL API.
+ * Calls X's GraphQL API directly with auth cookies.
  *
  * Run: npm run backfill:x-profiles
  *
@@ -14,9 +12,13 @@
  */
 
 import { neon } from "@neondatabase/serverless";
-import { Scraper } from "agent-twitter-client";
 
 const sql = neon(process.env.DATABASE_URL!);
+
+const BEARER =
+  "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
+const GRAPHQL_URL =
+  "https://x.com/i/api/graphql/G3KGOASz96M-Qu0nwmGXNg/UserByScreenName";
 
 // Parse CLI args
 const args = process.argv.slice(2);
@@ -40,27 +42,130 @@ function isValidHandle(handle: string): boolean {
   return true;
 }
 
-async function createScraper(): Promise<Scraper> {
-  const scraper = new Scraper();
+interface XUserProfile {
+  username: string;
+  name: string;
+  bio: string;
+  location: string;
+  website: string | null;
+  avatarUrl: string;
+  bannerUrl: string | null;
+  verified: boolean;
+  followers: number;
+  following: number;
+  tweetCount: number;
+  joined: string | null;
+}
+
+function getAvatarOriginalSize(url: string): string {
+  return url.replace(/_normal\.(jpg|jpeg|png|gif|webp)/i, ".$1");
+}
+
+async function fetchXProfile(
+  handle: string,
+  authToken: string,
+  ct0: string,
+): Promise<XUserProfile | null> {
+  const variables = JSON.stringify({
+    screen_name: handle,
+    withSafetyModeUserFields: true,
+  });
+  const features = JSON.stringify({
+    hidden_profile_likes_enabled: false,
+    hidden_profile_subscriptions_enabled: false,
+    responsive_web_graphql_exclude_directive_enabled: true,
+    verified_phone_label_enabled: false,
+    subscriptions_verification_info_is_identity_verified_enabled: false,
+    subscriptions_verification_info_verified_since_enabled: true,
+    highlights_tweets_tab_ui_enabled: true,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+  });
+  const fieldToggles = JSON.stringify({ withAuxiliaryUserLabels: false });
+  const params = new URLSearchParams({ variables, features, fieldToggles });
+
+  const res = await fetch(`${GRAPHQL_URL}?${params}`, {
+    headers: {
+      Authorization: `Bearer ${BEARER}`,
+      Cookie: `auth_token=${authToken}; ct0=${ct0}`,
+      "X-Csrf-Token": ct0,
+      "X-Twitter-Active-User": "yes",
+      "X-Twitter-Auth-Type": "OAuth2Session",
+      "X-Twitter-Client-Language": "en",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      Referer: `https://x.com/${handle}`,
+      Origin: "https://x.com",
+    },
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (res.status === 429) {
+    throw new Error("Rate limited — increase --delay or wait a few minutes");
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+  }
+
+  const data = (await res.json()) as {
+    data?: {
+      user?: {
+        result?: {
+          legacy?: Record<string, unknown>;
+          is_blue_verified?: boolean;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          [key: string]: any;
+        };
+      };
+    };
+  };
+
+  const result = data.data?.user?.result;
+  if (!result?.legacy) return null;
+
+  const u = result.legacy;
+  const urls =
+    (
+      u.entities as {
+        url?: { urls?: Array<{ expanded_url?: string }> };
+      }
+    )?.url?.urls ?? [];
+  const website = urls.length > 0 ? (urls[0]?.expanded_url ?? null) : null;
+
+  return {
+    username: (u.screen_name as string) || handle,
+    name: (u.name as string) || "",
+    bio: (u.description as string) || "",
+    location: (u.location as string) || "",
+    website,
+    avatarUrl: getAvatarOriginalSize(
+      (u.profile_image_url_https as string) || "",
+    ),
+    bannerUrl: (u.profile_banner_url as string) || null,
+    verified: result.is_blue_verified ?? false,
+    followers: (u.followers_count as number) ?? 0,
+    following: (u.friends_count as number) ?? 0,
+    tweetCount: (u.statuses_count as number) ?? 0,
+    joined: u.created_at
+      ? new Date(u.created_at as string).toISOString()
+      : null,
+  };
+}
+
+async function backfill() {
   const authToken = process.env["TWITTER_AUTH_TOKEN"];
   const ct0 = process.env["TWITTER_CT0"];
 
   if (!authToken || !ct0) {
-    throw new Error("TWITTER_AUTH_TOKEN and TWITTER_CT0 must be set in .env.local");
+    console.error(
+      "ERROR: TWITTER_AUTH_TOKEN and TWITTER_CT0 must be set in .env.local",
+    );
+    process.exit(1);
   }
 
-  await scraper.setCookies([
-    `auth_token=${authToken}; Domain=.twitter.com; Path=/; Secure; HttpOnly`,
-    `ct0=${ct0}; Domain=.twitter.com; Path=/; Secure`,
-  ]);
-
-  return scraper;
-}
-
-async function backfill() {
-  const scraper = await createScraper();
-
-  // Get authors to process
   const rows = force
     ? await sql`SELECT handle, total_trades FROM authors WHERE handle IS NOT NULL ORDER BY total_trades DESC`
     : await sql`SELECT handle, total_trades FROM authors WHERE handle IS NOT NULL AND x_profile_fetched_at IS NULL ORDER BY total_trades DESC`;
@@ -68,8 +173,10 @@ async function backfill() {
   let authors = rows.filter((r) => isValidHandle(r.handle as string));
   if (limit > 0) authors = authors.slice(0, limit);
 
-  console.log(`\nBackfilling X profiles for ${authors.length} authors (delay: ${delay}ms)\n`);
-  console.log("─".repeat(70));
+  console.log(
+    `\nBackfilling X profiles for ${authors.length} authors (delay: ${delay}ms)\n`,
+  );
+  console.log("\u2500".repeat(80));
 
   let success = 0;
   let failed = 0;
@@ -81,55 +188,51 @@ async function backfill() {
     const progress = `[${i + 1}/${authors.length}]`;
 
     try {
-      const profile = await scraper.getProfile(handle);
+      const profile = await fetchXProfile(handle, authToken, ct0);
 
-      if (!profile || !profile.username) {
-        console.log(`${progress} @${handle} — not found on X`);
+      if (!profile) {
+        console.log(`${progress} @${handle} \u2014 not found on X`);
         await sql`UPDATE authors SET x_profile_fetched_at = NOW() WHERE handle = ${handle}`;
         skipped++;
       } else {
-        const avatarUrl = profile.avatar ?? null;
-        const bannerUrl = profile.banner ?? null;
-        const displayName = profile.name ?? null;
-        const bio = profile.biography ?? null;
-        const location = profile.location ?? null;
-        const website = profile.website ?? null;
-        const verified = profile.isBlueVerified ?? profile.isVerified ?? false;
-        const followers = profile.followersCount ?? 0;
-        const following = profile.followingCount ?? 0;
-        const tweetCount = profile.tweetsCount ?? 0;
-        const joined = profile.joined ? profile.joined.toISOString() : null;
-
         await sql`
           UPDATE authors SET
-            avatar_url = ${avatarUrl},
-            banner_url = ${bannerUrl},
-            display_name = COALESCE(${displayName}, display_name),
-            bio = ${bio},
-            location = ${location},
-            website = ${website},
-            verified = ${verified},
-            followers = ${followers},
-            following = ${following},
-            tweet_count = ${tweetCount},
-            x_joined_at = ${joined},
+            avatar_url = ${profile.avatarUrl},
+            banner_url = ${profile.bannerUrl},
+            display_name = COALESCE(${profile.name || null}, display_name),
+            bio = ${profile.bio || null},
+            location = ${profile.location || null},
+            website = ${profile.website},
+            verified = ${profile.verified},
+            followers = ${profile.followers},
+            following = ${profile.following},
+            tweet_count = ${profile.tweetCount},
+            x_joined_at = ${profile.joined},
             x_profile_fetched_at = NOW()
           WHERE handle = ${handle}
         `;
 
-        const fmtFollowers = followers >= 1000
-          ? `${(followers / 1000).toFixed(1)}K`
-          : String(followers);
+        const fmtFollowers =
+          profile.followers >= 1_000_000
+            ? `${(profile.followers / 1_000_000).toFixed(1)}M`
+            : profile.followers >= 1_000
+              ? `${(profile.followers / 1_000).toFixed(1)}K`
+              : String(profile.followers);
 
         console.log(
-          `${progress} @${handle} — ${displayName || handle} | ${fmtFollowers} followers | ${verified ? "verified" : ""} | ${location || "no location"} | trades: ${trades}`,
+          `${progress} @${handle} \u2014 ${profile.name} | ${fmtFollowers} followers | ${profile.verified ? "verified" : ""} | ${profile.location || "no location"} | trades: ${trades}`,
         );
         success++;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`${progress} @${handle} — ERROR: ${msg}`);
+      console.error(`${progress} @${handle} \u2014 ERROR: ${msg}`);
       failed++;
+
+      if (msg.includes("Rate limited")) {
+        console.log("Waiting 60s before continuing...");
+        await new Promise((r) => setTimeout(r, 60_000));
+      }
     }
 
     // Rate limit
@@ -138,8 +241,10 @@ async function backfill() {
     }
   }
 
-  console.log("─".repeat(70));
-  console.log(`\nDone! ${success} fetched, ${skipped} not found, ${failed} failed\n`);
+  console.log("\u2500".repeat(80));
+  console.log(
+    `\nDone! ${success} fetched, ${skipped} not found, ${failed} failed\n`,
+  );
 }
 
 backfill().catch((err) => {

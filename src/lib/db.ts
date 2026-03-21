@@ -112,7 +112,7 @@ export async function upsertTrades(handle: string, trades: PasteTradeTrade[]): P
     );
     const tweetId = extractTweetId(t.source_url);
 
-    const author_handle = handle;
+    const author_handle = t.author_handle ?? handle;
     const ticker = t.ticker;
     const direction = t.direction;
     const pnl_pct = t.pnlPct ?? null;
@@ -128,6 +128,11 @@ export async function upsertTrades(handle: string, trades: PasteTradeTrade[]): P
     const counted_in_stats = countedInStats ? 1 : 0;
     const price_at_tweet_time = t.entryPrice ?? null;
     const price_at_submission = t.entryPrice ?? null;
+
+    // Ensure the real author exists in the authors table
+    if (author_handle !== handle) {
+      await sql`INSERT INTO authors (handle) VALUES (${author_handle}) ON CONFLICT DO NOTHING`;
+    }
 
     await sql`
       INSERT INTO trades (
