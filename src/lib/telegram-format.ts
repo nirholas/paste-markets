@@ -94,20 +94,7 @@ export function formatLeaderboard(rows: LeaderboardRow[], timeframe: string): st
 }
 
 export function formatWelcome(): string {
-  return [
-    "*Welcome to paste\\.markets\\!*",
-    "",
-    "Real\\-time trade tracking for CT callers\\.",
-    "",
-    "*Commands:*",
-    "/caller \\{handle\\} — Caller stats",
-    "/ticker \\{symbol\\} — Ticker stats",
-    "/top \\{timeframe\\} — Leaderboard \\(7d, 30d, 90d\\)",
-    "/subscribe \\{handle\\} — Get alerts for a caller",
-    "/help — Show this message",
-    "",
-    "[Visit paste\\.markets](https://paste.markets)",
-  ].join("\n");
+  return formatHelp();
 }
 
 export function formatHelp(): string {
