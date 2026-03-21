@@ -28,8 +28,9 @@ async function fetchFadeData(): Promise<FadeResponse | null> {
   }
 }
 
-function formatPnl(pnl: number): string {
-  return `${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}%`;
+function formatPnl(pnl: number | undefined | null): string {
+  const v = pnl ?? 0;
+  return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 }
 
 function ratingBadge(rating: string) {
