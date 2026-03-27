@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractTrades, type SourceType } from "@/lib/trade-extractor";
 import { saveExtraction, trackThesis } from "@/lib/db";
-import { submitTrade, skillRoute, skillDiscover } from "@/lib/paste-trade";
+import { submitTrade, skillRoute, skillDiscover, PasteTradeError } from "@/lib/paste-trade";
 
 interface SubmitResult {
   thesisId: string;
@@ -43,8 +43,6 @@ async function submitThesisToPasteTrade(thesis: {
     headline_quote: (thesis.quote || thesis.reasoning).slice(0, 120),
     explanation: thesis.reasoning,
   });
-
-  if (!result) return null;
 
   return {
     thesisId: thesis.id,

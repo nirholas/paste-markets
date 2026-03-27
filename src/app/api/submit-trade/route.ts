@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { submitTrade } from "@/lib/paste-trade";
+import { submitTrade, PasteTradeError } from "@/lib/paste-trade";
 
 interface SubmitTradeBody {
   ticker: string;
@@ -36,25 +36,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required field: thesis" }, { status: 400 });
   }
 
-  const result = await submitTrade({
-    ticker: body.ticker.toUpperCase().replace(/^\$/, ""),
-    direction: body.direction === "yes" || body.direction === "no" ? "long" : body.direction,
-    platform: body.platform || "hyperliquid",
-    instrument: body.instrument || "perps",
-    thesis: body.thesis.trim(),
-    source_url: body.source_url,
-    author_handle: body.author_handle,
-    headline_quote: body.headline_quote,
-    chain_steps: body.chain_steps,
-    explanation: body.explanation,
-  });
+  try {
+    const result = await submitTrade({
+      ticker: body.ticker.toUpperCase().replace(/^\$/, ""),
+      direction: body.direction === "yes" || body.direction === "no" ? "long" : body.direction,
+      platform: body.platform || "hyperliquid",
+      instrument: body.instrument || "perps",
+      thesis: body.thesis.trim(),
+      source_url: body.source_url,
+      author_handle: body.author_handle,
+      headline_quote: body.headline_quote,
+      chain_steps: body.chain_steps,
+      explanation: body.explanation,
+    });
 
-  if (!result) {
+    return NextResponse.json(result, { status: 201 });
+  } catch (err) {
+    if (err instanceof PasteTradeError) {
+      const status =
+        err.code === "no_api_key" ? 503 :
+        err.code === "unauthorized" ? 502 :
+        err.code === "network_error" ? 504 : 502;
+      return NextResponse.json(
+        { error: err.message, code: err.code, details: err.detail },
+        { status },
+      );
+    }
     return NextResponse.json(
       { error: "Failed to submit trade to paste.trade" },
       { status: 502 },
     );
   }
-
-  return NextResponse.json(result, { status: 201 });
 }

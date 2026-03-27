@@ -13,6 +13,51 @@ function authHeaders(key: string) {
   return { Authorization: `Bearer ${key}`, Accept: "application/json" };
 }
 
+// ── Error class for auth-required operations ────────────────────────────────
+
+export class PasteTradeError extends Error {
+  public readonly code: "no_api_key" | "unauthorized" | "api_error" | "network_error";
+  public readonly status?: number;
+  public readonly detail?: string;
+
+  constructor(
+    code: PasteTradeError["code"],
+    message: string,
+    opts?: { status?: number; detail?: string },
+  ) {
+    super(message);
+    this.name = "PasteTradeError";
+    this.code = code;
+    this.status = opts?.status;
+    this.detail = opts?.detail;
+  }
+}
+
+function requireApiKey(): string {
+  const key = getApiKey();
+  if (!key) {
+    throw new PasteTradeError(
+      "no_api_key",
+      "PASTE_TRADE_KEY is not set. Run: curl -s -X POST https://paste.trade/api/keys",
+    );
+  }
+  return key;
+}
+
+async function parseApiError(res: Response, endpoint: string): Promise<PasteTradeError> {
+  let detail: string | undefined;
+  try {
+    const body = await res.json() as { error?: { code?: string; message?: string }; message?: string };
+    detail = body?.error?.message ?? body?.message;
+  } catch { /* non-JSON body */ }
+  const code = res.status === 401 || res.status === 403 ? "unauthorized" : "api_error";
+  return new PasteTradeError(
+    code,
+    `${endpoint} failed (${res.status}): ${detail ?? res.statusText}`,
+    { status: res.status, detail },
+  );
+}
+
 // ── Core types ──────────────────────────────────────────────────────────────
 
 export interface PasteTradeTrade {
@@ -698,12 +743,12 @@ export async function fetchSource(sourceId: string): Promise<SourceResult | null
   }
 }
 
-export async function createSource(params: CreateSourceParams): Promise<CreateSourceResult | null> {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
+export async function createSource(params: CreateSourceParams): Promise<CreateSourceResult> {
+  const apiKey = requireApiKey();
 
+  let res: Response;
   try {
-    const res = await fetch(`${BASE_URL}/api/sources`, {
+    res = await fetch(`${BASE_URL}/api/sources`, {
       method: "POST",
       headers: {
         ...authHeaders(apiKey),
@@ -712,23 +757,26 @@ export async function createSource(params: CreateSourceParams): Promise<CreateSo
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(15000),
     });
-    if (!res.ok) return null;
-    return await res.json() as CreateSourceResult;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new PasteTradeError(
+      "network_error",
+      `POST /api/sources failed: ${err instanceof Error ? err.message : "network error"}`,
+    );
   }
+  if (!res.ok) throw await parseApiError(res, "POST /api/sources");
+  return await res.json() as CreateSourceResult;
 }
 
 // ---------------------------------------------------------------------------
 // Trade submission (auth required)
 // ---------------------------------------------------------------------------
 
-export async function submitTrade(params: SubmitTradeParams): Promise<SubmitTradeResult | null> {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
+export async function submitTrade(params: SubmitTradeParams): Promise<SubmitTradeResult> {
+  const apiKey = requireApiKey();
 
+  let res: Response;
   try {
-    const res = await fetch(`${BASE_URL}/api/trades`, {
+    res = await fetch(`${BASE_URL}/api/trades`, {
       method: "POST",
       headers: {
         ...authHeaders(apiKey),
@@ -737,11 +785,14 @@ export async function submitTrade(params: SubmitTradeParams): Promise<SubmitTrad
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(15000),
     });
-    if (!res.ok) return null;
-    return await res.json() as SubmitTradeResult;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new PasteTradeError(
+      "network_error",
+      `POST /api/trades failed: ${err instanceof Error ? err.message : "network error"}`,
+    );
   }
+  if (!res.ok) throw await parseApiError(res, "POST /api/trades");
+  return await res.json() as SubmitTradeResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -782,12 +833,12 @@ export async function fetchTradesList(params: TradesListParams = {}): Promise<Tr
 // Skill: Route — validate instrument and get pricing across venues
 // ---------------------------------------------------------------------------
 
-export async function skillRoute(params: SkillRouteParams): Promise<SkillRouteResult | null> {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
+export async function skillRoute(params: SkillRouteParams): Promise<SkillRouteResult> {
+  const apiKey = requireApiKey();
 
+  let res: Response;
   try {
-    const res = await fetch(`${BASE_URL}/api/skill/route`, {
+    res = await fetch(`${BASE_URL}/api/skill/route`, {
       method: "POST",
       headers: {
         ...authHeaders(apiKey),
@@ -800,23 +851,26 @@ export async function skillRoute(params: SkillRouteParams): Promise<SkillRouteRe
       }),
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return null;
-    return await res.json() as SkillRouteResult;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new PasteTradeError(
+      "network_error",
+      `POST /api/skill/route failed: ${err instanceof Error ? err.message : "network error"}`,
+    );
   }
+  if (!res.ok) throw await parseApiError(res, "POST /api/skill/route");
+  return await res.json() as SkillRouteResult;
 }
 
 // ---------------------------------------------------------------------------
 // Skill: Discover — instrument discovery across venues
 // ---------------------------------------------------------------------------
 
-export async function skillDiscover(params: SkillDiscoverParams): Promise<SkillDiscoverResult | null> {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
+export async function skillDiscover(params: SkillDiscoverParams): Promise<SkillDiscoverResult> {
+  const apiKey = requireApiKey();
 
+  let res: Response;
   try {
-    const res = await fetch(`${BASE_URL}/api/skill/discover`, {
+    res = await fetch(`${BASE_URL}/api/skill/discover`, {
       method: "POST",
       headers: {
         ...authHeaders(apiKey),
@@ -825,11 +879,14 @@ export async function skillDiscover(params: SkillDiscoverParams): Promise<SkillD
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return null;
-    return await res.json() as SkillDiscoverResult;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new PasteTradeError(
+      "network_error",
+      `POST /api/skill/discover failed: ${err instanceof Error ? err.message : "network error"}`,
+    );
   }
+  if (!res.ok) throw await parseApiError(res, "POST /api/skill/discover");
+  return await res.json() as SkillDiscoverResult;
 }
 
 // ---------------------------------------------------------------------------

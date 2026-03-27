@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { insertExecutedTrade, updateTradeStatus } from "@/lib/execution-db";
 import { ensureExecutedTradesTable } from "@/lib/execution-db-init";
 import { checkRisk } from "@/lib/execution/risk";
-import { skillRoute } from "@/lib/paste-trade";
+import { skillRoute, PasteTradeError } from "@/lib/paste-trade";
 
 // POST /api/execute — execute a trade
 export async function POST(req: NextRequest) {
@@ -122,6 +122,17 @@ export async function POST(req: NextRequest) {
       routing: routeInfo ?? undefined,
     });
   } catch (err: any) {
+    if (err instanceof PasteTradeError) {
+      const status =
+        err.code === "no_api_key" ? 503 :
+        err.code === "unauthorized" ? 502 :
+        err.code === "network_error" ? 504 : 502;
+      console.error(`[/api/execute] ${err.code}:`, err.message);
+      return NextResponse.json(
+        { error: err.message, code: err.code },
+        { status },
+      );
+    }
     console.error("[/api/execute] Error:", err);
     return NextResponse.json(
       { error: err.message || "Execution failed" },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRisk, estimateFees } from "@/lib/execution/risk";
-import { skillRoute, skillDiscover } from "@/lib/paste-trade";
+import { skillRoute, skillDiscover, PasteTradeError } from "@/lib/paste-trade";
 
 // GET /api/execution/preflight — risk check + venue routing before execution
 export async function GET(req: NextRequest) {
@@ -65,6 +65,17 @@ export async function GET(req: NextRequest) {
       instruments: discoverResult,
     });
   } catch (err: unknown) {
+    if (err instanceof PasteTradeError) {
+      const status =
+        err.code === "no_api_key" ? 503 :
+        err.code === "unauthorized" ? 502 :
+        err.code === "network_error" ? 504 : 502;
+      console.error(`[/api/execution/preflight] ${err.code}:`, err.message);
+      return NextResponse.json(
+        { error: err.message, code: err.code },
+        { status },
+      );
+    }
     const message = err instanceof Error ? err.message : "Preflight check failed";
     console.error("[/api/execution/preflight] Error:", err);
     return NextResponse.json(

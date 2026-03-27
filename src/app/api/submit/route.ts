@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSource } from "@/lib/paste-trade";
+import { createSource, PasteTradeError } from "@/lib/paste-trade";
 
 export const dynamic = "force-dynamic";
 
@@ -54,13 +54,6 @@ export async function POST(request: NextRequest) {
       author_handle,
     });
 
-    if (!result) {
-      return NextResponse.json(
-        { ok: false, error: "Submission failed" },
-        { status: 502 },
-      );
-    }
-
     return NextResponse.json({
       ok: true,
       source_id: result.source_id,
@@ -68,6 +61,16 @@ export async function POST(request: NextRequest) {
       status: result.status ?? "processing",
     });
   } catch (err) {
+    if (err instanceof PasteTradeError) {
+      const status =
+        err.code === "no_api_key" ? 503 :
+        err.code === "unauthorized" ? 502 :
+        err.code === "network_error" ? 504 : 502;
+      return NextResponse.json(
+        { ok: false, error: err.message, code: err.code, details: err.detail },
+        { status },
+      );
+    }
     console.error("[api/submit] Unexpected error:", err);
     return NextResponse.json(
       { ok: false, error: "Internal server error" },
