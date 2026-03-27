@@ -34,6 +34,7 @@ interface TradeExtraction {
   };
   theses: ExtractedThesis[];
   summary: string;
+  sourceText: string | null;
   processingTime: number;
   createdAt: string;
 }
@@ -587,6 +588,13 @@ function TradeFinderInner() {
             <h2 className="text-lg font-bold text-text-primary mb-2">
               {extraction.source.title}
             </h2>
+            {extraction.sourceText && (
+              <div className="bg-[#0a0a1a] border border-border rounded p-4 mb-3">
+                <p className="text-text-primary text-sm leading-relaxed whitespace-pre-wrap">
+                  {extraction.sourceText}
+                </p>
+              </div>
+            )}
             <p className="text-text-secondary text-sm leading-relaxed">
               {extraction.summary}
             </p>

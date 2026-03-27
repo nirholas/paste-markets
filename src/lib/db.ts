@@ -3,12 +3,21 @@
  * Uses @neondatabase/serverless (HTTP driver).
  */
 
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import type { PasteTradeTrade } from "./paste-trade";
 import { computeMetrics, type AuthorMetrics, type TradeSummary } from "./metrics";
 import { classifyIntegrity, extractTweetId, type IntegrityClass } from "./integrity";
 
-const sql = neon(process.env.DATABASE_URL!);
+// Lazy-init: avoid crashing at import time when DATABASE_URL is not set
+let _sql: NeonQueryFunction<false, false> | null = null;
+function sql(strings: TemplateStringsArray, ...values: unknown[]) {
+  if (!_sql) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL is not set");
+    _sql = neon(url);
+  }
+  return _sql(strings, ...values);
+}
 
 export interface Author {
   handle: string;

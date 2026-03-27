@@ -24,6 +24,7 @@ export interface TradeExtraction {
   };
   theses: ExtractedThesis[];
   summary: string;
+  sourceText: string | null; // raw content fetched from the source
   processingTime: number; // ms
   createdAt: string;
 }
@@ -107,7 +108,7 @@ async function fetchArticleContent(url: string): Promise<{ text: string; title: 
   }
 }
 
-async function fetchTweetThread(tweetId: string): Promise<{ tweets: string[]; author: string | null }> {
+async function fetchTweetThread(tweetId: string, handle?: string | null): Promise<{ tweets: string[]; author: string | null }> {
   // Try xactions scrapeThread if available
   try {
     const xactions = await import("xactions");
@@ -125,7 +126,57 @@ async function fetchTweetThread(tweetId: string): Promise<{ tweets: string[]; au
     // xactions not available or failed
   }
 
-  // Fallback: try fetching tweet via nitter or return placeholder
+  const h = handle ?? "i";
+
+  // Fallback 1: fxtwitter (free, no auth)
+  try {
+    const res = await fetch(`https://api.fxtwitter.com/${h}/status/${tweetId}`, {
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as {
+        tweet?: {
+          text: string;
+          author: { screen_name: string };
+          quote?: { text: string; author: { screen_name: string } };
+        };
+      };
+      if (data.tweet?.text) {
+        let text = data.tweet.text;
+        if (data.tweet.quote) {
+          text += `\n\n> QT @${data.tweet.quote.author.screen_name}: ${data.tweet.quote.text}`;
+        }
+        return {
+          tweets: [text],
+          author: data.tweet.author.screen_name,
+        };
+      }
+    }
+  } catch {
+    // fxtwitter failed
+  }
+
+  // Fallback 2: vxtwitter (backup)
+  try {
+    const res = await fetch(`https://api.vxtwitter.com/${h}/status/${tweetId}`, {
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as {
+        text?: string;
+        user_screen_name?: string;
+      };
+      if (data.text) {
+        return {
+          tweets: [data.text],
+          author: data.user_screen_name ?? null,
+        };
+      }
+    }
+  } catch {
+    // vxtwitter failed
+  }
+
   return { tweets: [], author: null };
 }
 
@@ -268,6 +319,7 @@ export async function extractTrades(
   let contentForClaude = "";
   let title = "";
   let author: string | null = null;
+  let sourceText: string | null = null;
 
   switch (sourceType) {
     case "tweet":
@@ -277,16 +329,18 @@ export async function extractTrades(
       author = handle ? `@${handle}` : null;
 
       if (tweetId) {
-        const { tweets, author: threadAuthor } = await fetchTweetThread(tweetId);
+        const { tweets, author: threadAuthor } = await fetchTweetThread(tweetId, handle);
         if (threadAuthor) author = `@${threadAuthor}`;
 
         if (tweets.length > 1) {
           // It's a thread
           title = `Thread by ${author ?? "unknown"}`;
-          contentForClaude = `Twitter thread by ${author ?? "unknown"}:\n\n${tweets.map((t, i) => `${i + 1}. ${t}`).join("\n\n")}`;
+          sourceText = tweets.map((t, i) => `${i + 1}. ${t}`).join("\n\n");
+          contentForClaude = `Twitter thread by ${author ?? "unknown"}:\n\n${sourceText}`;
         } else if (tweets.length === 1) {
           title = `Tweet by ${author ?? "unknown"}`;
-          contentForClaude = `Tweet by ${author ?? "unknown"}:\n\n${tweets[0]}`;
+          sourceText = tweets[0]!;
+          contentForClaude = `Tweet by ${author ?? "unknown"}:\n\n${sourceText}`;
         } else {
           // Could not fetch — ask Claude to work with URL context
           title = `Tweet by ${author ?? "unknown"}`;
@@ -334,6 +388,7 @@ export async function extractTrades(
     case "article": {
       const fetched = await fetchArticleContent(trimmed);
       title = fetched.title;
+      sourceText = fetched.text;
       contentForClaude = `Article: "${fetched.title}"\nURL: ${trimmed}\n\nContent:\n${fetched.text}`;
       break;
     }
@@ -341,6 +396,7 @@ export async function extractTrades(
     case "text":
     default: {
       title = trimmed.slice(0, 80) + (trimmed.length > 80 ? "..." : "");
+      sourceText = trimmed;
       contentForClaude = `Analyze this text for tradeable ideas:\n\n${trimmed}`;
       break;
     }
@@ -384,6 +440,7 @@ export async function extractTrades(
     },
     theses,
     summary: claudeResult?.summary || "No summary available.",
+    sourceText,
     processingTime: Date.now() - start,
     createdAt: new Date().toISOString(),
   };

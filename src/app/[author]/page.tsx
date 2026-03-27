@@ -21,6 +21,7 @@ import { computeFadeScore } from "@/lib/metrics";
 import { VenueBreakdown, computeVenueStats } from "@/components/venue-breakdown";
 import { FollowCallerButton } from "@/components/follow-caller-button";
 import { fetchAuthorProfile } from "@/lib/upstream";
+import { generateDemoMetrics, generateDemoXProfile } from "@/lib/demo-data";
 
 const PASTE_TRADE_BASE = "https://paste.trade";
 
@@ -177,12 +178,15 @@ export default async function AuthorPage({ params }: PageProps) {
     }
   }
 
+  // Final fallback: demo data so the profile always renders
+  let isDemo = false;
   if (!metrics || metrics.totalTrades === 0) {
-    return <NotFound handle={handle} />;
+    metrics = generateDemoMetrics(handle);
+    isDemo = true;
   }
 
   // Record the view (fire-and-forget, don't block page render)
-  recordView(handle, "profile").catch(() => {});
+  if (!isDemo) recordView(handle, "profile").catch(() => {});
 
   // Fetch X profile data (try DB cache first, then Twitter)
   let xProfile = {
@@ -244,9 +248,14 @@ export default async function AuthorPage({ params }: PageProps) {
     }
   }
 
+  // Demo mode: populate xProfile from generator
+  if (isDemo && !xProfile.displayName) {
+    xProfile = generateDemoXProfile(handle);
+  }
+
   // Avatar: upstream > X profile > paste.trade search
   let avatarUrl = upstreamAvatar ?? xProfile.avatarUrl;
-  if (!avatarUrl) {
+  if (!avatarUrl && !isDemo) {
     try {
       const fullTrades = await searchFullTrades({ author: handle, top: "30d", limit: 3 });
       for (const t of fullTrades) {
@@ -341,6 +350,12 @@ export default async function AuthorPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen px-4 py-12 max-w-3xl mx-auto">
+      {/* Demo data banner */}
+      {isDemo && (
+        <div className="mb-4 -mt-4 bg-accent/10 border border-accent/30 rounded-lg px-4 py-2 text-[12px] text-accent font-mono">
+          Demo data — real data will appear once this caller is tracked on paste.trade
+        </div>
+      )}
       {/* Banner */}
       {xProfile.bannerUrl && (
         // eslint-disable-next-line @next/next/no-img-element
