@@ -30,10 +30,9 @@ function baseUrl(): string {
 }
 
 async function loadFont(): Promise<ArrayBuffer> {
-  const fontData = await fetch(
-    "https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff"
-  ).then((res) => res.arrayBuffer());
-  return fontData;
+  const res = await fetch(new URL("/fonts/JetBrainsMono-Regular.ttf", baseUrl()));
+  if (!res.ok) throw new Error(`Font fetch failed: ${res.status}`);
+  return res.arrayBuffer();
 }
 
 function formatPnl(pnl: number): string {

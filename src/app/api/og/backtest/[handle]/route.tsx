@@ -17,10 +17,14 @@ const GREEN = "#2ecc71";
 const RED = "#e74c3c";
 const AMBER = "#f39c12";
 
+function baseUrl(): string {
+  return process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+}
+
 async function loadFont(): Promise<ArrayBuffer> {
-  return await fetch(
-    "https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff",
-  ).then((res) => res.arrayBuffer());
+  const res = await fetch(new URL("/fonts/JetBrainsMono-Regular.ttf", baseUrl()));
+  if (!res.ok) throw new Error(`Font fetch failed: ${res.status}`);
+  return res.arrayBuffer();
 }
 
 function gradeColor(grade: string): string {

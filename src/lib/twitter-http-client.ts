@@ -8,8 +8,22 @@
  * Proxy: PROXY_URL — optional rotating proxy (http://user:pass@host:port)
  */
 
-import { Scraper, SearchMode } from "agent-twitter-client";
 import { HttpsProxyAgent } from "https-proxy-agent";
+
+type ScraperType = import("agent-twitter-client").Scraper;
+type SearchModeType = typeof import("agent-twitter-client").SearchMode;
+
+let _Scraper: new (options?: Record<string, unknown>) => ScraperType;
+let _SearchMode: SearchModeType;
+
+async function loadTwitterClient() {
+  if (!_Scraper) {
+    const mod = await import("agent-twitter-client");
+    _Scraper = mod.Scraper;
+    _SearchMode = mod.SearchMode;
+  }
+  return { Scraper: _Scraper, SearchMode: _SearchMode };
+}
 
 // ─── Types (re-exported for compatibility) ───────────────────────────────────
 
