@@ -4,7 +4,7 @@ import { SmartInput } from "@/components/smart-input";
 import { HomeFeed } from "@/components/home-feed";
 import HeroGlobe from "@/components/hero-globe";
 import type { AssetSummary } from "@/lib/data";
-import { fetchPasteTradeStats } from "@/lib/paste-trade";
+
 import { fetchLeaderboard } from "@/lib/upstream";
 import { computeAlphaScore, callerTier } from "@/lib/alpha";
 
@@ -24,11 +24,7 @@ export const metadata: Metadata = {
   },
 };
 
-interface SiteStats {
-  total_trades: number;
-  total_callers: number;
-  avg_win_rate: number;
-}
+
 
 interface TopCallerRow {
   handle: string;
@@ -56,21 +52,7 @@ const jsonLd = {
 
 const PASTE_TRADE_BASE = "https://paste.trade";
 
-async function getSiteStats(): Promise<SiteStats | null> {
-  try {
-    const upstream = await fetchPasteTradeStats();
-    if (!upstream) return null;
-    return {
-      total_trades: upstream.total_trades,
-      total_callers: upstream.users,
-      avg_win_rate: upstream.total_trades > 0
-        ? Math.round((upstream.profitable_trades / upstream.total_trades) * 1000) / 10
-        : 0,
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 async function getInitialAssets(): Promise<AssetSummary[]> {
   // Assets are local-DB only; return empty if unavailable
@@ -108,8 +90,7 @@ async function getTopCallers(): Promise<TopCallerRow[]> {
 }
 
 export default async function HomePage() {
-  const [stats, assets, callers] = await Promise.all([
-    getSiteStats(),
+  const [assets, callers] = await Promise.all([
     getInitialAssets(),
     getTopCallers(),
   ]);
@@ -144,32 +125,7 @@ export default async function HomePage() {
             </Link>
           </p>
 
-          {/* Stats pills */}
-          {stats && (
-            <div className="mt-6 flex flex-wrap justify-center items-center gap-3">
-              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-lg px-4 py-2 text-sm">
-                <span className="text-[#f5f5f7] font-semibold font-mono">
-                  {stats.total_trades.toLocaleString()}
-                </span>
-                <span className="text-[#52525b]">trades</span>
-              </div>
-              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-lg px-4 py-2 text-sm">
-                <span className="text-[#f5f5f7] font-semibold font-mono">
-                  {stats.total_callers.toLocaleString()}
-                </span>
-                <span className="text-[#52525b]">callers</span>
-              </div>
-              <div className="flex items-center gap-2 bg-[#ffffff08] border border-[#ffffff0d] rounded-lg px-4 py-2 text-sm">
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: stats.avg_win_rate >= 50 ? "#22c55e" : "#ef4444" }}
-                >
-                  {stats.avg_win_rate.toFixed(1)}%
-                </span>
-                <span className="text-[#52525b]">avg WR</span>
-              </div>
-            </div>
-          )}
+
         </div>
       </section>
 

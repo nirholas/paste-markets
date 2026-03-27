@@ -47,41 +47,45 @@ function isValidHandle(handle: string): boolean {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { author: rawHandle } = await params;
-  const handle = cleanHandle(rawHandle);
-
-  if (!isValidHandle(handle)) return {};
-
-  let metrics: import("@/lib/metrics").AuthorMetrics | null = null;
   try {
-    metrics = await getAuthorMetrics(handle);
+    const { author: rawHandle } = await params;
+    const handle = cleanHandle(rawHandle);
+
+    if (!isValidHandle(handle)) return {};
+
+    let metrics: import("@/lib/metrics").AuthorMetrics | null = null;
+    try {
+      metrics = await getAuthorMetrics(handle);
+    } catch {
+      // DB unavailable — fall through to default description
+    }
+
+    const description = metrics
+      ? `@${handle}'s real trading performance: ${Math.round(metrics.winRate)}% win rate, ${metrics.avgPnl >= 0 ? "+" : ""}${metrics.avgPnl.toFixed(1)}% avg P&L across ${metrics.totalTrades} trades.`
+      : `@${handle} — Trade Scorecard on paste.markets`;
+
+    const baseUrl = process.env["NEXT_PUBLIC_BASE_URL"] ?? "http://localhost:3000";
+
+    return {
+      title: `@${handle} — Trade Scorecard | paste.markets`,
+      description,
+      openGraph: {
+        title: `@${handle} — Trade Scorecard`,
+        description,
+        images: [
+          { url: `${baseUrl}/api/og/author/${handle}`, width: 1200, height: 630 },
+        ],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: `@${handle} — Trade Scorecard`,
+        description,
+        images: [`${baseUrl}/api/og/author/${handle}`],
+      },
+    };
   } catch {
-    // DB unavailable — fall through to default description
+    return { title: "Trade Scorecard | paste.markets" };
   }
-
-  const description = metrics
-    ? `@${handle}'s real trading performance: ${Math.round(metrics.winRate)}% win rate, ${metrics.avgPnl >= 0 ? "+" : ""}${metrics.avgPnl.toFixed(1)}% avg P&L across ${metrics.totalTrades} trades.`
-    : `@${handle} — Trade Scorecard on paste.markets`;
-
-  const baseUrl = process.env["NEXT_PUBLIC_BASE_URL"] ?? "http://localhost:3000";
-
-  return {
-    title: `@${handle} — Trade Scorecard | paste.markets`,
-    description,
-    openGraph: {
-      title: `@${handle} — Trade Scorecard`,
-      description,
-      images: [
-        { url: `${baseUrl}/api/og/author/${handle}`, width: 1200, height: 630 },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `@${handle} — Trade Scorecard`,
-      description,
-      images: [`${baseUrl}/api/og/author/${handle}`],
-    },
-  };
 }
 
 function NotFound({ handle }: { handle: string }) {

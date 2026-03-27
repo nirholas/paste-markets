@@ -71,7 +71,8 @@ export interface SearchResult {
 
 // ─── Build scraper options (proxy if configured) ─────────────────────────────
 
-function buildScraper(): Scraper {
+async function buildScraper(): Promise<ScraperType> {
+  const { Scraper } = await loadTwitterClient();
   const proxyUrl = process.env["PROXY_URL"];
 
   if (proxyUrl) {
@@ -82,7 +83,7 @@ function buildScraper(): Scraper {
           return [input, { ...init, agent } as RequestInit];
         },
       },
-    });
+    } as Record<string, unknown>);
   }
 
   return new Scraper();
@@ -197,11 +198,14 @@ async function directGraphQLCheckSession(
 // ─── Client ─────────────────────────────────────────────────────────────────
 
 export class TwitterHttpClient {
-  private scraper: Scraper;
+  private scraper: ScraperType | null = null;
   private _authenticated = false;
 
-  constructor() {
-    this.scraper = buildScraper();
+  private async getScraper(): Promise<ScraperType> {
+    if (!this.scraper) {
+      this.scraper = await buildScraper();
+    }
+    return this.scraper;
   }
 
   get isAuthenticated(): boolean {
@@ -216,8 +220,9 @@ export class TwitterHttpClient {
 
     if (!authToken || !ct0) return;
 
+    const scraper = await this.getScraper();
     // Set cookies the same way Swarmsy does
-    await this.scraper.setCookies([
+    await scraper.setCookies([
       `auth_token=${authToken}; Domain=.twitter.com; Path=/; Secure; HttpOnly`,
       `ct0=${ct0}; Domain=.twitter.com; Path=/; Secure`,
     ]);
@@ -268,7 +273,8 @@ export class TwitterHttpClient {
     // Fallback: agent-twitter-client library (may have outdated query hashes)
     try {
       await this.authenticate();
-      const profile = await this.scraper.getProfile(username);
+      const scraper = await this.getScraper();
+      const profile = await scraper.getProfile(username);
       if (!profile) return null;
 
       return {
@@ -293,10 +299,11 @@ export class TwitterHttpClient {
 
   async getAllUserTweets(username: string, maxTweets: number): Promise<TwitterTweet[]> {
     await this.authenticate();
+    const scraper = await this.getScraper();
 
     const results: TwitterTweet[] = [];
 
-    for await (const tweet of this.scraper.getTweets(username, maxTweets)) {
+    for await (const tweet of scraper.getTweets(username, maxTweets)) {
       if (!tweet.id || tweet.isRetweet) continue;
 
       results.push({
@@ -328,10 +335,12 @@ export class TwitterHttpClient {
 
   async search(query: string, maxResults = 20): Promise<SearchResult> {
     await this.authenticate();
+    const { SearchMode } = await loadTwitterClient();
+    const scraper = await this.getScraper();
 
     const tweets: TwitterTweet[] = [];
 
-    for await (const tweet of this.scraper.searchTweets(query, maxResults, SearchMode.Latest)) {
+    for await (const tweet of scraper.searchTweets(query, maxResults, SearchMode.Latest)) {
       if (!tweet.id) continue;
 
       tweets.push({

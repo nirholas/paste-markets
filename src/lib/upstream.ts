@@ -578,13 +578,18 @@ export async function fetchAuthorProfile(
     console.error(`[upstream] Feed fetch failed for ${handle}:`, err);
   }
 
+  console.log(`[upstream] Feed path for @${handle}: ${authorTrades.length} trades from /api/feed`);
+
   // Fallback: /api/search (auth required) if feed returned nothing
   if (authorTrades.length === 0) {
     try {
       const allTrades = await searchFullTrades({ author: handle, top: "all", limit: 100 });
+      console.log(`[upstream] Search fallback for @${handle}: ${allTrades.length} raw, filtering by handle`);
       authorTrades = allTrades.filter(
         (t) => t.author_handle?.toLowerCase() === handle.toLowerCase(),
       );
+      console.log(`[upstream] After handle filter: ${authorTrades.length} trades for @${handle}`);
+
 
       for (const t of authorTrades) {
         if (t.author_avatar_url && !avatarUrl) {
@@ -593,12 +598,15 @@ export async function fetchAuthorProfile(
           break;
         }
       }
-    } catch {
-      // search also failed
+    } catch (err) {
+      console.error(`[upstream] search fallback also failed for ${handle}:`, err);
     }
   }
 
-  if (authorTrades.length === 0) return null;
+  if (authorTrades.length === 0) {
+    console.warn(`[upstream] No trades found for @${handle} from any source`);
+    return null;
+  }
 
   const summaries = authorTrades.map(apiTradeToSummary);
   const metrics = computeMetrics(handle, summaries);

@@ -546,7 +546,10 @@ async function fetchRawItems(
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    console.warn(`[paste-trade] fetchRawItems ${url.pathname} returned ${res.status}`);
+    return [];
+  }
 
   const body: unknown = await res.json();
   if (Array.isArray(body)) return body as Record<string, unknown>[];
@@ -562,7 +565,10 @@ async function fetchRawItems(
 
 export async function searchFullTrades(params: SearchParams): Promise<PasteTradeFullTrade[]> {
   const apiKey = process.env["PASTE_TRADE_KEY"];
-  if (!apiKey) return [];
+  if (!apiKey) {
+    console.warn("[paste-trade] searchFullTrades: PASTE_TRADE_KEY not set");
+    return [];
+  }
 
   const url = new URL("/api/search", BASE_URL);
   if (params.author) url.searchParams.set("author", params.author);
@@ -572,8 +578,10 @@ export async function searchFullTrades(params: SearchParams): Promise<PasteTrade
 
   try {
     const items = await fetchRawItems(url, apiKey);
+    console.log(`[paste-trade] searchFullTrades(${params.author ?? "*"}) returned ${items.length} items`);
     return items.map(normalizeFullTrade);
-  } catch {
+  } catch (err) {
+    console.error(`[paste-trade] searchFullTrades failed:`, err);
     return [];
   }
 }
@@ -646,9 +654,15 @@ export async function fetchPasteTradeFeed(params: FeedParams): Promise<FeedResul
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return { items: [], next_cursor: null, total: 0 };
-    return await res.json() as FeedResult;
-  } catch {
+    if (!res.ok) {
+      console.warn(`[paste-trade] feed ${url.search} returned ${res.status}`);
+      return { items: [], next_cursor: null, total: 0 };
+    }
+    const result = await res.json() as FeedResult;
+    console.log(`[paste-trade] feed(${params.author ?? params.sort}) returned ${result.items?.length ?? 0} items`);
+    return result;
+  } catch (err) {
+    console.error(`[paste-trade] feed fetch failed:`, err);
     return { items: [], next_cursor: null, total: 0 };
   }
 }
