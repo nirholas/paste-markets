@@ -545,6 +545,7 @@ async function fetchRawItems(
 ): Promise<Record<string, unknown>[]> {
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) {
     console.warn(`[paste-trade] fetchRawItems ${url.pathname} returned ${res.status}`);

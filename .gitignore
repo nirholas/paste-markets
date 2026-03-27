@@ -21,3 +21,5 @@ dist/
 *.keypair
 *-keypair.json
 test-ledger/
+# http://tofix.md/
+tofix.md

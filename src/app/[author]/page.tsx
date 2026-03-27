@@ -143,7 +143,12 @@ function winRateColor(pct: number): string {
 
 export default async function AuthorPage({ params }: PageProps) {
   const { author: rawHandle } = await params;
-  const handle = cleanHandle(rawHandle);
+  let handle: string;
+  try {
+    handle = cleanHandle(rawHandle);
+  } catch {
+    notFound();
+  }
 
   if (!isValidHandle(handle)) notFound();
 
